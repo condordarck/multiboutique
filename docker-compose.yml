@@ -1,0 +1,84 @@
+services:
+  # ---- BASE DE DONNÉES (PostgreSQL local, 100% chez toi) ----
+  db:
+    image: postgres:16-alpine
+    container_name: multiboutique-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: mb
+      POSTGRES_PASSWORD: mbpassword
+      POSTGRES_DB: multiboutique
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mb -d multiboutique"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    networks:
+      - multiboutique
+
+  # ---- APPLICATION (production) ----
+  app:
+    image: multiboutique:latest
+    container_name: multiboutique-prod
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    environment:
+      DATABASE_URL: postgresql://mb:mbpassword@db:5432/multiboutique
+      JWT_SECRET: "${JWT_SECRET:?JWT_SECRET doit etre defini dans l environnement (ex openssl rand -hex 32)}"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./public/uploads:/app/public/uploads
+    networks:
+      - multiboutique
+
+  # ---- APPLICATION (développement, hot reload) ----
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: multiboutique-dev
+    ports:
+      - "3002:3000"
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+    environment:
+      DATABASE_URL: postgresql://mb:mbpassword@db:5432/multiboutique
+      JWT_SECRET: "${JWT_SECRET:?JWT_SECRET doit etre defini dans l environnement (ex openssl rand -hex 32)}"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - multiboutique
+
+  # ---- Nginx reverse proxy (SSL en production) ----
+  nginx:
+    image: nginx:alpine
+    container_name: multiboutique-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d
+      - ./nginx/ssl:/etc/nginx/ssl
+    depends_on:
+      - app
+    networks:
+      - multiboutique
+
+networks:
+  multiboutique:
+    driver: bridge
+
+volumes:
+  pgdata:
