@@ -10,6 +10,12 @@ on:
     branches:
       - main
 
+# Un seul déploiement à la fois : deux pushes rapprochés lanceraient git pull
+# et compose up en parallèle dans le même répertoire sur le serveur.
+concurrency:
+  group: deploiement-${{ github.ref }}
+  cancel-in-progress: false
+
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
@@ -61,9 +67,9 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
+            type=semver,pattern={{version}}
             type=raw,value=main,enable={{is_default_branch}}
             type=sha,format=short
-            type=semver,pattern={{version}}
 
       - name: BuildKit
         uses: docker/setup-buildx-action@v3
@@ -95,7 +101,9 @@ jobs:
           script_stop: true
           script: |
             cd "${{ vars.APP_DIR || '/home/arnaud/multiboutique' }}"
-            git pull --ff-only origin main || true
+            # Sans échec ici, une image neuve se déploierait sur un checkout
+            # périmé : ancien compose, anciennes migrations, anciens scripts.
+            git pull --ff-only origin main
             export IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}"
             bash deploy/server-deploy.sh up
 
@@ -103,7 +111,7 @@ jobs:
         run: |
           for tentative in 1 2 3 4 5 6; do
             code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 \
-              "https://${{ vars.DOMAIN }}/api/health" || echo "000")
+              "https://${{ vars.DOMAIN }}/api/health")
             echo "Tentative ${tentative} : HTTP ${code}"
             if [ "$code" = "200" ]; then
               echo "Application saine."
@@ -116,6 +124,11 @@ jobs:
 
   # ------------------------------------------------------------------
   # CD production : tag v* → serveur de production
+  #
+  # Ce job duplique volontairement deploy-recette : les deux ne diffèrent que
+  # par l'environnement, la condition et la stratégie de checkout (pull de main
+  # contre checkout détaché du tag). TOUTE correction apportée à l'un doit être
+  # reportée ici, sous peine de voir la production diverger de la recette.
   # ------------------------------------------------------------------
   deploy-production:
     name: Déploiement production
@@ -136,9 +149,9 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
+            type=semver,pattern={{version}}
             type=raw,value=main,enable={{is_default_branch}}
             type=sha,format=short
-            type=semver,pattern={{version}}
 
       - name: BuildKit
         uses: docker/setup-buildx-action@v3
@@ -162,16 +175,23 @@ jobs:
 
       - name: Déployer sur le serveur (SSH)
         uses: appleboy/ssh-action@v1.2.0
+        env:
+          # Le nom du tag transite comme DONNÉE, pas par interpolation dans le
+          # texte du script : git accepte des noms de tag contenant des
+          # métacaractères shell, et une interpolation textuelle offrirait
+          # l'exécution de commandes arbitraires sur le serveur de production.
+          TAG: ${{ github.ref_name }}
         with:
           host: ${{ secrets.SERVER_HOST }}
           port: ${{ secrets.SERVER_PORT }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           script_stop: true
+          envs: TAG
           script: |
             cd "${{ vars.APP_DIR || '/home/arnaud/multiboutique' }}"
             git fetch origin --tags --force
-            git checkout --detach "${{ github.ref_name }}"
+            git checkout --detach "$TAG"
             export IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}"
             bash deploy/server-deploy.sh up
 
@@ -179,7 +199,7 @@ jobs:
         run: |
           for tentative in 1 2 3 4 5 6; do
             code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 \
-              "https://${{ vars.DOMAIN }}/api/health" || echo "000")
+              "https://${{ vars.DOMAIN }}/api/health")
             echo "Tentative ${tentative} : HTTP ${code}"
             if [ "$code" = "200" ]; then
               echo "Application saine."

@@ -26,10 +26,16 @@ IMAGE_RESTIC="${RESTIC_IMAGE:-restic/restic:0.17.3}"
 HORODATAGE="$(date +%Y%m%d-%H%M%S)"
 
 mkdir -p backups
+# Les dumps en clair et les journaux ne regardent pas les autres comptes de
+# cette machine partagée.
+chmod 700 backups 2>/dev/null || true
 JOURNAL="backups/backup.log"
 
 SCRATCH="$(mktemp -d)"
-trap 'rm -rf "$SCRATCH"' EXIT
+# INT et TERM en plus d'EXIT : bash n'exécute pas le trap EXIT sur un SIGTERM
+# non capturé, ce qui laisserait un dump en clair dans /tmp après un timeout
+# cron ou un redémarrage de la machine.
+trap 'rm -rf "$SCRATCH"' EXIT INT TERM
 
 journaliser() { echo "[$(date -Is)] $*" | tee -a "$JOURNAL"; }
 
@@ -70,17 +76,39 @@ journaliser "Dump produit : ${TAILLE} octets"
 # 2. Photos produits : aucune autre copie n'existe, elles ne sont pas en base.
 mkdir -p "$SCRATCH/uploads"
 if [ -d public/uploads ]; then
-  cp -a public/uploads/. "$SCRATCH/uploads/" 2>/dev/null || true
+  # Les fichiers sont écrits par le conteneur (uid 1001) et la sauvegarde
+  # tourne sous l'utilisateur de déploiement : une photo illisible doit faire
+  # échouer la sauvegarde, pas disparaître en silence du snapshot.
+  if ! cp -a public/uploads/. "$SCRATCH/uploads/" 2>"$SCRATCH/cp.err"; then
+    journaliser "Copie des uploads en échec : $(tr '\n' ' ' < "$SCRATCH/cp.err")"
+    echouer "copie des uploads"
+  fi
+  rm -f "$SCRATCH/cp.err"
+
+  ATTENDUS="$(find public/uploads -type f | wc -l)"
+  COPIES="$(find "$SCRATCH/uploads" -type f | wc -l)"
+  if [ "$COPIES" -ne "$ATTENDUS" ]; then
+    echouer "uploads incomplets : ${COPIES} fichiers copiés sur ${ATTENDUS}"
+  fi
+else
+  ATTENDUS=0
+  COPIES=0
 fi
-journaliser "Uploads inclus : $(find "$SCRATCH/uploads" -type f | wc -l) fichier(s)"
+journaliser "Uploads inclus : ${COPIES} fichier(s)"
 
 # 3. Envoi chiffré puis application de la rétention.
 restic_exec backup /data --tag multiboutique --host multiboutique \
   || echouer "restic backup"
 
-restic_exec forget --tag multiboutique \
-  --keep-daily 7 --keep-weekly 4 --keep-monthly 6 --prune \
-  || echouer "restic forget"
+journaliser "Snapshot envoyé"
+
+# Un échec de rétention n'invalide pas le snapshot, qui est déjà stocké : on le
+# signale sans transformer une sauvegarde réussie en échec. Cause la plus
+# fréquente : un verrou laissé par une exécution interrompue (`restic unlock`).
+if ! restic_exec forget --tag multiboutique \
+  --keep-daily 7 --keep-weekly 4 --keep-monthly 6 --prune; then
+  journaliser "AVERTISSEMENT : rétention non appliquée (snapshot bien enregistré). Si le dépôt est verrouillé : restic unlock"
+fi
 
 journaliser "Sauvegarde terminée"
 

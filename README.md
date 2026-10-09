@@ -10,15 +10,26 @@ Application web de gestion de 3 boutiques alimentaires : ventes, stock, réserva
 - Un port libre pour l'application (`APP_PORT`, 3002 en recette)
 - Le reverse proxy (80/443) est fourni par l'hôte, pas par le compose
 
-## Démarrage rapide (production)
+## Démarrage rapide (local)
+
+`POSTGRES_PASSWORD` et `JWT_SECRET` sont **tous deux obligatoires** — il n'existe
+plus aucune valeur par défaut, ni dans le compose, ni dans `lib/db.ts` :
 
 ```bash
+cat > .env <<'EOF'
+POSTGRES_PASSWORD=
+JWT_SECRET=
+EOF
+# openssl rand -hex 16  →  POSTGRES_PASSWORD
+# openssl rand -hex 32  →  JWT_SECRET
+
 docker compose up -d db app
 ```
 
-L'application est accessible sur `http://localhost:3001`
+L'application est accessible sur `http://localhost:3001`.
 
-> Note : le port 3000 de l'hôte est déjà utilisé (Grafana), l'app est exposée sur 3001.
+> Pour un déploiement serveur, ce n'est pas ce compose-ci : voir
+> *Déploiement GitHub + CI/CD* et `deploy/docker-compose.prod.yml`.
 
 ### Comptes par défaut
 
@@ -73,16 +84,27 @@ hebdomadaires, 6 mensuelles.
 PostgreSQL jetable et vérifie que les tables répondent. Journaux dans
 `backups/`.
 
-Restauration manuelle :
+Restauration manuelle. **restic conserve les chemins absolus** : le contenu
+atterrit sous `restauration/data/`, pas à la racine de la cible.
 
 ```bash
 set -a; . deploy/.env; set +a
+
 docker run --rm -e RESTIC_REPOSITORY -e RESTIC_PASSWORD \
   -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY \
   -v "$PWD/restauration:/restore" restic/restic:0.17.3 \
   restore latest --tag multiboutique --target /restore
+
+# Repérer le dump restauré (un seul par snapshot) :
+ls -l restauration/data/
+DUMP=$(ls -1 restauration/data/multiboutique-*.dump | tail -1)
+
+# Base :
 docker compose -f deploy/docker-compose.prod.yml exec -T db \
-  pg_restore -U mb -d multiboutique --clean --no-owner < restauration/*.dump
+  pg_restore -U mb -d multiboutique --clean --no-owner < "$DUMP"
+
+# Photos produits :
+cp -a restauration/data/uploads/. public/uploads/
 ```
 
 ## Mode développement (hot reload)
@@ -182,6 +204,13 @@ Après déploiement, le job interroge `https://$DOMAIN/api/health` et échoue si
 réponse n'est pas 200 : un déploiement qui laisse l'application cassée ne passe
 plus en vert.
 
+> **Protéger l'environnement `production`.** Le cloisonnement par environnement
+> empêche un push sur `main` d'atteindre la production, mais **pas** un tag
+> `v*` poussé depuis n'importe quelle branche par n'importe quel contributeur.
+> Dans Settings → Environments → `production`, ajouter une règle *Deployment
+> branches and tags* limitée à `v*` et au moins un *Required reviewer*. Sans
+> ça, l'environnement est un coffre à secrets, pas une porte.
+
 ### 3. Préparer le serveur (une seule fois)
 
 ```bash
@@ -189,15 +218,26 @@ plus en vert.
 cd ~/multiboutique
 
 cp deploy/.env.example deploy/.env
+chmod 600 deploy/.env
 # puis renseigner POSTGRES_PASSWORD, JWT_SECRET, APP_PORT, DOMAIN et les
 # variables RESTIC_*/AWS_* (cf. section Sauvegardes).
 
-sudo bash deploy/setup-vhost.sh                      # vhost Apache + certificat
 IMAGE=ghcr.io/<TOI>/multiboutique:main bash deploy/server-deploy.sh up
 bash deploy/rotate-seed-passwords.sh                 # noter les identifiants
+sudo bash deploy/setup-vhost.sh                      # vhost Apache + certificat
 
 crontab -e   # ajouter les trois entrées ci-dessous
 ```
+
+> **L'ordre compte.** La rotation des mots de passe vient *avant* le vhost :
+> dans l'autre sens, l'instance est joignable en HTTPS public avec `admin123`
+> pendant tout l'intervalle.
+
+> `deploy/.env` contient `JWT_SECRET` (permet de forger n'importe quelle
+> session), le mot de passe de la base, les clés R2 et `RESTIC_PASSWORD` (permet
+> de déchiffrer toutes les sauvegardes). Sur une machine partagée, `chmod 600`
+> n'est pas une précaution de confort. Les scripts posent `chmod 700` sur
+> `backups/`, qui contient des dumps SQL en clair.
 
 ```cron
 30 2 * * *   cd ~/multiboutique && bash deploy/backup.sh           >> backups/cron.log 2>&1

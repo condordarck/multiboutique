@@ -28,6 +28,7 @@ CONTENEUR="multiboutique-restore-test"
 TABLES=(boutiques utilisateurs)
 
 mkdir -p backups
+chmod 700 backups 2>/dev/null || true
 JOURNAL="backups/restore-test.log"
 SCRATCH="$(mktemp -d)"
 
@@ -35,7 +36,9 @@ nettoyer() {
   docker rm -f "$CONTENEUR" >/dev/null 2>&1 || true
   rm -rf "$SCRATCH"
 }
-trap nettoyer EXIT
+# INT et TERM en plus d'EXIT : sans eux, un SIGTERM laisse tourner un PostgreSQL
+# jetable et un dump en clair sur une machine qui n'a pas la place pour.
+trap nettoyer EXIT INT TERM
 
 journaliser() { echo "[$(date -Is)] $*" | tee -a "$JOURNAL"; }
 
@@ -57,6 +60,11 @@ fi
 DUMP="$(find "$SCRATCH" -name '*.dump' -type f | sort | tail -1)"
 [ -n "$DUMP" ] || { journaliser "ECHEC : aucun dump dans le snapshot"; exit 1; }
 journaliser "Dump restauré : $(basename "$DUMP") ($(stat -c%s "$DUMP") octets)"
+
+# Les photos produits représentent la moitié de ce que la sauvegarde stocke et
+# n'ont aucune autre copie : une preuve mensuelle qui les ignore n'en est pas une.
+PHOTOS="$(find "$SCRATCH" -path '*/uploads/*' -type f | wc -l)"
+journaliser "Uploads présents dans le snapshot : ${PHOTOS} fichier(s)"
 
 # 2. Base jetable.
 docker run -d --name "$CONTENEUR" \

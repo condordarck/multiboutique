@@ -32,11 +32,18 @@ if [ -n "$IP_LOCALE" ] && [ "$IP_DNS" != "$IP_LOCALE" ]; then
   exit 1
 fi
 
-# 2. Le port applicatif ne doit pas être déjà pris par un autre projet.
+# 2. Le port applicatif ne doit pas appartenir à un autre projet. Publier un
+#    vhost HTTPS qui mandate l'application de quelqu'un d'autre n'est pas une
+#    gêne, c'est une fuite : on s'arrête.
 if ss -tln | grep -qE "[:.]${APP_PORT}\b"; then
-  echo "ATTENTION : le port $APP_PORT est déjà écouté." >&2
-  echo "S'il ne s'agit pas de multiboutique-prod, changer APP_PORT." >&2
-  ss -tlnp 2>/dev/null | grep -E "[:.]${APP_PORT}\b" || true
+  if docker inspect -f '{{.State.Status}}' multiboutique-prod >/dev/null 2>&1; then
+    echo "Le port $APP_PORT est écouté par multiboutique-prod — attendu."
+  else
+    echo "ERREUR : le port $APP_PORT est déjà écouté, et pas par multiboutique-prod." >&2
+    ss -tlnp 2>/dev/null | grep -E "[:.]${APP_PORT}\b" || true
+    echo "Choisir un autre APP_PORT dans deploy/.env avant de relancer." >&2
+    exit 1
+  fi
 fi
 
 # 3. Les modules Apache requis.
@@ -50,6 +57,13 @@ VHOST="/etc/apache2/sites-available/${DOMAIN}.conf"
 
 if [ -f "$VHOST" ]; then
   echo "Le vhost $VHOST existe déjà — rien à créer."
+  # Relançable sans risque, mais ne reconfigure PAS un vhost existant : après
+  # un changement d'APP_PORT, corriger la ligne ProxyPass à la main.
+  if ! grep -q "127.0.0.1:${APP_PORT}/" "$VHOST"; then
+    echo "ATTENTION : le vhost ne mandate pas le port ${APP_PORT} attendu." >&2
+    grep -E "ProxyPass\s" "$VHOST" >&2 || true
+    echo "Corriger $VHOST puis : systemctl reload apache2" >&2
+  fi
 else
   cat > "$VHOST" <<VHOSTEOF
 <VirtualHost *:80>
@@ -57,6 +71,11 @@ else
     ProxyPreserveHost On
     ProxyPass        / http://127.0.0.1:${APP_PORT}/
     ProxyPassReverse / http://127.0.0.1:${APP_PORT}/
+    # Apache pose X-Forwarded-For et -Host, mais PAS -Proto. Sans lui,
+    # l'application derrière le proxy croit être servie en clair. expr=
+    # donne la bonne valeur dans ce vhost comme dans celui que certbot
+    # dérivera pour le 443.
+    RequestHeader set X-Forwarded-Proto expr=%{REQUEST_SCHEME}
     Header always set X-Content-Type-Options "nosniff"
     Header setifempty Referrer-Policy "strict-origin-when-cross-origin"
     ErrorLog  \${APACHE_LOG_DIR}/error.${DOMAIN}.log

@@ -24,13 +24,23 @@ echo
 for email in "${COMPTES[@]}"; do
   motdepasse="$(openssl rand -base64 18 | tr -d '/+=' | cut -c1-24)"
 
-  # --set alimente des variables psql interpolées par :'nom', ce qui échappe
-  # correctement la valeur : le mot de passe n'est jamais concaténé dans le SQL.
-  # Le SQL passe par l'entrée standard et non par -c, qui n'interpole pas les
-  # variables psql.
+  # Le mot de passe est défini par \set DANS le flux SQL, jamais en argument de
+  # commande : sur une machine partagée, --set=nouveau=... exposerait le
+  # cleartext dans `ps` et dans la requête exec transmise au démon Docker.
+  # Il passe par l'entrée standard car psql -c n'interpole pas les :'variables'.
+  # openssl rand -base64 puis suppression de /+= ne laisse que [A-Za-z0-9] :
+  # aucune apostrophe à échapper. Vérifié ci-dessous plutôt que supposé.
+  case "$motdepasse" in
+    *[!A-Za-z0-9]*)
+      echo "ERREUR : mot de passe généré avec un caractère inattendu, abandon." >&2
+      exit 1
+      ;;
+  esac
+
   resultat="$(docker compose -f "$COMPOSE_FILE" exec -T db \
-    psql -U mb -d multiboutique -v ON_ERROR_STOP=1 -q -tA \
-         --set=nouveau="$motdepasse" --set=cible="$email" <<'SQL'
+    psql -U mb -d multiboutique -v ON_ERROR_STOP=1 -q -tA <<SQL
+\set nouveau '${motdepasse}'
+\set cible '${email}'
 UPDATE utilisateurs
    SET password_hash = crypt(:'nouveau', gen_salt('bf', 10))
  WHERE email = :'cible'

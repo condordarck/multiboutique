@@ -41,12 +41,30 @@ if [ "$SOUS_COMMANDE" = "pull" ]; then
 fi
 
 # 2. Sauvegarde automatique de la base (garde les 10 dernières)
-if docker compose -f "$COMPOSE_FILE" ps --quiet db >/dev/null 2>&1; then
+#
+# `ps --quiet db` sort en code 0 avec une sortie VIDE quand aucun conteneur
+# n'existe : tester son code de retour rendait la condition toujours vraie, et
+# le premier déploiement d'un serveur neuf mourait sur le pg_dump avant même
+# d'avoir lancé quoi que ce soit. C'est la sortie qu'il faut tester.
+if [ -n "$(docker compose -f "$COMPOSE_FILE" ps --quiet --status running db)" ]; then
   mkdir -p backups
+  chmod 700 backups
   backup="backups/db-$(date +%Y%m%d-%H%M%S).sql"
   echo "[deploy] Sauvegarde → $backup"
-  docker compose -f "$COMPOSE_FILE" exec -T db pg_dump -U mb multiboutique > "$backup"
+  # Écriture dans un fichier temporaire promu seulement en cas de succès :
+  # un dump interrompu ne doit pas entrer dans la rotation et y occuper la
+  # place d'une sauvegarde valide.
+  if docker compose -f "$COMPOSE_FILE" exec -T db pg_dump -U mb multiboutique > "${backup}.partiel"; then
+    mv "${backup}.partiel" "$backup"
+    chmod 600 "$backup"
+  else
+    rm -f "${backup}.partiel"
+    echo "[deploy] ECHEC de la sauvegarde préalable — déploiement interrompu." >&2
+    exit 1
+  fi
   ls -1t backups/db-*.sql 2>/dev/null | tail -n +11 | xargs -r rm --
+else
+  echo "[deploy] Aucune base en cours d'exécution — pas de sauvegarde préalable."
 fi
 
 # 3. Récupérer l'image et (re)lancer l'app

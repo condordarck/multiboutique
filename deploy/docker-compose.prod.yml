@@ -3,6 +3,11 @@
 # (Apache + certbot en recette, cf. deploy/setup-vhost.sh).
 # Secrets et valeurs par environnement : deploy/.env (jamais commité).
 
+# Sans ce nom, Docker déduit le projet du répertoire parent — « deploy » —, qui
+# est un nom plausible pour un autre projet de cette machine partagée : un
+# `docker compose down` voisin emporterait alors notre réseau et notre volume.
+name: multiboutique
+
 services:
   db:
     image: postgres:16-alpine
