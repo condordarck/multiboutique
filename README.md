@@ -7,7 +7,8 @@ Application web de gestion de 3 boutiques alimentaires : ventes, stock, réserva
 ## Prérequis
 
 - Docker + Docker Compose
-- Ports libres : **3001** (application), **5432** (postgres), 80/443 (nginx optionnel)
+- Un port libre pour l'application (`APP_PORT`, 3002 en recette)
+- Le reverse proxy (80/443) est fourni par l'hôte, pas par le compose
 
 ## Démarrage rapide (production)
 
@@ -19,14 +20,15 @@ L'application est accessible sur `http://localhost:3001`
 
 > Note : le port 3000 de l'hôte est déjà utilisé (Grafana), l'app est exposée sur 3001.
 
-### Comptes seed
+### Comptes par défaut
 
-| Rôle | Email | Mot de passe |
-|------|-------|--------------|
-| Administrateur (configuration générale) | `admin@multiboutique.com` | `admin123` |
-| Propriétaire (gestion commerciale) | `proprietaire@multiboutique.com` | `proprietaire123` |
+`db/init.sql` crée deux comptes : `admin@multiboutique.com` (administrateur) et
+`proprietaire@multiboutique.com` (propriétaire).
 
-**Change ces mots de passe immédiatement** via le login une fois connecté.
+**Leurs mots de passe initiaux sont publics dans `db/init.sql`.** Sur toute
+instance joignable depuis un réseau, lancer `bash deploy/rotate-seed-passwords.sh`
+au premier déploiement : le script les remplace par des valeurs aléatoires et les
+affiche une seule fois.
 
 ### Rôles et interfaces
 
@@ -54,18 +56,33 @@ openssl rand -hex 32   # à placer dans .env (JWT_SECRET=...)
 - Hôte : `db` (dans le réseau Docker), `localhost` (depuis l'hôte)
 - Base : `multiboutique`
 - Utilisateur : `mb`
-- Mot de passe : `mbpassword`
+- Mot de passe : valeur de `POSTGRES_PASSWORD` (aucun défaut, à définir dans `deploy/.env`)
 
-## Sauvegarde des données
+## Sauvegardes
 
-Les données vivent dans le volume Docker `multiboutique_pgdata`. Pour sauvegarder :
+`deploy/backup.sh` s'exécute chaque nuit à 02h30 : dump PostgreSQL **et**
+`public/uploads` (les photos produits n'ont aucune autre copie), chiffrés par
+restic avant envoi sur Cloudflare R2. Rétention : 7 quotidiennes, 4
+hebdomadaires, 6 mensuelles.
+
+> **`RESTIC_PASSWORD` doit être conservé hors du serveur** (gestionnaire de mots
+> de passe). C'est la clé de chiffrement du dépôt : perdue, les sauvegardes sont
+> définitivement irrécupérables.
+
+`deploy/restore-test.sh`, mensuel, restaure le dernier snapshot dans un
+PostgreSQL jetable et vérifie que les tables répondent. Journaux dans
+`backups/`.
+
+Restauration manuelle :
 
 ```bash
-# Image / fichier SQL
-docker exec multiboutique-db pg_dump -U mb multiboutique > sauvegarde.sql
-
-# Restaurer
-docker exec -i multiboutique-db psql -U mb multiboutique < sauvegarde.sql
+set -a; . deploy/.env; set +a
+docker run --rm -e RESTIC_REPOSITORY -e RESTIC_PASSWORD \
+  -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY \
+  -v "$PWD/restauration:/restore" restic/restic:0.17.3 \
+  restore latest --tag multiboutique --target /restore
+docker compose -f deploy/docker-compose.prod.yml exec -T db \
+  pg_restore -U mb -d multiboutique --clean --no-owner < restauration/*.dump
 ```
 
 ## Mode développement (hot reload)
@@ -114,17 +131,23 @@ multiboutique/
 └── hooks/                 # Hooks React custom
 ```
 
-## Nginx (optionnel — SSL en production)
+## Reverse proxy et HTTPS
 
-Si tu veux exposer l'app sur Internet avec HTTPS :
+Le reverse proxy n'est pas dans le compose : il est fourni par l'hôte. Sur le
+serveur de recette, Apache et certbot sont déjà installés et servent les autres
+projets de la machine.
 
-1. Mets ta config dans `nginx/conf.d/default.conf`
-2. Mets tes certificats dans `nginx/ssl/`
-3. Lance `docker compose up -d nginx`
+```bash
+sudo bash deploy/setup-vhost.sh
+```
+
+Le script lit `DOMAIN` et `APP_PORT` dans `deploy/.env`, vérifie que le DNS
+pointe bien sur la machine, crée le vhost sur le modèle des vhosts existants puis
+délivre le certificat Let's Encrypt. Il est idempotent : relançable sans risque.
 
 ## Déploiement GitHub + CI/CD
 
-Chaîne de bout en bout : **push sur `main` → GitHub Actions build l'image → push sur GHCR → SSH sur le serveur → sauvegarde BDD + migrations + redémarrage**.
+Chaîne de bout en bout : **push sur `main` → GitHub Actions build l'image → push sur GHCR → SSH sur le serveur → sauvegarde BDD + migrations + redémarrage → vérification de `/api/health`**. Un tag `v*` suit le même chemin vers l'environnement de production.
 
 ### 1. Pousser le code
 
@@ -138,44 +161,54 @@ git branch -M main
 git push -u origin main
 ```
 
-### 2. Secrets GitHub Actions (repo → Settings → Secrets and variables → Actions)
+### 2. Environnements GitHub (repo → Settings → Environments)
 
-| Secret | Valeur |
+La chaîne distingue deux environnements : **`recette`** (déclenché par un push sur
+`main`) et **`production`** (déclenché par un tag `v*`). Les secrets sont portés
+par environnement, jamais au niveau du dépôt : c'est ce cloisonnement qui empêche
+un push sur `main` d'atteindre la production.
+
+| Secret / variable | Valeur |
 |---|---|
 | `SERVER_HOST` | IP du serveur |
-| `SERVER_PORT` | Port SSH (défaut `22`) |
-| `SERVER_USER` | Utilisateur SSH (ex. `deploy`) |
+| `SERVER_PORT` | Port SSH |
+| `SERVER_USER` | Utilisateur SSH |
 | `SERVER_SSH_KEY` | Clé privée SSH (format PEM) |
-| `GHCR_USER` / `GHCR_TOKEN` | **Optionnel** : uniquement si le dépôt est privé (token `read:packages`) |
+| `APP_DIR` *(variable)* | Chemin du dépôt sur le serveur, ex. `/home/arnaud/multiboutique` |
+| `DOMAIN` *(variable)* | Hôte interrogé par le smoke test, ex. `multiboutique.dev4future.space` |
+| `GHCR_USER` / `GHCR_TOKEN` | **Optionnel** : uniquement si le paquet GHCR est privé |
 
-> Le paquet GHCR `ghcr.io/<TOI>/multiboutique` est public si le dépôt est public (pull serveur sans login).
-> Variable optionnelle : `APP_DIR` (chemin du dépôt sur le serveur, défaut `/opt/multiboutique`).
+Après déploiement, le job interroge `https://$DOMAIN/api/health` et échoue si la
+réponse n'est pas 200 : un déploiement qui laisse l'application cassée ne passe
+plus en vert.
 
 ### 3. Préparer le serveur (une seule fois)
 
 ```bash
-# Sur un VPS Linux avec Docker + compose plugin :
-git clone https://github.com/<TOI>/multiboutique.git /opt/multiboutique
-cd /opt/multiboutique
+# Sur un VPS Linux avec Docker + compose plugin, dépôt cloné sous ~ :
+cd ~/multiboutique
 
-# Secrets de production locaux (NON commités)
-cat > deploy/.env <<'EOF'
-POSTGRES_PASSWORD=<openssl rand -hex 16>
-JWT_SECRET=<openssl rand -hex 32>
-EOF
+cp deploy/.env.example deploy/.env
+# puis renseigner POSTGRES_PASSWORD, JWT_SECRET, APP_PORT, DOMAIN et les
+# variables RESTIC_*/AWS_* (cf. section Sauvegardes).
 
-# Si le dépôt / paquet GHCR est privé, ajouter aussi :
-#   GHCR_USER=<TOI>
-#   GHCR_TOKEN=<token read:packages>
-
-# Marquage des migrations déjà appliquées (base fraîche : inutile, sauter cette étape)
-bash db/migrate.sh   # sur une base neuve, applique 002→008 dans l'ordre
-
-# Premier lancement :
+sudo bash deploy/setup-vhost.sh                      # vhost Apache + certificat
 IMAGE=ghcr.io/<TOI>/multiboutique:main bash deploy/server-deploy.sh up
+bash deploy/rotate-seed-passwords.sh                 # noter les identifiants
+
+crontab -e   # ajouter les trois entrées ci-dessous
 ```
 
-> ⚠️ `POSTGRES_PASSWORD` n'est lu qu'au **premier** démarrage du volume `pgdata`. Pour changer après coup, voir la section *Sauvegarde des données*.
+```cron
+30 2 * * *   cd ~/multiboutique && bash deploy/backup.sh           >> backups/cron.log 2>&1
+*/2 * * * *  cd ~/multiboutique && bash deploy/healthcheck-cron.sh >> backups/cron.log 2>&1
+0 4 1 * *    cd ~/multiboutique && bash deploy/restore-test.sh     >> backups/cron.log 2>&1
+```
+
+> Le dépôt doit être cloné sous `~` et non sous `/opt` : `/opt` appartient à root
+> et `sudo` exige un mot de passe sur la cible, ce que le CI ne peut pas fournir.
+
+> ⚠️ `POSTGRES_PASSWORD` n'est lu qu'au **premier** démarrage du volume `pgdata`.
 
 ### 4. Migrations automatiques
 
@@ -183,5 +216,12 @@ Les migrations `db/migrations/*.sql` sont appliquées automatiquement à chaque 
 
 ### 5. Vérifier
 
-- Serveur : `http://<IP>` (nginx 80/443) → catalogue et login
-- Tableau de bord : `http://<IP>/login`
+```bash
+curl -sI https://$DOMAIN | head -1                                  # 200 ou 301
+curl -s -o /dev/null -w "%{http_code}\n" https://$DOMAIN/api/health # 200
+ss -tln | grep -E "0\.0\.0\.0:($APP_PORT|5432)" && echo ECHEC || echo "aucun bind public"
+bash deploy/backup.sh && bash deploy/restore-test.sh                # sauvegarde + restauration
+```
+
+- Catalogue et connexion : `https://$DOMAIN`
+- Tableau de bord : `https://$DOMAIN/login`
