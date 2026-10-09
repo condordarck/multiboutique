@@ -34,7 +34,7 @@ Contraintes imposées par le code applicatif, vérifiées :
 | Uploads écrits sur le disque local | `app/api/upload/route.ts:43` | Volume persistant obligatoire ; à inclure dans les sauvegardes |
 | Rate-limit en mémoire | `lib/rate-limit.ts:7` | **Une seule instance applicative**, pas de scaling horizontal |
 | Pool `pg` persistant | `lib/db.ts` | Runtime Node long-vivant requis |
-| Mots de passe bcrypt via `pgcrypto` | `db/init.sql:474` | Rotation des comptes faisable en SQL pur |
+| Mots de passe bcrypt (`password_hash`) via `pgcrypto` | `db/init.sql:474` | Rotation des comptes faisable en SQL pur |
 
 ### 2.2 Serveur de recette (`carrefoot-dev`)
 
@@ -159,7 +159,7 @@ la panne au lieu de la traiter.
   locale.
 - **`deploy/rotate-seed-passwords.sh`** : génère un mot de passe aléatoire (24 caractères)
   pour `admin@multiboutique.com` et `proprietaire@multiboutique.com`, l'applique via
-  `UPDATE utilisateurs SET mot_de_passe = crypt($1, gen_salt('bf', 10))`, et l'affiche
+  `UPDATE utilisateurs SET password_hash = crypt($1, gen_salt('bf', 10))`, et l'affiche
   **une seule fois** sur la sortie standard. À lancer au premier déploiement de chaque
   environnement. Les identifiants `admin123` et `proprietaire123` sont documentés dans un
   README public : tant qu'ils restent actifs sur une instance joignable en HTTPS,
