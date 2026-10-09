@@ -525,18 +525,31 @@ et durée (M1), code bcrypt (M5).
 
 ### 10.1 Environnements
 
+Deux environnements partagent le même `deploy/docker-compose.prod.yml`, paramétré
+par un `deploy/.env` propre à chaque serveur : **recette** (`carrefoot-dev`) et
+**production** (cible dédiée).
+
 | Service | Image / build | Port hôte | Rôle |
 |---|---|---|---|
-| `db` | `postgres:16-alpine` | 5432 | Base de données (volume `pgdata`) |
-| `app` | `multiboutique:latest` (conteneur `multiboutique-prod`) | 3001 → 3000 | Application production |
-| `dev` | `Dockerfile.dev` | 3002 → 3000 | Développement (hot reload) |
-| `nginx` | `nginx:alpine` | 80/443 | Reverse proxy (SSL optionnel) |
+| `db` | `postgres:16-alpine` | aucun | Base de données (volume `pgdata`), joignable par le réseau Docker seulement |
+| `app` | image GHCR (conteneur `multiboutique-prod`) | `127.0.0.1:${APP_PORT}` → 3000 | Application |
+| `dev` | `Dockerfile.dev` | 3002 → 3000 | Développement local (hot reload) |
+
+Le **reverse proxy n'est pas conteneurisé** : il est fourni par l'hôte (Apache et
+certbot en recette, cf. `deploy/setup-vhost.sh`). Limites mémoire : 640 Mo pour
+`app`, 512 Mo pour `db`.
 
 ### 10.2 Variables d'environnement
 
-- `DATABASE_URL` — chaîne de connexion PostgreSQL.
+- `IMAGE` — image GHCR à déployer (obligatoire, sans défaut).
+- `APP_PORT` — port local écouté par l'application (3002 en recette).
+- `DOMAIN` — nom d'hôte du vhost et cible du smoke test.
+- `DATABASE_URL` — chaîne de connexion PostgreSQL (obligatoire, sans repli).
 - `JWT_SECRET` — secret de signature (≥ 32 car., obligatoire).
 - `POSTGRES_PASSWORD`, `POSTGRES_USER`, `POSTGRES_DB` (service `db`).
+- `RESTIC_REPOSITORY`, `RESTIC_PASSWORD`, `AWS_ACCESS_KEY_ID`,
+  `AWS_SECRET_ACCESS_KEY` — sauvegardes chiffrées (cf. 10.6).
+- `BACKUP_PING_URL` — optionnel, alerte en cas d'échec de sauvegarde.
 - `NODE_ENV=production`, `NODE_OPTIONS=--max-old-space-size=4096` (build).
 
 ### 10.3 Build & image
@@ -557,41 +570,64 @@ et durée (M1), code bcrypt (M5).
 
 1. `push`/`PR` sur `main` → **job `build`** (`npm ci` + `npm run build`, inclut le
    typecheck).
-2. Sur `main` → **job `deploy`** : build & push de l'image sur **GHCR** (`main`, `sha`),
-   puis **SSH** sur le serveur : `git pull` →
-   `IMAGE=... bash deploy/server-deploy.sh up` (sauvegarde BDD + migrations + redémarrage).
+2. `push` sur `main` → **job `deploy-recette`** (environnement GitHub `recette`).
+3. `push` d'un tag `v*` → **job `deploy-production`** (environnement `production`).
 
-Secrets Actions requis : `SERVER_HOST`, `SERVER_PORT`, `SERVER_USER`, `SERVER_SSH_KEY`
-(+ `GHCR_USER`/`GHCR_TOKEN` si dépôt privé). Variable optionnelle `APP_DIR`.
+Les deux jobs de déploiement poussent l'image sur **GHCR** (`main`, `sha-`,
+`semver`), ouvrent une session **SSH** sur leur serveur, lancent
+`bash deploy/server-deploy.sh up` (sauvegarde BDD + migrations + redémarrage),
+puis **interrogent `https://${DOMAIN}/api/health` et échouent si la réponse n'est
+pas 200**.
+
+Les secrets `SERVER_HOST`, `SERVER_PORT`, `SERVER_USER`, `SERVER_SSH_KEY` et les
+variables `APP_DIR`, `DOMAIN` sont portés **par environnement GitHub**, jamais au
+niveau du dépôt : c'est ce cloisonnement qui empêche un push sur `main`
+d'atteindre la production.
 
 ### 10.6 Sauvegarde / restauration
 
-```bash
-# Sauvegarde
-docker exec multiboutique-db pg_dump -U mb multiboutique > sauvegarde.sql
-# Restauration
-docker exec -i multiboutique-db psql -U mb multiboutique < sauvegarde.sql
-```
+`deploy/backup.sh` (quotidien, 02h30, crontab utilisateur) : `pg_dump -Fc` de la
+base **et** copie de `public/uploads` — les photos produits n'ont aucune autre
+copie — chiffrés par **restic** (conteneur `restic/restic`) avant envoi sur
+**Cloudflare R2**. Rétention : 7 quotidiennes, 4 hebdomadaires, 6 mensuelles. Le
+script refuse d'envoyer un dump vide et journalise dans `backups/backup.log`.
+
+> `RESTIC_PASSWORD` est la clé de chiffrement du dépôt. Elle doit être conservée
+> **hors du serveur** : perdue, les sauvegardes sont irrécupérables.
+
+`deploy/restore-test.sh` (mensuel) restaure le dernier snapshot dans un PostgreSQL
+jetable et vérifie que `boutiques` et `utilisateurs` sont peuplées. Une sauvegarde
+jamais restaurée n'est pas une sauvegarde.
+
+Le `pg_dump` local conservé par `server-deploy.sh` (10 rotations) couvre le
+rollback immédiat après un déploiement raté ; R2 couvre le sinistre matériel.
 
 ---
 
 ### 10.7 Commandes utiles
 
 ```bash
-# Démarrage production
-docker compose up -d db app
+# Déploiement (lit deploy/.env)
+bash deploy/server-deploy.sh up
 
 # Vérifier l'état
-docker compose ps
+docker compose -f deploy/docker-compose.prod.yml ps
+docker inspect -f '{{.State.Health.Status}}' multiboutique-prod
 docker logs multiboutique-prod --tail 50
 
 # Appliquer les migrations
 bash db/migrate.sh
+
+# Sauvegarde et contrôle de restauration
+bash deploy/backup.sh
+bash deploy/restore-test.sh
 ```
 
 ### 10.8 Documentation de référence
 
-- `README.md` — démarrage, comptes seed, CI/CD.
+- `README.md` — démarrage, exploitation, CI/CD.
+- `docs/superpowers/specs/2026-10-09-deploiement-vps-design.md` — design du
+  durcissement du déploiement.
 - `RAPPORT_SAST_DAST.md` — audit de sécurité.
 - Le présent `docs/CAHIER_DES_CHARGES.md` — spécifications.
 
@@ -630,12 +666,17 @@ Scénarios vérifiés de bout en bout (environnement local `:3001`).
 
 ## 12. Annexes
 
-### 12.1 Comptes seed (à changer impérativement)
+### 12.1 Comptes seed
 
-| Rôle | Email | Mot de passe |
-|---|---|---|
-| Administrateur | `admin@multiboutique.com` | `admin123` |
-| Propriétaire | `proprietaire@multiboutique.com` | `proprietaire123` |
+| Rôle | Email |
+|---|---|
+| Administrateur | `admin@multiboutique.com` |
+| Propriétaire | `proprietaire@multiboutique.com` |
+
+Leurs mots de passe initiaux figurent en clair dans `db/init.sql`, qui est
+versionné. Ils doivent être remplacés au premier déploiement de chaque
+environnement par `bash deploy/rotate-seed-passwords.sh`, qui tire des valeurs
+aléatoires et ne les affiche qu'une fois.
 
 ### 12.2 Boutiques seed
 

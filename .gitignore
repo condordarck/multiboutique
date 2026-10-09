@@ -5,3 +5,6 @@ node_modules/
 .env*.local
 *.tsbuildinfo
 next-env.d.ts
+
+# Journaux et dumps produits par deploy/backup.sh et deploy/server-deploy.sh
+backups/

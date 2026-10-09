@@ -6,7 +6,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: mb
-      POSTGRES_PASSWORD: mbpassword
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD manquant (ex: openssl rand -hex 16)}"
       POSTGRES_DB: multiboutique
     volumes:
       - pgdata:/var/lib/postgresql/data
@@ -29,7 +29,7 @@ services:
     ports:
       - "3001:3000"
     environment:
-      DATABASE_URL: postgresql://mb:mbpassword@db:5432/multiboutique
+      DATABASE_URL: "postgresql://mb:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD manquant}@db:5432/multiboutique"
       JWT_SECRET: "${JWT_SECRET:?JWT_SECRET doit etre defini dans l environnement (ex openssl rand -hex 32)}"
     depends_on:
       db:
@@ -52,27 +52,11 @@ services:
       - /app/node_modules
       - /app/.next
     environment:
-      DATABASE_URL: postgresql://mb:mbpassword@db:5432/multiboutique
+      DATABASE_URL: "postgresql://mb:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD manquant}@db:5432/multiboutique"
       JWT_SECRET: "${JWT_SECRET:?JWT_SECRET doit etre defini dans l environnement (ex openssl rand -hex 32)}"
     depends_on:
       db:
         condition: service_healthy
-    networks:
-      - multiboutique
-
-  # ---- Nginx reverse proxy (SSL en production) ----
-  nginx:
-    image: nginx:alpine
-    container_name: multiboutique-nginx
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx/conf.d:/etc/nginx/conf.d
-      - ./nginx/ssl:/etc/nginx/ssl
-    depends_on:
-      - app
     networks:
       - multiboutique
 

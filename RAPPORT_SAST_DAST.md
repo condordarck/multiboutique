@@ -96,5 +96,18 @@ Aucune alerte passive XSS/SQLi/Injection — cohérent avec la revue statique.
 3. ✅ **M3 fermé** — redirect interne uniquement (présent dans le bundle).
 4. ✅ **M4 fermé** — consolidation filtrée par périmètre (vérifié DAST).
 5. ✅ **H2/M5 fermés** — rate-limit login/register + bcrypt cost 10 (vérifié DAST).
-6. **Restant — H1** : tourner les identifiants seed `admin123`/`proprietaire123` (rotations + forçage de changement au 1er login, retrait du README pour la prod).
-7. **Restant — H3/M6/M1** : TLS au nginx + `X-Forwarded-Proto` (Secure/HSTS), CSRF logout (vérif token double-submit ou POST + même-site), sessions révocables (jti en DB).
+6. ⚠️ **H1 partiellement fermé** — `deploy/rotate-seed-passwords.sh` remplace
+   `admin123`/`proprietaire123` par des valeurs aléatoires au premier déploiement,
+   et les mots de passe ont été retirés du README et du cahier des charges.
+   **Reste ouvert** : le forçage du changement au premier login, qui demande une
+   évolution applicative (indicateur en base + redirection), et le fait que les
+   valeurs d'origine restent lisibles dans `db/init.sql` du dépôt — c'est le
+   déploiement qui les neutralise, pas le code.
+7. ✅ **H3 fermé** — TLS assuré par le vhost Apache + certbot de l'hôte
+   (`deploy/setup-vhost.sh`), avec redirection 80 → 443 (`certbot --redirect`)
+   et `RequestHeader set X-Forwarded-Proto expr=%{REQUEST_SCHEME}` : Apache
+   transmet `X-Forwarded-For` et `-Host` d'office, mais pas `-Proto`.
+   **Reste ouvert** : HSTS n'est pas posé (`Strict-Transport-Security`), à
+   ajouter au vhost une fois le certificat confirmé stable.
+8. **Restant — M6/M1** : CSRF logout (token double-submit ou POST + même-site),
+   sessions révocables (jti en base).

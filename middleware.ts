@@ -8,11 +8,14 @@ export async function middleware(request: NextRequest) {
   );
 
   const isAuthApi = pathname.startsWith("/api/auth");
+  // Sonde de santé : publique par nécessité. Le healthcheck Docker et le
+  // smoke test de déploiement ne portent aucun cookie de session.
+  const isHealth = pathname === "/api/health";
   const isProtected =
     pathname.startsWith("/dashboard") ||
     pathname.startsWith("/admin") ||
     pathname.startsWith("/client") ||
-    (pathname.startsWith("/api") && !isAuthApi);
+    (pathname.startsWith("/api") && !isAuthApi && !isHealth);
 
   // Routes protégées → connexion requise
   if (isProtected && !user) {

@@ -4,9 +4,17 @@ on:
   push:
     branches:
       - main
+    tags:
+      - "v*"
   pull_request:
     branches:
       - main
+
+# Un seul déploiement à la fois : deux pushes rapprochés lanceraient git pull
+# et compose up en parallèle dans le même répertoire sur le serveur.
+concurrency:
+  group: deploiement-${{ github.ref }}
+  cancel-in-progress: false
 
 env:
   REGISTRY: ghcr.io
@@ -38,13 +46,14 @@ jobs:
           NODE_OPTIONS: "--max-old-space-size=4096"
 
   # ------------------------------------------------------------------
-  # CD : image Docker poussée sur GHCR, puis déploiement SSH (main)
+  # CD recette : push sur main → serveur de recette
   # ------------------------------------------------------------------
-  deploy:
-    name: Image GHCR + déploiement serveur
+  deploy-recette:
+    name: Déploiement recette
     runs-on: ubuntu-latest
     needs: build
     if: github.ref == 'refs/heads/main'
+    environment: recette
     permissions:
       contents: read
       packages: write
@@ -58,7 +67,8 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=raw,value=main
+            type=semver,pattern={{version}}
+            type=raw,value=main,enable={{is_default_branch}}
             type=sha,format=short
 
       - name: BuildKit
@@ -90,7 +100,112 @@ jobs:
           key: ${{ secrets.SERVER_SSH_KEY }}
           script_stop: true
           script: |
-            cd "${{ vars.APP_DIR || '/opt/multiboutique' }}"
-            git pull --ff-only origin main || true
-            export IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main"
+            cd "${{ vars.APP_DIR || '/home/arnaud/multiboutique' }}"
+            # Sans échec ici, une image neuve se déploierait sur un checkout
+            # périmé : ancien compose, anciennes migrations, anciens scripts.
+            git pull --ff-only origin main
+            export IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}"
             bash deploy/server-deploy.sh up
+
+      - name: Vérifier la santé de l'application
+        run: |
+          for tentative in 1 2 3 4 5 6; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 \
+              "https://${{ vars.DOMAIN }}/api/health")
+            echo "Tentative ${tentative} : HTTP ${code}"
+            if [ "$code" = "200" ]; then
+              echo "Application saine."
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "L'application ne répond pas 200 sur /api/health après déploiement." >&2
+          exit 1
+
+  # ------------------------------------------------------------------
+  # CD production : tag v* → serveur de production
+  #
+  # Ce job duplique volontairement deploy-recette : les deux ne diffèrent que
+  # par l'environnement, la condition et la stratégie de checkout (pull de main
+  # contre checkout détaché du tag). TOUTE correction apportée à l'un doit être
+  # reportée ici, sous peine de voir la production diverger de la recette.
+  # ------------------------------------------------------------------
+  deploy-production:
+    name: Déploiement production
+    runs-on: ubuntu-latest
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    environment: production
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v4
+
+      - name: Métadonnées (tags image)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=raw,value=main,enable={{is_default_branch}}
+            type=sha,format=short
+
+      - name: BuildKit
+        uses: docker/setup-buildx-action@v3
+
+      - name: Connexion GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & push de l'image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Déployer sur le serveur (SSH)
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          # Le nom du tag transite comme DONNÉE, pas par interpolation dans le
+          # texte du script : git accepte des noms de tag contenant des
+          # métacaractères shell, et une interpolation textuelle offrirait
+          # l'exécution de commandes arbitraires sur le serveur de production.
+          TAG: ${{ github.ref_name }}
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          port: ${{ secrets.SERVER_PORT }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script_stop: true
+          envs: TAG
+          script: |
+            cd "${{ vars.APP_DIR || '/home/arnaud/multiboutique' }}"
+            git fetch origin --tags --force
+            git checkout --detach "$TAG"
+            export IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}"
+            bash deploy/server-deploy.sh up
+
+      - name: Vérifier la santé de l'application
+        run: |
+          for tentative in 1 2 3 4 5 6; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 \
+              "https://${{ vars.DOMAIN }}/api/health")
+            echo "Tentative ${tentative} : HTTP ${code}"
+            if [ "$code" = "200" ]; then
+              echo "Application saine."
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "L'application ne répond pas 200 sur /api/health après déploiement." >&2
+          exit 1
