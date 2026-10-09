@@ -5,8 +5,11 @@ set -euo pipefail
 #
 #   bash deploy/healthcheck-cron.sh     (toutes les 2 minutes via cron)
 #
-# Docker ne redémarre PAS un conteneur unhealthy de lui-même : `restart:
-# unless-stopped` ne couvre que les arrêts du processus, pas les blocages.
+# Docker ne redémarre PAS un conteneur unhealthy de lui-même. Vérifié sur
+# Docker 29.7 : `restart: unless-stopped` n'a pas relancé le conteneur après un
+# `docker kill` non plus (RestartCount resté à 0). Ce script est donc le seul
+# filet, aussi bien pour un conteneur bloqué que pour un conteneur sorti — un
+# conteneur `exited` rapporte `Health.Status=unhealthy` et est repris ici.
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
