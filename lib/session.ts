@@ -42,12 +42,7 @@ export interface SessionUser {
 
 const SESSION_DURATION_SECONDS = 7 * 24 * 60 * 60; // 7 jours
 
-function base64UrlEncode(str: string): string {
-  return btoa(str).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
-}
-
-function base64UrlEncodeBuffer(buf: ArrayBuffer): string {
-  const bytes = new Uint8Array(buf);
+function bytesToBase64Url(bytes: Uint8Array): string {
   let binary = "";
   for (let i = 0; i < bytes.length; i++) {
     binary += String.fromCharCode(bytes[i]);
@@ -55,9 +50,22 @@ function base64UrlEncodeBuffer(buf: ArrayBuffer): string {
   return btoa(binary).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
 }
 
-function base64UrlDecode(str: string): string {
+function base64UrlEncode(str: string): string {
+  return bytesToBase64Url(new TextEncoder().encode(str));
+}
+
+function base64UrlEncodeBuffer(buf: ArrayBuffer): string {
+  return bytesToBase64Url(new Uint8Array(buf));
+}
+
+function base64UrlDecode(str: string): Uint8Array {
   const pad = str.length % 4 === 0 ? "" : "=".repeat(4 - (str.length % 4));
-  return atob(str.replace(/-/g, "+").replace(/_/g, "/") + pad);
+  const binary = atob(str.replace(/-/g, "+").replace(/_/g, "/") + pad);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
 }
 
 async function hmacSha256(secret: string, message: string): Promise<string> {
@@ -113,7 +121,7 @@ export async function verifyToken(token: string): Promise<SessionUser | null> {
 
   let decoded: any;
   try {
-    decoded = JSON.parse(base64UrlDecode(payload));
+    decoded = JSON.parse(new TextDecoder().decode(base64UrlDecode(payload)));
   } catch {
     return null;
   }

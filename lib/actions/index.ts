@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { randomBytes } from "crypto";
 import { pool } from "@/lib/db";
 import { getSession, canAccessBoutique } from "@/lib/auth";
 import {
@@ -18,6 +19,7 @@ import type {
   CodePromoFormData,
   ClientFormData,
   CommandeFormData,
+  RoleUtilisateur,
   FournisseurFormData,
   CommandeFournisseurFormData,
   GroupeFormData,
@@ -37,6 +39,56 @@ const ROLES_AVEC_SCOPE = new Set([
   "directeur_groupe",
   "directeur_region",
 ]);
+
+// Profils d'équipe créés par défaut à chaque boutique
+const ROLES_PAR_DEFAUT: { role: RoleUtilisateur; label: string }[] = [
+  { role: "gerant", label: "Gérant" },
+  { role: "gerant_stock", label: "Magasinier" },
+  { role: "comptable", label: "Comptable" },
+  { role: "vendeur", label: "Vendeur" },
+];
+
+function slugifier(nom: string): string {
+  return (
+    nom
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "boutique"
+  ).slice(0, 24);
+}
+
+function genererMotDePasse(): string {
+  return randomBytes(9).toString("base64url");
+}
+
+async function creerComptesParDefaut(
+  boutiqueId: string,
+  boutiqueNom: string
+): Promise<{ role: RoleUtilisateur; label: string; email: string; password: string }[]> {
+  const slug = `${slugifier(boutiqueNom)}-${boutiqueId.slice(0, 6)}`;
+  const crees = [];
+  for (const { role, label } of ROLES_PAR_DEFAUT) {
+    const email = `${role}.${slug}@defaut.multiboutique.com`;
+    const { rows } = await pool.query(
+      `SELECT 1 FROM utilisateurs
+       WHERE role = $1::role_utilisateur AND boutique_ids @> ARRAY[$2]::uuid[]
+       LIMIT 1`,
+      [role, boutiqueId]
+    );
+    if (rows.length > 0) continue;
+
+    const password = genererMotDePasse();
+    await pool.query(
+      `INSERT INTO utilisateurs (email, password_hash, nom_complet, role, boutique_ids, actif)
+       VALUES ($1, crypt($2, gen_salt('bf', 10)), $3, $4::role_utilisateur, $5, true)`,
+      [email, password, `${label} — ${boutiqueNom}`, role, [boutiqueId]]
+    );
+    crees.push({ role, label, email, password });
+  }
+  return crees;
+}
 
 async function exigerAccesBoutique(
   boutiqueId: string,
@@ -1257,9 +1309,10 @@ export async function creerBoutique(data: BoutiqueFormData) {
   await exigerAdministrateur();
   if (!data.nom.trim()) throw new Error("Le nom de la boutique est requis");
 
-  await pool.query(
+  const { rows } = await pool.query(
     `INSERT INTO boutiques (nom, adresse, telephone, email, region_id, statut)
-     VALUES ($1, $2, $3, $4, $5, $6)`,
+     VALUES ($1, $2, $3, $4, $5, $6)
+     RETURNING id`,
     [
       data.nom.trim(),
       data.adresse?.trim() || null,
@@ -1269,10 +1322,50 @@ export async function creerBoutique(data: BoutiqueFormData) {
       data.statut,
     ]
   );
+  const boutiqueId = rows[0].id;
+
+  const comptes = await creerComptesParDefaut(boutiqueId, data.nom.trim());
 
   revalidatePath("/admin/boutiques");
+  revalidatePath("/admin/utilisateurs");
   revalidatePath("/boutique");
-  return { success: true };
+  return { success: true, boutiqueId, comptes };
+}
+
+export async function listerComptesBoutique(boutiqueId: string) {
+  await exigerAdministrateur();
+  const { rows } = await pool.query(
+    `SELECT id, nom_complet, email, role, actif
+     FROM utilisateurs
+     WHERE boutique_ids @> ARRAY[$1]::uuid[]
+     ORDER BY role, email`,
+    [boutiqueId]
+  );
+  return rows;
+}
+
+export async function creerUtilisateursDefaut(boutiqueId: string) {
+  const admin = await exigerAdministrateur();
+  const { rows } = await pool.query(
+    `SELECT id, nom FROM boutiques WHERE id = $1`,
+    [boutiqueId]
+  );
+  if (rows.length === 0) throw new Error("Boutique introuvable");
+
+  const comptes = await creerComptesParDefaut(boutiqueId, rows[0].nom);
+
+  if (comptes.length > 0) {
+    await pool.query(
+      `INSERT INTO journal_audit (auteur_id, action, entite, valeur_apres)
+       VALUES ($1, 'creation', 'utilisateurs_defaut',
+               jsonb_build_object('boutique_id', $2::text, 'comptes', $3::text))`,
+      [admin.id, boutiqueId, JSON.stringify(comptes.map((c) => c.email))]
+    );
+  }
+
+  revalidatePath("/admin/boutiques");
+  revalidatePath("/admin/utilisateurs");
+  return { success: true, comptes };
 }
 
 export async function modifierBoutique(

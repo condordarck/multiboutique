@@ -5,6 +5,13 @@ import { useRouter } from "next/navigation";
 import { creerBoutique } from "@/lib/actions";
 import type { Region } from "@/types";
 
+interface CompteCree {
+  role: string;
+  label: string;
+  email: string;
+  password: string;
+}
+
 export function NouvelleBoutiqueForm({ regions }: { regions: Region[] }) {
   const router = useRouter();
   const [nom, setNom] = useState("");
@@ -15,6 +22,7 @@ export function NouvelleBoutiqueForm({ regions }: { regions: Region[] }) {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [comptes, setComptes] = useState<CompteCree[]>([]);
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -22,8 +30,9 @@ export function NouvelleBoutiqueForm({ regions }: { regions: Region[] }) {
     setLoading(true);
     setError("");
     setSuccess("");
+    setComptes([]);
     try {
-      await creerBoutique({
+      const resultat = await creerBoutique({
         nom,
         adresse,
         telephone,
@@ -31,7 +40,8 @@ export function NouvelleBoutiqueForm({ regions }: { regions: Region[] }) {
         region_id: regionId || null,
         statut: "active",
       });
-      setSuccess("Boutique créée");
+      setSuccess("Boutique créée avec ses profils d'équipe par défaut");
+      setComptes(resultat.comptes || []);
       setNom("");
       setAdresse("");
       setTelephone("");
@@ -58,6 +68,22 @@ export function NouvelleBoutiqueForm({ regions }: { regions: Region[] }) {
           )}
           {success && (
             <div className="rounded-lg bg-green-50 p-3 text-sm text-green-700">{success}</div>
+          )}
+          {comptes.length > 0 && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm">
+              <p className="font-semibold text-amber-800">
+                Profils créés — notez ces accès, puis changez les mots de
+                passe :
+              </p>
+              <ul className="mt-1 space-y-1 text-amber-900">
+                {comptes.map((c) => (
+                  <li key={c.email}>
+                    <span className="font-medium">{c.label}</span> —{" "}
+                    {c.email} / <span className="font-mono">{c.password}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
