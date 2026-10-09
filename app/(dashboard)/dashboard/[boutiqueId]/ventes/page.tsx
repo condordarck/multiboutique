@@ -178,6 +178,7 @@ export default async function VentesPage({
                   <th className="pb-3 font-medium text-gray-500">Montant</th>
                   <th className="pb-3 font-medium text-gray-500">Paiement</th>
                   <th className="pb-3 font-medium text-gray-500">Statut</th>
+                  <th className="pb-3 font-medium text-gray-500"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -211,11 +212,19 @@ export default async function VentesPage({
                         <span className="badge-warning">Corrigée</span>
                       )}
                     </td>
+                    <td className="py-3 text-right">
+                      <a
+                        href={`/dashboard/${boutiqueId}/ventes/${v.id}`}
+                        className="rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100"
+                      >
+                        Reçu
+                      </a>
+                    </td>
                   </tr>
                 ))}
                 {ventes.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="py-8 text-center text-gray-400">
+                    <td colSpan={7} className="py-8 text-center text-gray-400">
                       Aucune vente enregistrée
                     </td>
                   </tr>

@@ -153,6 +153,8 @@ export interface Vente {
   motif_annulation: string | null;
   code_promo_id: string | null;
   remise: number;
+  client_id: string | null;
+  montant_paye: number;
   created_at: string;
   updated_at: string;
 }

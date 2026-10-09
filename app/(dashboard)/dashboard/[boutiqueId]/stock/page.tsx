@@ -4,6 +4,7 @@ import { aPermission } from "@/lib/permissions";
 import { query } from "@/lib/db";
 import { getMonnaie } from "@/lib/monnaie";
 import { StockActions } from "@/components/dashboard/StockActions";
+import { MouvementsFiltres } from "@/components/dashboard/MouvementsFiltres";
 import type { Boutique } from "@/types";
 
 interface StockRow {
@@ -33,10 +34,13 @@ interface MouvementRow {
 
 export default async function StockPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ boutiqueId: string }>;
+  searchParams: Promise<{ periode?: string; type?: string; produit?: string }>;
 }) {
   const { boutiqueId } = await params;
+  const { periode, type, produit } = await searchParams;
   const monnaie = await getMonnaie();
   const user = await getSession();
   const peutGererStock = aPermission(user, "stock:gerer");
@@ -55,15 +59,56 @@ export default async function StockPage({
     [boutiqueId]
   );
 
+  const maintenant = new Date();
+  const debut = new Date(maintenant);
+  switch (periode) {
+    case "jour":
+      debut.setHours(0, 0, 0, 0);
+      break;
+    case "semaine": {
+      const jour = (debut.getDay() + 6) % 7; // lundi = 0
+      debut.setDate(debut.getDate() - jour);
+      debut.setHours(0, 0, 0, 0);
+      break;
+    }
+    case "mois":
+      debut.setDate(1);
+      debut.setHours(0, 0, 0, 0);
+      break;
+    case "annee":
+      debut.setMonth(0, 1);
+      debut.setHours(0, 0, 0, 0);
+      break;
+    default:
+      debut.setFullYear(0);
+  }
+
+  const conditions = ["m.boutique_id = $1"];
+  const parametres: (string | number)[] = [boutiqueId];
+  if (periode) {
+    parametres.push(debut.toISOString());
+    conditions.push(`m.created_at >= $${parametres.length}`);
+  }
+  if (type) {
+    parametres.push(type);
+    conditions.push(`m.type = $${parametres.length}`);
+  }
+  if (produit && produit.trim()) {
+    parametres.push(`%${produit.trim()}%`);
+    conditions.push(
+      `(p.nom ILIKE $${parametres.length} OR p.reference ILIKE $${parametres.length})`
+    );
+  }
+
   const mouvements = await query<MouvementRow>(
     `SELECT m.*, p.nom AS produit_nom, u.nom_complet AS auteur_nom
      FROM mouvements_stock m
      JOIN produits p ON p.id = m.produit_id
      LEFT JOIN utilisateurs u ON u.id = m.auteur_id
-     WHERE m.boutique_id = $1
+     WHERE ${conditions.join(" AND ")}
      ORDER BY m.created_at DESC
-     LIMIT 20`,
-    [boutiqueId]
+     LIMIT 500`,
+    parametres
   );
 
   const enStock = stocks.filter((s) => s.statut_stock !== "rupture").length;
@@ -159,11 +204,9 @@ export default async function StockPage({
         </div>
       </div>
 
-      {/* Derniers mouvements */}
+      {/* Historique des mouvements */}
+      <MouvementsFiltres total={mouvements.length} />
       <div className="card">
-        <h2 className="mb-4 text-lg font-semibold text-gray-900">
-          Derniers mouvements
-        </h2>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
@@ -208,7 +251,7 @@ export default async function StockPage({
               {mouvements.length === 0 && (
                 <tr>
                   <td colSpan={7} className="py-8 text-center text-gray-400">
-                    Aucun mouvement enregistré
+                    Aucun mouvement pour les filtres sélectionnés
                   </td>
                 </tr>
               )}
