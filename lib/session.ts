@@ -37,6 +37,7 @@ export interface SessionUser {
   boutique_ids: string[];
   region_id?: string | null;
   groupe_id?: string | null;
+  permissions?: string[];
 }
 
 const SESSION_DURATION_SECONDS = 7 * 24 * 60 * 60; // 7 jours

@@ -17,6 +17,7 @@ export function ClientForm({ boutiqueId }: Props) {
   const [adresse, setAdresse] = useState("");
   const [typeClient, setTypeClient] = useState<TypeClient>("grossiste");
   const [plafond, setPlafond] = useState("");
+  const [estVip, setEstVip] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [open, setOpen] = useState(false);
@@ -36,6 +37,7 @@ export function ClientForm({ boutiqueId }: Props) {
         adresse,
         type_client: typeClient,
         plafond_credit: plafond ? Number(plafond) : 0,
+        est_vip: estVip,
       });
       setSuccess("Client créé avec succès");
       setNom("");
@@ -133,6 +135,19 @@ export function ClientForm({ boutiqueId }: Props) {
               />
             </div>
           </div>
+
+          <label className="flex w-fit items-center gap-2 text-sm text-gray-700">
+            <input
+              type="checkbox"
+              checked={estVip}
+              onChange={(e) => setEstVip(e.target.checked)}
+              className="h-4 w-4 accent-amber-500"
+            />
+            Client VIP <span className="text-xs text-amber-600">★</span>
+            <span className="text-xs font-normal text-gray-400">
+              Paiement partiel autorisé à la vente (créance suivie au registre)
+            </span>
+          </label>
 
           <div className="flex justify-end">
             <button type="submit" disabled={loading} className="btn-primary">

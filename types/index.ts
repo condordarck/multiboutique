@@ -234,6 +234,8 @@ export interface VenteFormData {
   boutique_id: string;
   mode_paiement: ModePaiement;
   code_promo?: string;
+  client_id?: string;
+  montant_paye?: number;
   lignes: {
     produit_id: string;
     quantite: number;
@@ -259,6 +261,7 @@ export interface ProduitFormData {
   description?: string;
   categorie_id?: string;
   image_url?: string;
+  code?: string;
 }
 
 export interface NouvelUtilisateurData {
@@ -333,6 +336,8 @@ export interface Client {
   type_client: TypeClient;
   plafond_credit: number;
   encours: number;
+  est_vip: boolean;
+  derniere_activite?: string | null;
   actif: boolean;
   created_at: string;
   updated_at: string;
@@ -416,6 +421,7 @@ export interface ClientFormData {
   adresse?: string;
   type_client: TypeClient;
   plafond_credit?: number;
+  est_vip?: boolean;
 }
 
 export interface CommandeFormData {

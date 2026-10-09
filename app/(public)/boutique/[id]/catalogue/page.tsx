@@ -8,6 +8,8 @@ interface CatalogueItem {
   id: string;
   produit_nom: string;
   produit_reference: string;
+  produit_code: string | null;
+  produit_image: string | null;
   produit_id: string;
   disponible: number;
   prix_vente: number;
@@ -40,7 +42,8 @@ export default async function CataloguePage({
 
   const catalogue = await query<CatalogueItem>(
     `SELECT sd.id, sd.produit_nom, sd.produit_reference, sd.produit_id,
-            sd.disponible, sd.prix_vente, c.id AS categorie_id, c.nom AS categorie_nom
+            sd.disponible, sd.prix_vente, c.id AS categorie_id, c.nom AS categorie_nom,
+            p.code AS produit_code, p.image_url AS produit_image
      FROM stock_disponible sd
      JOIN produits p ON p.id = sd.produit_id
      LEFT JOIN categories c ON c.id = p.categorie_id

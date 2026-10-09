@@ -8,17 +8,20 @@ interface Props {
   monnaie: string;
   nomApplication: string;
   seuilAlerte: string;
+  delaiRelance: string;
 }
 
 export function ParametresForm({
   monnaie,
   nomApplication,
   seuilAlerte,
+  delaiRelance,
 }: Props) {
   const router = useRouter();
   const [monnaieEd, setMonnaieEd] = useState(monnaie);
   const [nomAppEd, setNomAppEd] = useState(nomApplication);
   const [seuilEd, setSeuilEd] = useState(seuilAlerte);
+  const [delaiEd, setDelaiEd] = useState(delaiRelance);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -33,6 +36,7 @@ export function ParametresForm({
         { cle: "monnaie", valeur: monnaieEd },
         { cle: "nom_application", valeur: nomAppEd },
         { cle: "seuil_alerte_defaut", valeur: seuilEd },
+        { cle: "relance_delai_jours", valeur: delaiEd },
       ]);
       setMessage("Paramètres enregistrés");
       router.refresh();
@@ -97,6 +101,23 @@ export function ParametresForm({
         <p className="mt-1 text-xs text-gray-400">
           Alerte déclenchée quand le disponible passe sous ce seuil pour un
           nouveau produit.
+        </p>
+      </div>
+
+      <div>
+        <label className="mb-1 block text-sm font-medium text-gray-700">
+          Délai de relance des créances (jours)
+        </label>
+        <input
+          type="number"
+          value={delaiEd}
+          onChange={(e) => setDelaiEd(e.target.value)}
+          className="input-field"
+          min={1}
+        />
+        <p className="mt-1 text-xs text-gray-400">
+          Un client avec un reste dû est signalé dans la page Clients après ce
+          nombre de jours sans activité.
         </p>
       </div>
 

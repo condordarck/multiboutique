@@ -8,6 +8,8 @@ interface ArticleCatalogue {
   produit_id: string;
   produit_nom: string;
   produit_reference: string;
+  produit_code?: string | null;
+  produit_image?: string | null;
   disponible: number;
   prix_vente: number;
   categorie_id: string | null;
@@ -312,24 +314,39 @@ export function CatalogueReservation({
                     : "border-gray-200"
                 }`}
               >
-                <div className="mb-3 flex h-24 items-center justify-center rounded-lg bg-gray-100">
-                  <svg
-                    className="h-10 w-10 text-gray-300"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.5}
-                      d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                <div className="mb-3 flex h-28 items-center justify-center overflow-hidden rounded-lg bg-gray-100">
+                  {item.produit_image ? (
+                    <img
+                      src={item.produit_image}
+                      alt={item.produit_nom}
+                      className="h-full w-full object-cover"
                     />
-                  </svg>
+                  ) : (
+                    <svg
+                      className="h-10 w-10 text-gray-300"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={1.5}
+                        d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                      />
+                    </svg>
+                  )}
                 </div>
 
                 <h3 className="font-semibold text-gray-900">{item.produit_nom}</h3>
-                <p className="text-xs text-gray-500">{item.produit_reference}</p>
+                <div className="mt-1 flex items-center gap-2">
+                  <p className="text-xs text-gray-500">{item.produit_reference}</p>
+                  {item.produit_code && (
+                    <span className="rounded bg-blue-50 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-blue-700">
+                      {item.produit_code}
+                    </span>
+                  )}
+                </div>
 
                 <div className="mt-3 flex items-center justify-between">
                   <p className="text-lg font-bold text-green-600">

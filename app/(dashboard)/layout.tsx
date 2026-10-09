@@ -36,6 +36,7 @@ export default async function DashboardLayout({
         boutiqueIds={user.boutique_ids}
         boutiques={boutiques}
         userName={user.nom_complet}
+        permissions={user.permissions || []}
       />
       <main className="flex-1 overflow-auto">
         <div className="mx-auto max-w-7xl p-6">{children}</div>

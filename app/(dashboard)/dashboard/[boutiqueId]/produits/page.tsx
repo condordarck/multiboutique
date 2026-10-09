@@ -12,6 +12,8 @@ interface ProduitRow {
   produit_id: string;
   produit_nom: string;
   produit_reference: string;
+  produit_code: string | null;
+  produit_image: string | null;
   produit_description: string | null;
   produit_actif: boolean;
   categorie_nom: string | null;
@@ -45,6 +47,7 @@ export default async function ProduitsPage({
 
   const produits = await query<ProduitRow>(
     `SELECT pb.id, pb.produit_id, p.nom AS produit_nom, p.reference AS produit_reference,
+            p.code AS produit_code, p.image_url AS produit_image,
             p.description AS produit_description, p.actif AS produit_actif,
             c.nom AS categorie_nom,
             pb.prix_vente, pb.cout_revient,
@@ -58,8 +61,8 @@ export default async function ProduitsPage({
     [boutiqueId]
   );
 
-  const categories = await query<{ id: string; nom: string }>(
-    `SELECT id, nom FROM categories ORDER BY nom`
+  const categories = await query<{ id: string; nom: string; code: string | null }>(
+    `SELECT id, nom, code FROM categories ORDER BY nom`
   );
 
   return (
@@ -83,6 +86,7 @@ export default async function ProduitsPage({
             <thead>
               <tr className="border-b border-gray-200">
                 <th className="pb-3 font-medium text-gray-500">Produit</th>
+                <th className="pb-3 font-medium text-gray-500">Code</th>
                 <th className="pb-3 font-medium text-gray-500">Référence</th>
                 <th className="pb-3 font-medium text-gray-500">Catégorie</th>
                 <th className="pb-3 font-medium text-gray-500">Prix de vente</th>
@@ -103,10 +107,30 @@ export default async function ProduitsPage({
                 return (
                   <tr key={p.id} className="hover:bg-gray-50">
                     <td className="py-3">
-                      <p className="font-medium text-gray-900">{p.produit_nom}</p>
-                      <p className="text-xs text-gray-500">
-                        {p.produit_description?.substring(0, 60)}
-                      </p>
+                      <div className="flex items-center gap-3">
+                        {p.produit_image && (
+                          <img
+                            src={p.produit_image}
+                            alt={p.produit_nom}
+                            className="h-10 w-10 rounded-lg object-cover"
+                          />
+                        )}
+                        <div>
+                          <p className="font-medium text-gray-900">{p.produit_nom}</p>
+                          <p className="text-xs text-gray-500">
+                            {p.produit_description?.substring(0, 60)}
+                          </p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="py-3">
+                      {p.produit_code ? (
+                        <span className="rounded bg-blue-50 px-1.5 py-0.5 font-mono text-xs font-semibold text-blue-700">
+                          {p.produit_code}
+                        </span>
+                      ) : (
+                        <span className="text-gray-300">—</span>
+                      )}
                     </td>
                     <td className="py-3 text-gray-500">{p.produit_reference}</td>
                     <td className="py-3">
@@ -166,7 +190,7 @@ export default async function ProduitsPage({
               })}
               {produits.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="py-8 text-center text-gray-400">
+                  <td colSpan={10} className="py-8 text-center text-gray-400">
                     Aucun produit dans cette boutique, utilisez « Nouveau
                     produit » pour commencer
                   </td>

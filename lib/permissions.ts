@@ -21,6 +21,8 @@ export type Permission =
   | "promos:gerer"
   | "clients:voir"
   | "clients:gerer"
+  | "credits:voir"
+  | "credits:gerer"
   | "commandes:voir"
   | "commandes:gerer"
   | "achats:voir"
@@ -45,6 +47,8 @@ const TOUTES_PERMISSIONS: Permission[] = [
   "promos:gerer",
   "clients:voir",
   "clients:gerer",
+  "credits:voir",
+  "credits:gerer",
   "commandes:voir",
   "commandes:gerer",
   "achats:voir",
@@ -63,6 +67,7 @@ const PERMISSIONS_DIRECTION: Permission[] = [
   "rapports:voir",
   "promos:voir",
   "clients:voir",
+  "credits:voir",
   "commandes:voir",
   "achats:voir",
   "consolidation:voir",
@@ -86,8 +91,8 @@ const PERMISSIONS_PAR_ROLE: Record<RoleUtilisateur, Permission[]> = {
   // (hors publication des prix conseillés, réservée au siège)
   gerant: TOUTES_PERMISSIONS.filter((p) => p !== "prix_conseilles:gerer"),
 
-  // Uniquement les entrées/ajustements de stock
-  gerant_stock: ["stock:voir", "stock:gerer", "produits:voir"],
+  // Magasinier : CONSULTE le stock et les produits, ne le modifie pas
+  gerant_stock: ["stock:voir", "produits:voir"],
 
   // Lecture seule des ventes et réservations (suivi financier)
   comptable: [
@@ -98,6 +103,8 @@ const PERMISSIONS_PAR_ROLE: Record<RoleUtilisateur, Permission[]> = {
     "rapports:voir",
     "promos:voir",
     "clients:voir",
+    "credits:voir",
+    "credits:gerer",
     "commandes:voir",
     "achats:voir",
     "consolidation:voir",
@@ -120,6 +127,11 @@ export function aPermission(
   permission: Permission
 ): boolean {
   if (!user) return false;
+  // L'administrateur gère la configuration, pas les données commerciales
+  if (user.role === "administrateur") return false;
+  if (Array.isArray(user.permissions) && user.permissions.length > 0) {
+    return user.permissions.includes(permission);
+  }
   return permissionsDuRole(user.role).includes(permission);
 }
 

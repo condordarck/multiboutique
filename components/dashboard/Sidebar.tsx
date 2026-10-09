@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { permissionsDuRole } from "@/lib/permissions";
 import type { RoleUtilisateur, Boutique } from "@/types";
 
 interface SidebarProps {
@@ -10,6 +9,7 @@ interface SidebarProps {
   boutiqueIds: string[];
   boutiques: Boutique[];
   userName: string;
+  permissions: string[];
 }
 
 const LIBELLES_ROLE: Record<string, string> = {
@@ -95,10 +95,10 @@ const LIENS_BOUTIQUE: LienMenu[] = [
   },
 ];
 
-export function Sidebar({ role, boutiqueIds, boutiques, userName }: SidebarProps) {
+export function Sidebar({ role, boutiqueIds, boutiques, userName, permissions }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const perms = permissionsDuRole(role);
+  const perms = permissions;
   const isProprietaire = role === "proprietaire";
 
   async function handleLogout() {

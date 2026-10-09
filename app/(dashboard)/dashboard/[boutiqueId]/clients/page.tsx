@@ -28,9 +28,12 @@ export default async function ClientsPage({
   const boutique = boutiques[0];
 
   const clients = await query<Client>(
-    `SELECT * FROM clients
-     WHERE boutique_id = $1
-     ORDER BY actif DESC, nom`,
+    `SELECT c.*,
+            (SELECT MAX(created_at) FROM registre_credits rc
+             WHERE rc.client_id = c.id) AS derniere_activite
+     FROM clients c
+     WHERE c.boutique_id = $1
+     ORDER BY c.actif DESC, c.nom`,
     [boutiqueId]
   );
 
@@ -42,6 +45,29 @@ export default async function ClientsPage({
     (acc, c) => acc + (Number(c.plafond_credit) || 0),
     0
   );
+  const nbVip = clients.filter((c) => c.est_vip).length;
+
+  // === Relances : créance active restée inerte au-delà du délai configuré ===
+  const delaiRelance = Number(
+    (
+      await query(
+        `SELECT valeur FROM parametres WHERE cle = 'relance_delai_jours'`
+      )
+    )[0]?.valeur
+  );
+  const maintenant = Date.now();
+  const aRelancer = clients
+    .filter((c) => Number(c.encours) > 0 && c.actif)
+    .map((c) => {
+      const dernierMvt = c.derniere_activite
+        ? new Date(c.derniere_activite).getTime()
+        : Date.now();
+      return {
+        client: c,
+        jours: Math.max(0, Math.floor((maintenant - dernierMvt) / 86400000)),
+      };
+    })
+    .filter((r) => r.jours >= (delaiRelance || 30));
 
   return (
     <div>
@@ -71,7 +97,38 @@ export default async function ClientsPage({
             {totalPlafond.toLocaleString("fr-FR")} {monnaie}
           </p>
         </div>
+        <div className="card">
+          <p className="text-sm text-gray-500">Clients VIP</p>
+          <p className="mt-1 text-3xl font-bold text-amber-500">{nbVip}</p>
+        </div>
       </div>
+
+      {aRelancer.length > 0 && (
+        <div className="mb-8 rounded-lg border border-red-200 bg-red-50 p-4">
+          <h2 className="text-sm font-semibold text-red-800">
+            ⚠ Relances — {aRelancer.length} client
+            {aRelancer.length > 1 ? "s" : ""} au-delà de {delaiRelance || 30} jours
+            sans activité
+          </h2>
+          <ul className="mt-2 space-y-1">
+            {aRelancer.map(({ client, jours }) => (
+              <li
+                key={client.id}
+                className="flex items-center justify-between text-sm text-red-700"
+              >
+                <span className="font-medium">{client.nom}</span>
+                <span>
+                  {Number(client.encours).toLocaleString("fr-FR")} {monnaie} ·{" "}
+                  {jours} j
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-xs text-red-500">
+            Délai configurable dans Paramètres généraux (Admin).
+          </p>
+        </div>
+      )}
 
       {peutGerer && <ClientForm boutiqueId={boutiqueId} />}
 
@@ -105,7 +162,17 @@ export default async function ClientsPage({
                 return (
                   <tr key={c.id} className="hover:bg-gray-50 align-top">
                     <td className="py-3">
-                      <p className="font-medium text-gray-900">{c.nom}</p>
+                      <p className="font-medium text-gray-900">
+                        {c.nom}{" "}
+                        {c.est_vip && (
+                          <span
+                            className="text-amber-500"
+                            title="Client VIP"
+                          >
+                            ★
+                          </span>
+                        )}
+                      </p>
                       <p className="text-xs text-gray-500">
                         {c.telephone || ""}
                         {c.email ? ` · ${c.email}` : ""}

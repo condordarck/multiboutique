@@ -21,6 +21,14 @@ interface LignePanier {
   disponible: number;
 }
 
+export interface ClientVente {
+  id: string;
+  nom: string;
+  telephone: string | null;
+  encours: number;
+  plafond_credit: number;
+}
+
 interface VenteFormProps {
   boutiqueId: string;
   boutiqueNom: string;
@@ -29,6 +37,7 @@ interface VenteFormProps {
   monnaie: string;
   vendeurNom: string;
   produits: ProduitVente[];
+  clients: ClientVente[];
 }
 
 type Ecran = "panier" | "recu";
@@ -47,20 +56,28 @@ export function VenteForm({
   monnaie,
   vendeurNom,
   produits,
+  clients,
 }: VenteFormProps) {
   const [lignes, setLignes] = useState<LignePanier[]>([]);
   const [modePaiement, setModePaiement] = useState<ModePaiement>("especes");
   const [erreur, setErreur] = useState<string | null>(null);
   const [envoyee, setEnvoyee] = useState(false);
   const [ecran, setEcran] = useState<Ecran>("panier");
+  const [clientId, setClientId] = useState("");
+  const [montantVerse, setMontantVerse] = useState("");
   const [recu, setRecu] = useState<{
     reference: string;
     montantTotal: number;
     remise: number;
     date: string;
+    paye: number;
+    reste: number;
+    clientNom: string | null;
   } | null>(null);
   const [montantRecu, setMontantRecu] = useState<string>("");
   const [codePromo, setCodePromo] = useState("");
+
+  const clientChoisi = clients.find((c) => c.id === clientId) || null;
 
   const produitsVendables = produits.filter((p) => p.disponible > 0);
 
@@ -131,6 +148,8 @@ const reste = useMemo(() => {
     setErreur(null);
     setMontantRecu("");
     setCodePromo("");
+    setClientId("");
+    setMontantVerse("");
     setEcran("panier");
     setRecu(null);
   }
@@ -140,7 +159,17 @@ const reste = useMemo(() => {
       setErreur("Ajoutez au moins un article au panier");
       return;
     }
-    if (modePaiement === "especes" && !codePromo.trim() && reste < 0) {
+    const parti = Number(montantVerse) || 0;
+    if (clientId && parti <= 0) {
+      setErreur("Indiquez le montant payé par le client");
+      return;
+    }
+    if (
+      !clientId &&
+      modePaiement === "especes" &&
+      !codePromo.trim() &&
+      reste < 0
+    ) {
       setErreur(`Montant reçu insuffisant (il manque ${-reste.toFixed(2)} ${monnaie})`);
       return;
     }
@@ -152,6 +181,8 @@ const reste = useMemo(() => {
         boutique_id: boutiqueId,
         mode_paiement: modePaiement,
         code_promo: codePromo.trim() || undefined,
+        client_id: clientId || undefined,
+        montant_paye: clientId ? parti : undefined,
         lignes: lignes.map((l) => ({
           produit_id: l.produit_id,
           quantite: l.quantite,
@@ -164,6 +195,9 @@ const reste = useMemo(() => {
           montantTotal: resultat.montantTotal,
           remise: resultat.remise || 0,
           date: new Date().toLocaleString("fr-FR"),
+          paye: clientId ? parti : resultat.montantTotal,
+          reste: resultat.reste || 0,
+          clientNom: clientChoisi ? clientChoisi.nom : null,
         });
         setEcran("recu");
       }
@@ -209,6 +243,11 @@ const reste = useMemo(() => {
             <p className="text-xs text-gray-600 capitalize">
               Paiement : {modePaiement.replace("_", " ")}
             </p>
+            {recu.clientNom && (
+              <p className="text-xs font-medium text-gray-700">
+                Client : {recu.clientNom}
+              </p>
+            )}
           </div>
 
           <div className="border-t border-dashed border-gray-300 pt-2">
@@ -246,7 +285,7 @@ const reste = useMemo(() => {
                 {recu.montantTotal.toLocaleString("fr-FR")} {monnaie}
               </span>
             </div>
-            {modePaiement === "especes" && (
+            {modePaiement === "especes" && !recu.clientNom && (
               <div className="mt-1 flex justify-between text-sm text-gray-600">
                 <span>Rendu</span>
                 <span>
@@ -257,6 +296,24 @@ const reste = useMemo(() => {
                   {monnaie}
                 </span>
               </div>
+            )}
+            {recu.clientNom && (
+              <>
+                <div className="mt-1 flex justify-between text-sm text-gray-600">
+                  <span>Payé</span>
+                  <span>
+                    {recu.paye.toLocaleString("fr-FR")} {monnaie}
+                  </span>
+                </div>
+                {recu.reste > 0 && (
+                  <div className="mt-1 flex justify-between text-sm font-semibold text-red-600">
+                    <span>Reste à devoir</span>
+                    <span>
+                      {recu.reste.toLocaleString("fr-FR")} {monnaie}
+                    </span>
+                  </div>
+                )}
+              </>
             )}
           </div>
 
@@ -276,6 +333,57 @@ const reste = useMemo(() => {
           <button onClick={toutEffacer} className="text-sm text-red-600 hover:underline">
             Tout effacer
           </button>
+        )}
+      </div>
+
+      <div className="mb-4 grid grid-cols-1 gap-4 rounded-lg border border-gray-200 bg-gray-50 p-4 sm:grid-cols-2">
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-700">
+            Client (facultatif)
+          </label>
+          <select
+            value={clientId}
+            onChange={(e) => {
+              setClientId(e.target.value);
+              setMontantVerse("");
+            }}
+            className="input-field"
+          >
+            <option value="">— Vente comptant —</option>
+            {clients
+              .filter((c) => c.id)
+              .map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nom}
+                  {Number(c.encours) > 0
+                    ? ` (encours : ${Number(c.encours).toLocaleString("fr-FR")})`
+                    : ""}
+                </option>
+              ))}
+          </select>
+          <p className="mt-1 text-xs text-gray-400">
+            Renseignez un client pour accepter un paiement partiel (crédit).
+          </p>
+        </div>
+        {clientId && (
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">
+              Montant payé
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              min="0.01"
+              value={montantVerse}
+              onChange={(e) => setMontantVerse(e.target.value)}
+              className="input-field"
+              placeholder={`0 — ${total} ${monnaie}`}
+            />
+            <p className="mt-1 text-xs text-gray-400">
+              La différence ({total.toLocaleString("fr-FR")} {monnaie} au
+              total) sera portée au crédit du client.
+            </p>
+          </div>
         )}
       </div>
 

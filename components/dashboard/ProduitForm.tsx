@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { creerProduit, entrerStock } from "@/lib/actions";
 
 interface Props {
   boutiqueId: string;
-  categories?: { id: string; nom: string }[];
+  categories?: { id: string; nom: string; code?: string | null }[];
 }
 
 export function ProduitForm({ boutiqueId, categories = [] }: Props) {
@@ -14,14 +14,43 @@ export function ProduitForm({ boutiqueId, categories = [] }: Props) {
   const [open, setOpen] = useState(false);
   const [nom, setNom] = useState("");
   const [reference, setReference] = useState("");
+  const [code, setCode] = useState("");
   const [description, setDescription] = useState("");
   const [categorieId, setCategorieId] = useState("");
   const [prixVente, setPrixVente] = useState("");
   const [coutRevient, setCoutRevient] = useState("");
   const [quantiteInitiale, setQuantiteInitiale] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
+  const [uploadEnCours, setUploadEnCours] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
+  const photoRef = useRef<HTMLInputElement>(null);
+
+  const categorieChoisie = categories.find((c) => c.id === categorieId);
+  const apercuCode = code.trim()
+    ? code.trim().toUpperCase()
+    : `${(categorieChoisie?.code || "PRD")}-000${(categories.length || 0) + 1}`;
+
+  async function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const fichier = e.target.files?.[0];
+    if (!fichier) return;
+    setUploadEnCours(true);
+    setError("");
+    try {
+      const fd = new FormData();
+      fd.append("file", fichier);
+      const res = await fetch("/api/upload", { method: "POST", body: fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Upload impossible");
+      setImageUrl(data.url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erreur lors de l'upload");
+    } finally {
+      setUploadEnCours(false);
+      if (photoRef.current) photoRef.current.value = "";
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -44,6 +73,8 @@ export function ProduitForm({ boutiqueId, categories = [] }: Props) {
           reference: reference || nom.replace(/\s+/g, "-").toUpperCase(),
           description: description || undefined,
           categorie_id: categorieId || undefined,
+          image_url: imageUrl || undefined,
+          code: code || undefined,
         },
         prix,
         coutRevient ? Number(coutRevient) : undefined
@@ -63,11 +94,13 @@ export function ProduitForm({ boutiqueId, categories = [] }: Props) {
       setSuccess("Produit ajouté");
       setNom("");
       setReference("");
+      setCode("");
       setDescription("");
       setCategorieId("");
       setPrixVente("");
       setCoutRevient("");
       setQuantiteInitiale("");
+      setImageUrl("");
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur lors de l'ajout");
@@ -118,7 +151,60 @@ export function ProduitForm({ boutiqueId, categories = [] }: Props) {
                 placeholder="auto si vide"
               />
             </div>
-            <div className="sm:col-span-2">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                Photo produit
+              </label>
+              <div className="flex items-center gap-3">
+                {imageUrl ? (
+                  <img
+                    src={imageUrl}
+                    alt="Aperçu produit"
+                    className="h-14 w-14 rounded-lg object-cover"
+                  />
+                ) : (
+                  <div className="flex h-14 w-14 items-center justify-center rounded-lg border border-dashed border-gray-300 bg-gray-50 text-xs text-gray-400">
+                    {uploadEnCours ? "…" : "Aucune"}
+                  </div>
+                )}
+                <div className="flex flex-col gap-1">
+                  <input
+                    ref={photoRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    onChange={handlePhoto}
+                    disabled={uploadEnCours}
+                    className="text-sm text-gray-600 file:mr-2 file:rounded-lg file:border-0 file:bg-blue-600 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-white"
+                  />
+                  {imageUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setImageUrl("")}
+                      className="text-left text-xs text-red-600 hover:underline"
+                    >
+                      Retirer la photo
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                Code produit (nomenclature)
+              </label>
+              <input
+                type="text"
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                className="input-field uppercase"
+                placeholder={apercuCode}
+              />
+              <p className="mt-1 text-xs text-gray-400">
+                Vide = généré automatiquement (ex. {apercuCode}) — pour le
+                scanner des produits plus tard.
+              </p>
+            </div>
+            <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">
                 Description
               </label>

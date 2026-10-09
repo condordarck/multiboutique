@@ -67,6 +67,27 @@ export default async function VentesPage({
     disponible: Number(p.quantite) - Number(p.quantite_reservee),
   }));
 
+  const clientsRows = await query<{
+    id: string;
+    nom: string;
+    telephone: string | null;
+    encours: number;
+    plafond_credit: number;
+  }>(
+    `SELECT id, nom, telephone, encours, plafond_credit
+     FROM clients
+     WHERE boutique_id = $1 AND actif = true
+     ORDER BY nom`,
+    [boutiqueId]
+  );
+  const clients = clientsRows.map((c) => ({
+    id: c.id,
+    nom: c.nom,
+    telephone: c.telephone,
+    encours: Number(c.encours) || 0,
+    plafond_credit: Number(c.plafond_credit) || 0,
+  }));
+
   // Stats du jour / du mois (calcul côté serveur)
   const now = new Date();
   const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(
@@ -104,7 +125,7 @@ export default async function VentesPage({
       </div>
 
       {peutVendre && (
-        <VenteForm
+<VenteForm
           boutiqueId={boutiqueId}
           boutiqueNom={boutique.nom}
           boutiqueAdresse={boutique.adresse}
@@ -112,6 +133,7 @@ export default async function VentesPage({
           monnaie={monnaie}
           vendeurNom={user.nom_complet}
           produits={produits}
+          clients={clients}
         />
       )}
 

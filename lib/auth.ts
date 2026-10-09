@@ -61,7 +61,16 @@ export async function getSession(): Promise<SessionUser | null> {
     boutique_ids: boutiqueIds,
     region_id: row.region_id,
     groupe_id: row.groupe_id,
+    permissions: (await chargerPermissions(row.role)) as string[],
   };
+}
+
+async function chargerPermissions(role: RoleUtilisateur): Promise<string[]> {
+  const rows = await query<{ permission: string }>(
+    `SELECT permission FROM roles_permissions WHERE role = $1 AND active = true`,
+    [role]
+  );
+  return rows.map((r) => r.permission);
 }
 
 export function isProprietaire(user: SessionUser | null): boolean {

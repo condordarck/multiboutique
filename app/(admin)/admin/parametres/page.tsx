@@ -18,6 +18,7 @@ export default async function ParametresPage() {
           monnaie={params["monnaie"] || "$"}
           nomApplication={params["nom_application"] || "MultiBoutique"}
           seuilAlerte={params["seuil_alerte_defaut"] || "10"}
+          delaiRelance={params["relance_delai_jours"] || "30"}
         />
       </div>
     </div>

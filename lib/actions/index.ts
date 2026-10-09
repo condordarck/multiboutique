@@ -249,23 +249,94 @@ export async function creerVente(data: VenteFormData) {
       montantTotal
     );
 
-    if (codePromoId) {
-      await client.query(
-        `UPDATE ventes SET montant_total = $1, remise = $2, code_promo_id = $3 WHERE id = $4`,
-        [montantFinal, remise, codePromoId, venteId]
+    // Paiement partiel : seul un client rattaché peut faire crédit
+    let reste = 0;
+    if (data.client_id) {
+      const { rows: clientRows } = await client.query(
+        `SELECT * FROM clients WHERE id = $1 AND boutique_id = $2 AND actif = true FOR UPDATE`,
+        [data.client_id, data.boutique_id]
       );
+      if (clientRows.length === 0) {
+        throw new Error("Client introuvable ou inactif dans cette boutique");
+      }
+      const clientRow = clientRows[0];
+      const paie = Math.min(Number(data.montant_paye) || 0, montantFinal);
+      if (paie <= 0) {
+        throw new Error("Le montant payé est invalide pour une vente au client");
+      }
+      reste = montantFinal - paie;
+      const encoursAvant = Number(clientRow.encours) || 0;
+      const plafond = Number(clientRow.plafond_credit) || 0;
+      if (reste > 0 && plafond > 0 && encoursAvant + reste > plafond) {
+        throw new Error(
+          `Le crédit (${reste.toFixed(
+            2
+          )}) dépasserait le plafond de ${plafond.toFixed(2)}`
+        );
+      }
+
+      if (codePromoId) {
+        await client.query(
+          `UPDATE ventes
+           SET montant_total = $1, remise = $2, code_promo_id = $3,
+               client_id = $4, montant_paye = $5, updated_at = NOW()
+           WHERE id = $6`,
+          [montantFinal, remise, codePromoId, data.client_id, paie, venteId]
+        );
+      } else {
+        await client.query(
+          `UPDATE ventes
+           SET montant_total = $1, client_id = $2, montant_paye = $3, updated_at = NOW()
+           WHERE id = $4`,
+          [montantFinal, data.client_id, paie, venteId]
+        );
+      }
+
+      if (reste > 0) {
+        // Registre de créance : dette contractée
+        const { rows: majClient } = await client.query(
+          `UPDATE clients
+           SET encours = encours + $2, updated_at = NOW()
+           WHERE id = $1
+           RETURNING encours`,
+          [data.client_id, reste]
+        );
+        const nouvelEncours = Number(majClient[0].encours);
+        await client.query(
+          `INSERT INTO registre_credits
+             (client_id, boutique_id, vente_id, type, libelle, montant, solde_apres, auteur_id)
+           VALUES ($1, $2, $3, 'vente', $4, $5, $6, $7)`,
+          [
+            data.client_id,
+            data.boutique_id,
+            venteId,
+            `Vente ${reference} — reste à payer`,
+            reste,
+            nouvelEncours,
+            user.id,
+          ]
+        );
+      }
     } else {
-      await client.query(
-        `UPDATE ventes SET montant_total = $1 WHERE id = $2`,
-        [montantFinal, venteId]
-      );
+      if (codePromoId) {
+        await client.query(
+          `UPDATE ventes SET montant_total = $1, remise = $2, code_promo_id = $3 WHERE id = $4`,
+          [montantFinal, remise, codePromoId, venteId]
+        );
+      } else {
+        await client.query(
+          `UPDATE ventes SET montant_total = $1, montant_paye = $1 WHERE id = $2`,
+          [montantFinal, venteId]
+        );
+      }
     }
 
     await client.query("COMMIT");
 
     revalidatePath(`/dashboard/${data.boutique_id}/ventes`);
     revalidatePath(`/dashboard/${data.boutique_id}/stock`);
-    return { success: true, reference, montantTotal: montantFinal, remise };
+    revalidatePath(`/dashboard/${data.boutique_id}/clients`);
+    return { success: true, reference, montantTotal: montantFinal, remise, reste };
   } catch (error) {
     await client.query("ROLLBACK");
     throw error;
@@ -331,6 +402,37 @@ export async function annulerVente(venteId: string, motif: string) {
       });
     }
 
+    // Annulation de la créance si la vente était à crédit
+    if (vente.client_id) {
+      const montantFinal = Number(vente.montant_total) || 0;
+      const paie = Number(vente.montant_paye) || 0;
+      const reste = Math.max(0, montantFinal - paie);
+      if (reste > 0) {
+        const { rows: majClient } = await client.query(
+          `UPDATE clients
+           SET encours = GREATEST(0, encours - $2), updated_at = NOW()
+           WHERE id = $1
+           RETURNING encours`,
+          [vente.client_id, reste]
+        );
+        const nouvelEncours = Number(majClient[0].encours);
+        await client.query(
+          `INSERT INTO registre_credits
+             (client_id, boutique_id, vente_id, type, libelle, montant, solde_apres, auteur_id)
+           VALUES ($1, $2, $3, 'annulation', $4, $5, $6, $7)`,
+          [
+            vente.client_id,
+            vente.boutique_id,
+            venteId,
+            `Annulation vente ${vente.reference_vente} — ${motif}`,
+            -reste,
+            nouvelEncours,
+            user.id,
+          ]
+        );
+      }
+    }
+
     await client.query(
       `UPDATE ventes SET statut = 'annulee', motif_annulation = $1, updated_at = NOW() WHERE id = $2`,
       [motif, venteId]
@@ -340,6 +442,7 @@ export async function annulerVente(venteId: string, motif: string) {
 
     revalidatePath(`/dashboard/${vente.boutique_id}/ventes`);
     revalidatePath(`/dashboard/${vente.boutique_id}/stock`);
+    revalidatePath(`/dashboard/${vente.boutique_id}/clients`);
     return { success: true };
   } catch (error) {
     await client.query("ROLLBACK");
@@ -739,13 +842,43 @@ export async function creerProduit(
       [data.reference]
     );
 
+    // Code produit (nomenclature) : fourni par l'utilisateur ou généré
+    let code: string;
+    if (data.code && data.code.trim()) {
+      code = data.code.trim().toUpperCase();
+      if (!/^[A-Z0-9-]{2,20}$/.test(code)) {
+        throw new Error("Code produit invalide (lettres, chiffres, tirets uniquement)");
+      }
+      const { rows: dupe } = await client.query(
+        `SELECT 1 FROM produits WHERE code = $1`,
+        [code]
+      );
+      if (dupe.length > 0) throw new Error("Ce code produit existe déjà");
+    } else {
+      const { rows: prefixRows } = await client.query(
+        `SELECT COALESCE((SELECT code FROM categories WHERE id = $1), 'PRD') AS prefix`,
+        [data.categorie_id || null]
+      );
+      const prefix = prefixRows[0].prefix;
+      const { rows: last } = await client.query(
+        `SELECT code FROM produits WHERE code LIKE $1 ORDER BY code DESC LIMIT 1`,
+        [`${prefix}-%`]
+      );
+      const seq = last.length ? parseInt(last[0].code.split("-").pop(), 10) + 1 : 1;
+      code = `${prefix}-${String(seq).padStart(4, "0")}`;
+    }
+
     let produitId: string;
     if (existRows.length > 0) {
       produitId = existRows[0].id;
+      await client.query(
+        `UPDATE produits SET code = $1, updated_at = NOW() WHERE id = $2`,
+        [code, produitId]
+      );
     } else {
       const { rows: newRows } = await client.query(
-        `INSERT INTO produits (reference, nom, description, categorie_id, image_url)
-         VALUES ($1, $2, $3, $4, $5)
+        `INSERT INTO produits (reference, nom, description, categorie_id, image_url, code)
+         VALUES ($1, $2, $3, $4, $5, $6)
          RETURNING id`,
         [
           data.reference,
@@ -753,6 +886,7 @@ export async function creerProduit(
           data.description || null,
           data.categorie_id || null,
           data.image_url || null,
+          code,
         ]
       );
       produitId = newRows[0].id;
@@ -1397,8 +1531,8 @@ export async function creerClient(
   if (!data.nom.trim()) throw new Error("Le nom du client est requis");
 
   await pool.query(
-    `INSERT INTO clients (nom, telephone, email, adresse, boutique_id, type_client, plafond_credit)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+    `INSERT INTO clients (nom, telephone, email, adresse, boutique_id, type_client, plafond_credit, est_vip)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
     [
       data.nom.trim(),
       data.telephone?.trim() || null,
@@ -1407,6 +1541,7 @@ export async function creerClient(
       boutiqueId,
       data.type_client,
       data.plafond_credit != null ? Number(data.plafond_credit) : 0,
+      data.est_vip ?? false,
     ]
   );
 
@@ -1426,7 +1561,7 @@ export async function modifierClient(
   await pool.query(
     `UPDATE clients
      SET nom = $2, telephone = $3, email = $4, adresse = $5,
-         type_client = $6, plafond_credit = $7, updated_at = NOW()
+         type_client = $6, plafond_credit = $7, est_vip = $8, updated_at = NOW()
      WHERE id = $1`,
     [
       clientId,
@@ -1436,6 +1571,7 @@ export async function modifierClient(
       data.adresse?.trim() || null,
       data.type_client,
       data.plafond_credit != null ? Number(data.plafond_credit) : 0,
+      data.est_vip ?? false,
     ]
   );
 
@@ -1459,23 +1595,99 @@ export async function toggleActifClient(
   return { success: true };
 }
 
+export async function basculerVip(clientId: string, boutiqueId: string) {
+  await exigerAccesBoutique(boutiqueId, ["clients:gerer"]);
+  await exigerClientDeLaBoutique(clientId, boutiqueId);
+
+  await pool.query(
+    `UPDATE clients SET est_vip = NOT est_vip, updated_at = NOW() WHERE id = $1`,
+    [clientId]
+  );
+
+  revalidatePath(`/dashboard/${boutiqueId}/clients`);
+  return { success: true };
+}
+
+export async function listerRegistre(clientId: string, boutiqueId: string) {
+  await exigerAccesBoutique(boutiqueId, ["clients:voir"]);
+  await exigerClientDeLaBoutique(clientId, boutiqueId);
+
+  const { rows } = await pool.query(
+    `SELECT rc.id, rc.type, rc.libelle, rc.montant, rc.solde_apres,
+            rc.auteur_id, rc.created_at,
+            u.nom_complet AS auteur_nom
+     FROM registre_credits rc
+     LEFT JOIN utilisateurs u ON u.id = rc.auteur_id
+     WHERE rc.client_id = $1 AND rc.boutique_id = $2
+     ORDER BY rc.created_at DESC`,
+    [clientId, boutiqueId]
+  );
+
+  return rows.map((r) => ({
+    id: r.id,
+    type: r.type,
+    libelle: r.libelle,
+    montant: Number(r.montant),
+    soldeApres: Number(r.solde_apres),
+    auteurNom: r.auteur_nom,
+    createdAt: r.created_at,
+  }));
+}
+
 export async function reglerEncours(
   clientId: string,
   boutiqueId: string,
   montant: number
 ) {
-  await exigerAccesBoutique(boutiqueId, ["clients:gerer"]);
+  const user = await exigerAccesBoutique(boutiqueId, ["clients:gerer"]);
   await exigerClientDeLaBoutique(clientId, boutiqueId);
   const montantRegle = Number(montant);
   if (!montantRegle || montantRegle <= 0) {
     throw new Error("Le montant à régler doit être positif");
   }
 
-  await pool.query(
-    `UPDATE clients SET encours = GREATEST(0, encours - $2), updated_at = NOW()
-     WHERE id = $1`,
-    [clientId, montantRegle]
-  );
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+
+    const { rows } = await client.query(
+      `SELECT id, encours, nom FROM clients WHERE id = $1 AND boutique_id = $2 FOR UPDATE`,
+      [clientId, boutiqueId]
+    );
+    if (rows.length === 0) {
+      throw new Error("Client non trouvé dans cette boutique");
+    }
+    const encoursAvant = Number(rows[0].encours) || 0;
+    const difference = Math.min(montantRegle, encoursAvant);
+
+    const { rows: maj } = await client.query(
+      `UPDATE clients SET encours = GREATEST(0, encours - $2), updated_at = NOW()
+       WHERE id = $1 RETURNING encours`,
+      [clientId, difference]
+    );
+    const nouvelEncours = Number(maj[0].encours);
+
+    await client.query(
+      `INSERT INTO registre_credits
+         (client_id, boutique_id, type, libelle, montant, solde_apres, auteur_id)
+       VALUES ($1, $2, 'versement', $3, $4, $5, $6)`,
+      [
+        clientId,
+        boutiqueId,
+        `Versement de ${difference.toFixed(2)}`,
+        -difference,
+        nouvelEncours,
+        user.id,
+      ]
+    );
+
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
 
   revalidatePath(`/dashboard/${boutiqueId}/clients`);
   return { success: true };
@@ -2199,4 +2411,50 @@ export async function supprimerCategorie(categorieId: string) {
   revalidatePath("/admin/categories");
   revalidatePath("/boutique");
   return { success: true };
+}
+
+// ============================================================
+// ADMIN — RÔLES & PERMISSIONS (habilitations configurables)
+// ============================================================
+
+const ROLES_AUTORISES = new Set([
+  "proprietaire",
+  "directeur_groupe",
+  "directeur_region",
+  "gerant",
+  "gerant_stock",
+  "comptable",
+  "vendeur",
+  "client",
+]);
+
+export async function togglePermissionRole(
+  role: string,
+  permission: string,
+  active: boolean
+) {
+  await exigerAdministrateur();
+  if (!ROLES_AUTORISES.has(role)) {
+    throw new Error("Rôle inconnu");
+  }
+  if (!permission.includes(":")) {
+    throw new Error("Permission invalide");
+  }
+
+  await pool.query(
+    `INSERT INTO roles_permissions (role, permission, active)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (role, permission)
+     DO UPDATE SET active = $3`,
+    [role, permission, active]
+  );
+
+  revalidatePath("/admin/roles");
+  revalidatePath("/dashboard");
+  return {
+    success: true,
+    role,
+    permission,
+    active,
+  };
 }
