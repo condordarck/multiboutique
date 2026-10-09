@@ -1,6 +1,7 @@
-# Application — profil PRODUCTION (serveur)
-# Utilise l'image buildée par GitHub Actions sur GHCR.
-# Les secrets sont lus depuis un fichier `.env` placé à côté de ce fichier.
+# Application — profil PRODUCTION et RECETTE.
+# Le reverse proxy n'est PAS dans ce fichier : il est fourni par l'hôte
+# (Apache + certbot en recette, cf. deploy/setup-vhost.sh).
+# Secrets et valeurs par environnement : deploy/.env (jamais commité).
 
 services:
   db:
@@ -14,22 +15,24 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ../db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
-    ports:
-      - "127.0.0.1:5432:5432"
+    # Aucun port publié : la base n'est joignable que par le réseau Docker.
+    # Les pg_dump passent par `docker compose exec`.
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U mb -d multiboutique"]
       interval: 5s
       timeout: 5s
       retries: 12
+    mem_limit: 512m
     networks:
       - multiboutique
 
   app:
-    image: "${IMAGE:?IMAGE manquant (ex: ghcr.io/vous/multiboutique:main)}"
+    image: "${IMAGE:?IMAGE manquant (ex: ghcr.io/condordarck/multiboutique:main)}"
     container_name: multiboutique-prod
     restart: unless-stopped
     ports:
-      - "127.0.0.1:3000:3000"
+      # Jamais 0.0.0.0 : c'est le reverse proxy de l'hôte qui expose l'app.
+      - "127.0.0.1:${APP_PORT:?APP_PORT manquant (recette: 3002)}:3000"
     environment:
       DATABASE_URL: "postgresql://mb:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD manquant}@db:5432/multiboutique"
       JWT_SECRET: "${JWT_SECRET:?JWT_SECRET manquant (ex: openssl rand -hex 32)}"
@@ -38,21 +41,13 @@ services:
         condition: service_healthy
     volumes:
       - ../public/uploads:/app/public/uploads
-    networks:
-      - multiboutique
-
-  nginx:
-    image: nginx:alpine
-    container_name: multiboutique-nginx
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ../nginx/conf.d:/etc/nginx/conf.d
-      - ../nginx/ssl:/etc/nginx/ssl
-    depends_on:
-      - app
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+    mem_limit: 640m
     networks:
       - multiboutique
 

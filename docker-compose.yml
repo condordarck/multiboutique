@@ -60,22 +60,6 @@ services:
     networks:
       - multiboutique
 
-  # ---- Nginx reverse proxy (SSL en production) ----
-  nginx:
-    image: nginx:alpine
-    container_name: multiboutique-nginx
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx/conf.d:/etc/nginx/conf.d
-      - ./nginx/ssl:/etc/nginx/ssl
-    depends_on:
-      - app
-    networks:
-      - multiboutique
-
 networks:
   multiboutique:
     driver: bridge
