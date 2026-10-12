@@ -67,7 +67,7 @@ est inaccessible en écriture au compte de déploiement.
 | D3 | **restic en conteneur** plutôt qu'en paquet système | `sudo` est interactif : `apt install` est impossible depuis un script automatisé. Docker est disponible sans sudo. |
 | D4 | **Cloudflare R2** comme cible de sauvegarde | S3-compatible, sans frais d'egress (déterminant pour une restauration depuis le Bénin), 10 Go gratuits. Un compte Cloudflare est déjà utilisé sur la machine (`cloudflared`). Le MinIO local ne peut pas servir : même machine, donc même sinistre. |
 | D5 | **Script hôte de redémarrage** plutôt qu'un conteneur `autoheal` | Docker ne redémarre pas un conteneur `unhealthy`. Un conteneur de plus pèse sur une machine à 1,9 Go libre. |
-| D6 | **`APP_DIR` sous `/home/arnaud`** | `/opt` appartient à root ; sans sudo non interactif, le CI ne peut pas y écrire. |
+| D6 | **`APP_DIR` = `/var/www/multiboutique`, propriété d'`arnaud`** | `/opt` appartient à root et `sudo` est interactif : le CI ne pourrait pas y écrire. `/var/www` est la convention déjà en place sur la cible (`carrefoot-backoffice`, `carrefoot-espace`, `carrefoot-front` y vivent, possédés par `arnaud`) ; seule la création initiale demande sudo. Aucun `DocumentRoot` ne pointe sur `/var/www` lui-même, donc `deploy/.env` n'y est pas exposé en HTTP. |
 
 ## 4. Périmètre
 
@@ -218,7 +218,7 @@ après un déploiement raté, là où R2 couvre le sinistre matériel.
   cassée affiche un badge vert.
 
 Valeurs de recette : `SERVER_HOST=51.77.221.201`, `SERVER_PORT=22020`,
-`SERVER_USER=arnaud`, `APP_DIR=/home/arnaud/multiboutique`.
+`SERVER_USER=arnaud`, `APP_DIR=/var/www/multiboutique`.
 
 ### 5.6 Documentation
 

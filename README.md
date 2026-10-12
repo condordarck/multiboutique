@@ -196,7 +196,7 @@ un push sur `main` d'atteindre la production.
 | `SERVER_PORT` | Port SSH |
 | `SERVER_USER` | Utilisateur SSH |
 | `SERVER_SSH_KEY` | Clé privée SSH (format PEM) |
-| `APP_DIR` *(variable)* | Chemin du dépôt sur le serveur, ex. `/home/arnaud/multiboutique` |
+| `APP_DIR` *(variable)* | Chemin du dépôt sur le serveur, ex. `/var/www/multiboutique` |
 | `DOMAIN` *(variable)* | Hôte interrogé par le smoke test, ex. `multiboutique.dev4future.space` |
 | `GHCR_USER` / `GHCR_TOKEN` | **Optionnel** : uniquement si le paquet GHCR est privé |
 
@@ -214,8 +214,13 @@ plus en vert.
 ### 3. Préparer le serveur (une seule fois)
 
 ```bash
-# Sur un VPS Linux avec Docker + compose plugin, dépôt cloné sous ~ :
-cd ~/multiboutique
+# Sur un VPS Linux avec Docker + compose plugin. Le dépôt vit dans /var/www,
+# mais il doit appartenir à l'utilisateur de déploiement, sinon le CI ne peut
+# pas y faire git pull :
+sudo mkdir -p /var/www/multiboutique
+sudo chown -R "$USER":"$USER" /var/www/multiboutique
+git clone https://github.com/<TOI>/multiboutique.git /var/www/multiboutique
+cd /var/www/multiboutique
 
 cp deploy/.env.example deploy/.env
 chmod 600 deploy/.env
@@ -240,13 +245,16 @@ crontab -e   # ajouter les trois entrées ci-dessous
 > `backups/`, qui contient des dumps SQL en clair.
 
 ```cron
-30 2 * * *   cd ~/multiboutique && bash deploy/backup.sh           >> backups/cron.log 2>&1
-*/2 * * * *  cd ~/multiboutique && bash deploy/healthcheck-cron.sh >> backups/cron.log 2>&1
-0 4 1 * *    cd ~/multiboutique && bash deploy/restore-test.sh     >> backups/cron.log 2>&1
+30 2 * * *   cd /var/www/multiboutique && bash deploy/backup.sh           >> backups/cron.log 2>&1
+*/2 * * * *  cd /var/www/multiboutique && bash deploy/healthcheck-cron.sh >> backups/cron.log 2>&1
+0 4 1 * *    cd /var/www/multiboutique && bash deploy/restore-test.sh     >> backups/cron.log 2>&1
 ```
 
-> Le dépôt doit être cloné sous `~` et non sous `/opt` : `/opt` appartient à root
-> et `sudo` exige un mot de passe sur la cible, ce que le CI ne peut pas fournir.
+> **Propriété du répertoire.** `/var/www/multiboutique` doit appartenir à
+> l'utilisateur SSH du déploiement. `sudo` est interactif sur la cible : le CI ne
+> peut pas l'utiliser, donc tout ce qu'il fait — `git pull`, `docker compose` —
+> doit passer sans élévation. Seules la création du répertoire et l'installation
+> du vhost demandent `sudo`, une fois chacune.
 
 > ⚠️ `POSTGRES_PASSWORD` n'est lu qu'au **premier** démarrage du volume `pgdata`.
 

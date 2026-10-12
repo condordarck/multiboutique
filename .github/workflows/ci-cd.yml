@@ -100,7 +100,7 @@ jobs:
           key: ${{ secrets.SERVER_SSH_KEY }}
           script_stop: true
           script: |
-            cd "${{ vars.APP_DIR || '/home/arnaud/multiboutique' }}"
+            cd "${{ vars.APP_DIR || '/var/www/multiboutique' }}"
             # Sans échec ici, une image neuve se déploierait sur un checkout
             # périmé : ancien compose, anciennes migrations, anciens scripts.
             git pull --ff-only origin main
@@ -189,7 +189,7 @@ jobs:
           script_stop: true
           envs: TAG
           script: |
-            cd "${{ vars.APP_DIR || '/home/arnaud/multiboutique' }}"
+            cd "${{ vars.APP_DIR || '/var/www/multiboutique' }}"
             git fetch origin --tags --force
             git checkout --detach "$TAG"
             export IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}"
