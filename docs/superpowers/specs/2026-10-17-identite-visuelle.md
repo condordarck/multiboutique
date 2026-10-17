@@ -91,7 +91,30 @@ La tâche 8 rend ces vérifications automatiques ; ce tableau n'en est qu'un ape
 En thème sombre, les ombres disparaissent : la hiérarchie passe par `surface` et
 `surfaceRelevee`.
 
-## 5. Référence visuelle
+## 5. Logotype
+
+Proposition « Étiquette », retenue parmi trois :
+
+- **Logotype** : « MultiBoutique » en Bricolage Grotesque 800, taille optique 96,
+  approche -0,02 em, couleur `texte`. Variante `currentColor` pour fond sombre et impression.
+- **Icône** : « M » blanc sur carré `primaire` aux coins arrondis (22,5 %), avec une
+  pastille `accent` dans le coin supérieur droit, qui évoque l'œillet d'une étiquette
+  de prix.
+
+Les lettres sont vectorisées : les SVG ne dépendent d'aucune police. Ils sont produits
+par `packages/ui/outils/logotype.py` (fontTools), et les icônes de la PWA par
+`npm run icones -w @multiboutique/ui` à partir de `assets/icone.svg`.
+
+| Fichier (`packages/ui/assets/`) | Usage |
+|---|---|
+| `logo.svg`, `logo-monochrome.svg` | En-têtes, écran de connexion, documents |
+| `icone.svg` | Source des icônes |
+| `favicon.ico`, `pwa-64x64.png` | Onglet du navigateur |
+| `pwa-192x192.png`, `pwa-512x512.png` | Manifeste de la PWA |
+| `maskable-icon-512x512.png` | Android : fond bleu plein, monogramme dans la zone de sécurité de 80 % |
+| `apple-touch-icon-180x180.png` | iOS : fond bleu plein, marge réduite à 12 % |
+
+## 6. Référence visuelle
 
 Canevas des trois directions, avec les planches A mises à jour en bleu :
 https://claude.ai/artifact/4auUPuhCZKw547ZbTgaXZB
