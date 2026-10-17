@@ -83,3 +83,71 @@ export async function creerRegion(pool: pg.Pool, boutiques: string[] = []): Prom
   if (boutiques.length) await pool.query(`UPDATE boutiques SET region_id = $1 WHERE id = ANY($2)`, [region, boutiques]);
   return { groupe, region };
 }
+
+/** Un produit vendu dans une boutique : prix, coût et stock. */
+export async function creerProduit(
+  pool: pg.Pool,
+  boutique: string,
+  options: { prix?: number; cout?: number | null; stock?: number; seuil?: number; nom?: string } = {}
+): Promise<string> {
+  const ref = `P-${randomBytes(4).toString("hex")}`;
+  const { rows } = await pool.query<{ id: string }>(
+    `INSERT INTO produits (reference, nom) VALUES ($1, $2) RETURNING id`,
+    [ref, options.nom ?? `Produit ${ref}`]
+  );
+  const id = rows[0]!.id;
+  await pool.query(
+    `INSERT INTO prix_boutique (produit_id, boutique_id, prix_vente, cout_revient) VALUES ($1, $2, $3, $4)`,
+    [id, boutique, options.prix ?? 10, options.cout ?? null]
+  );
+  await pool.query(
+    `INSERT INTO stocks (produit_id, boutique_id, quantite, seuil_alerte) VALUES ($1, $2, $3, $4)`,
+    [id, boutique, options.stock ?? 10, options.seuil ?? 2]
+  );
+  return id;
+}
+
+export async function stock(pool: pg.Pool, produit: string, boutique: string): Promise<{ quantite: number; reservee: number }> {
+  const { rows } = await pool.query(
+    `SELECT quantite, quantite_reservee FROM stocks WHERE produit_id = $1 AND boutique_id = $2`,
+    [produit, boutique]
+  );
+  return { quantite: rows[0].quantite, reservee: rows[0].quantite_reservee };
+}
+
+export async function creerClient(
+  pool: pg.Pool,
+  boutique: string,
+  options: { plafond?: number; encours?: number } = {}
+): Promise<string> {
+  const { rows } = await pool.query<{ id: string }>(
+    `INSERT INTO clients (nom, boutique_id, plafond_credit, encours) VALUES ('Client test', $1, $2, $3) RETURNING id`,
+    [boutique, options.plafond ?? 0, options.encours ?? 0]
+  );
+  return rows[0]!.id;
+}
+
+export async function creerCodePromo(
+  pool: pg.Pool,
+  boutique: string,
+  options: { code?: string; pourcentage?: number; actif?: boolean; dateFin?: string | null; max?: number | null; utilisations?: number } = {}
+): Promise<string> {
+  const code = options.code ?? `PROMO${randomBytes(3).toString("hex").toUpperCase()}`;
+  await pool.query(
+    `INSERT INTO codes_promo (code, type_reduction, valeur_reduction, boutique_id, actif, date_fin, max_utilisations, nombre_utilisations)
+     VALUES ($1, 'pourcentage', $2, $3, $4, $5, $6, $7)`,
+    [code, options.pourcentage ?? 10, boutique, options.actif ?? true, options.dateFin ?? null, options.max ?? null, options.utilisations ?? 0]
+  );
+  return code;
+}
+
+/** Nombre de lignes d'une table : pour vérifier qu'un échec n'a rien écrit. */
+export async function compter(pool: pg.Pool, table: string): Promise<number> {
+  const { rows } = await pool.query(`SELECT count(*)::int AS n FROM ${table}`);
+  return rows[0].n;
+}
+
+/** Écriture JSON depuis un front, avec la session donnée. */
+export function ecriture(audience: keyof typeof ORIGINES, cookie?: string) {
+  return { origin: ORIGINES[audience], "content-type": "application/json", ...(cookie ? { cookie } : {}) };
+}

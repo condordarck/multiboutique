@@ -21,6 +21,9 @@ function app() {
       code: "23505",
     });
   });
+  a.get("/syntaxe", async () => {
+    throw Object.assign(new Error('invalid input syntax for type uuid: "abc"'), { code: "22P02" });
+  });
   a.get("/zod", async () => {
     z.object({ quantite: z.number() }).parse({ quantite: "deux" });
   });
@@ -48,6 +51,12 @@ describe("gestionnaireErreurs", () => {
     const r = await app().inject({ url: "/doublon" });
     expect(r.statusCode).toBe(409);
     expect(r.body).not.toContain("utilisateurs_email_key");
+  });
+
+  it("traduit un identifiant mal formé en 400 sans détail SQL", async () => {
+    const r = await app().inject({ url: "/syntaxe" });
+    expect(r.statusCode).toBe(400);
+    expect(r.body).not.toContain("uuid");
   });
 
   it("traduit une erreur de validation en 400 avec le détail des champs", async () => {

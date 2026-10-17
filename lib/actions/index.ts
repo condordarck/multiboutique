@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { randomBytes } from "crypto";
 import { pool } from "@/lib/db";
+import * as metier from "@multiboutique/metier";
 import { getSession, canAccessBoutique } from "@/lib/auth";
 import {
   aPermission,
@@ -114,6 +115,14 @@ async function exigerAdministrateur() {
   return user;
 }
 
+// Session de l'appelant, pour les services de @multiboutique/metier : mêmes
+// messages qu'avant le déplacement du code métier.
+async function sessionExigee(): Promise<metier.Utilisateur> {
+  const user = await getSession();
+  if (!user) throw new Error("Non authentifié");
+  return { ...user, permissions: user.permissions ?? [] };
+}
+
 // ============================================================
 // HELPERS
 // ============================================================
@@ -219,657 +228,74 @@ async function appliquerCodePromo(
 }
 
 // ============================================================
-// VENTES
+// VENTES — code métier dans packages/metier/src/ventes.ts
 // ============================================================
 
 export async function creerVente(data: VenteFormData) {
-  const user = await exigerAccesBoutique(data.boutique_id, ["ventes:creer"]);
-  if (!data.lignes?.length) throw new Error("La vente doit contenir au moins un article");
-
-  const reference = genererReference("VTE");
-  const client = await pool.connect();
-
-  try {
-    await client.query("BEGIN");
-
-    // Création de la vente
-    const { rows: venteRows } = await client.query(
-      `INSERT INTO ventes (reference_vente, boutique_id, vendeur_id, mode_paiement, montant_total, statut)
-       VALUES ($1, $2, $3, $4, 0, 'validee')
-       RETURNING id`,
-      [reference, data.boutique_id, user.id, data.mode_paiement]
-    );
-    const venteId = venteRows[0].id;
-
-    let montantTotal = 0;
-
-    for (const ligne of data.lignes) {
-      // Prix officiel depuis la base (pas de prix client modifiable)
-      const { rows: prixRows } = await client.query(
-        `SELECT prix_vente, cout_revient FROM prix_boutique
-         WHERE produit_id = $1 AND boutique_id = $2 AND actif = true`,
-        [ligne.produit_id, data.boutique_id]
-      );
-      if (prixRows.length === 0) {
-        throw new Error("Produit non configuré dans cette boutique");
-      }
-      const prixVente = Number(prixRows[0].prix_vente);
-      const coutUnitaire = prixRows[0].cout_revient
-        ? Number(prixRows[0].cout_revient)
-        : null;
-
-      // Insertion ligne
-      await client.query(
-        `INSERT INTO lignes_vente (vente_id, produit_id, quantite, prix_unitaire, cout_unitaire)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [venteId, ligne.produit_id, ligne.quantite, prixVente, coutUnitaire]
-      );
-
-      // Récupération stock avant
-      const { rows: stockRows } = await client.query(
-        `SELECT quantite FROM stocks WHERE produit_id = $1 AND boutique_id = $2 FOR UPDATE`,
-        [ligne.produit_id, data.boutique_id]
-      );
-      const quantiteAvant = stockRows.length ? Number(stockRows[0].quantite) : 0;
-
-      // Déduction atomique
-      await client.query(
-        `SELECT deduire_stock($1::uuid, $2::uuid, $3::integer)`,
-        [ligne.produit_id, data.boutique_id, ligne.quantite]
-      );
-
-      // Mouvement
-      await insererMouvementWithClient(client, {
-        produit_id: ligne.produit_id,
-        boutique_id: data.boutique_id,
-        type: "sortie",
-        quantite: ligne.quantite,
-        quantite_avant: quantiteAvant,
-        quantite_apres: quantiteAvant - ligne.quantite,
-        motif: `Vente ${reference}`,
-        auteur_id: user.id,
-      });
-
-      montantTotal += ligne.quantite * prixVente;
-    }
-
-    // Mise à jour du total (avec remise si code promo valide)
-    const { remise, montantFinal, codePromoId } = await appliquerCodePromo(
-      client,
-      data.code_promo,
-      data.boutique_id,
-      montantTotal
-    );
-
-    // Paiement partiel : seul un client rattaché peut faire crédit
-    let reste = 0;
-    if (data.client_id) {
-      const { rows: clientRows } = await client.query(
-        `SELECT * FROM clients WHERE id = $1 AND boutique_id = $2 AND actif = true FOR UPDATE`,
-        [data.client_id, data.boutique_id]
-      );
-      if (clientRows.length === 0) {
-        throw new Error("Client introuvable ou inactif dans cette boutique");
-      }
-      const clientRow = clientRows[0];
-      const paie = Math.min(Number(data.montant_paye) || 0, montantFinal);
-      if (paie <= 0) {
-        throw new Error("Le montant payé est invalide pour une vente au client");
-      }
-      reste = montantFinal - paie;
-      const encoursAvant = Number(clientRow.encours) || 0;
-      const plafond = Number(clientRow.plafond_credit) || 0;
-      if (reste > 0 && plafond > 0 && encoursAvant + reste > plafond) {
-        throw new Error(
-          `Le crédit (${reste.toFixed(
-            2
-          )}) dépasserait le plafond de ${plafond.toFixed(2)}`
-        );
-      }
-
-      if (codePromoId) {
-        await client.query(
-          `UPDATE ventes
-           SET montant_total = $1, remise = $2, code_promo_id = $3,
-               client_id = $4, montant_paye = $5, updated_at = NOW()
-           WHERE id = $6`,
-          [montantFinal, remise, codePromoId, data.client_id, paie, venteId]
-        );
-      } else {
-        await client.query(
-          `UPDATE ventes
-           SET montant_total = $1, client_id = $2, montant_paye = $3, updated_at = NOW()
-           WHERE id = $4`,
-          [montantFinal, data.client_id, paie, venteId]
-        );
-      }
-
-      if (reste > 0) {
-        // Registre de créance : dette contractée
-        const { rows: majClient } = await client.query(
-          `UPDATE clients
-           SET encours = encours + $2, updated_at = NOW()
-           WHERE id = $1
-           RETURNING encours`,
-          [data.client_id, reste]
-        );
-        const nouvelEncours = Number(majClient[0].encours);
-        await client.query(
-          `INSERT INTO registre_credits
-             (client_id, boutique_id, vente_id, type, libelle, montant, solde_apres, auteur_id)
-           VALUES ($1, $2, $3, 'vente', $4, $5, $6, $7)`,
-          [
-            data.client_id,
-            data.boutique_id,
-            venteId,
-            `Vente ${reference} — reste à payer`,
-            reste,
-            nouvelEncours,
-            user.id,
-          ]
-        );
-      }
-    } else {
-      if (codePromoId) {
-        await client.query(
-          `UPDATE ventes SET montant_total = $1, remise = $2, code_promo_id = $3 WHERE id = $4`,
-          [montantFinal, remise, codePromoId, venteId]
-        );
-      } else {
-        await client.query(
-          `UPDATE ventes SET montant_total = $1, montant_paye = $1 WHERE id = $2`,
-          [montantFinal, venteId]
-        );
-      }
-    }
-
-    await client.query("COMMIT");
-
-    revalidatePath(`/dashboard/${data.boutique_id}/ventes`);
-    revalidatePath(`/dashboard/${data.boutique_id}/stock`);
-    revalidatePath(`/dashboard/${data.boutique_id}/clients`);
-    return { success: true, reference, montantTotal: montantFinal, remise, reste };
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
-  } finally {
-    client.release();
-  }
+  const resultat = await metier.creerVente(pool, await sessionExigee(), data);
+  revalidatePath(`/dashboard/${data.boutique_id}/ventes`);
+  revalidatePath(`/dashboard/${data.boutique_id}/stock`);
+  revalidatePath(`/dashboard/${data.boutique_id}/clients`);
+  return resultat;
 }
 
 export async function annulerVente(venteId: string, motif: string) {
-  const user = await getSession();
-  if (!user) throw new Error("Non authentifié");
-  if (!aPermission(user, "ventes:annuler")) {
-    throw new Error("Votre profil n'a pas les droits pour annuler une vente");
-  }
-  if (!motif.trim()) throw new Error("Un motif d'annulation est requis");
-
-  const client = await pool.connect();
-
-  try {
-    await client.query("BEGIN");
-
-    // Récupérer la vente + lignes
-    const { rows: venteRows } = await client.query(
-      `SELECT * FROM ventes WHERE id = $1 AND statut = 'validee' FOR UPDATE`,
-      [venteId]
-    );
-    if (venteRows.length === 0) {
-      throw new Error("Vente non trouvée ou déjà annulée");
-    }
-    const vente = venteRows[0];
-    if (!canAccessBoutique(user, vente.boutique_id)) {
-      throw new Error("Accès refusé à cette boutique");
-    }
-
-    const { rows: lignes } = await client.query(
-      `SELECT * FROM lignes_vente WHERE vente_id = $1`,
-      [venteId]
-    );
-
-    // Rétablir le stock
-    for (const ligne of lignes) {
-      const { rows: stockRows } = await client.query(
-        `SELECT quantite FROM stocks WHERE produit_id = $1 AND boutique_id = $2 FOR UPDATE`,
-        [ligne.produit_id, vente.boutique_id]
-      );
-      const quantiteAvant = stockRows.length ? Number(stockRows[0].quantite) : 0;
-
-      await client.query(
-        `UPDATE stocks SET quantite = quantite + $1, updated_at = NOW()
-         WHERE produit_id = $2 AND boutique_id = $3`,
-        [ligne.quantite, ligne.produit_id, vente.boutique_id]
-      );
-
-      await insererMouvementWithClient(client, {
-        produit_id: ligne.produit_id,
-        boutique_id: vente.boutique_id,
-        type: "entree",
-        quantite: ligne.quantite,
-        quantite_avant: quantiteAvant,
-        quantite_apres: quantiteAvant + ligne.quantite,
-        motif: `Annulation vente ${vente.reference_vente} — ${motif}`,
-        auteur_id: user.id,
-      });
-    }
-
-    // Annulation de la créance si la vente était à crédit
-    if (vente.client_id) {
-      const montantFinal = Number(vente.montant_total) || 0;
-      const paie = Number(vente.montant_paye) || 0;
-      const reste = Math.max(0, montantFinal - paie);
-      if (reste > 0) {
-        const { rows: majClient } = await client.query(
-          `UPDATE clients
-           SET encours = GREATEST(0, encours - $2), updated_at = NOW()
-           WHERE id = $1
-           RETURNING encours`,
-          [vente.client_id, reste]
-        );
-        const nouvelEncours = Number(majClient[0].encours);
-        await client.query(
-          `INSERT INTO registre_credits
-             (client_id, boutique_id, vente_id, type, libelle, montant, solde_apres, auteur_id)
-           VALUES ($1, $2, $3, 'annulation', $4, $5, $6, $7)`,
-          [
-            vente.client_id,
-            vente.boutique_id,
-            venteId,
-            `Annulation vente ${vente.reference_vente} — ${motif}`,
-            -reste,
-            nouvelEncours,
-            user.id,
-          ]
-        );
-      }
-    }
-
-    await client.query(
-      `UPDATE ventes SET statut = 'annulee', motif_annulation = $1, updated_at = NOW() WHERE id = $2`,
-      [motif, venteId]
-    );
-
-    await client.query("COMMIT");
-
-    revalidatePath(`/dashboard/${vente.boutique_id}/ventes`);
-    revalidatePath(`/dashboard/${vente.boutique_id}/stock`);
-    revalidatePath(`/dashboard/${vente.boutique_id}/clients`);
-    return { success: true };
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
-  } finally {
-    client.release();
-  }
+  const resultat = await metier.annulerVente(pool, await sessionExigee(), venteId, motif);
+  revalidatePath(`/dashboard/${resultat.boutique_id}/ventes`);
+  revalidatePath(`/dashboard/${resultat.boutique_id}/stock`);
+  revalidatePath(`/dashboard/${resultat.boutique_id}/clients`);
+  return resultat;
 }
 
+
+
 // ============================================================
-// RÉSERVATIONS
+// RÉSERVATIONS — code métier dans packages/metier/src/reservations.ts
 // ============================================================
 
 export async function creerReservation(data: ReservationFormData) {
-  if (!data.lignes?.length)
-    throw new Error("La réservation doit contenir au moins un article");
-
+  // Le flux public reste ouvert aux visiteurs anonymes : pas de session exigée.
   const session = await getSession();
-
-  // Le flux public (visiteur anonyme) et l'espace client restent ouverts :
-  // on réserve dans la boutique dont on consulte le catalogue.
-  // En revanche, un membre du personnel ne peut créer de réservation que dans
-  // une boutique de son périmètre, avec la permission dédiée (anti-IDOR).
-  if (session && session.role !== "client") {
-    await exigerAccesBoutique(data.boutique_id, ["reservations:gerer"]);
-  }
-
-  // Si un client est connecté, lier sa réservation à son compte
-  const utilisateurId =
-    session && session.role === "client" ? session.id : null;
-
-  const reference = genererReference("RES");
-  const client = await pool.connect();
-
-  try {
-    await client.query("BEGIN");
-
-    const { rows: resRows } = await client.query(
-      `INSERT INTO reservations
-         (reference_reservation, utilisateur_id, client_nom, client_telephone, client_email, boutique_id, statut, montant_total, date_retrait_prevue)
-       VALUES ($1, $2, $3, $4, $5, $6, 'en_attente', 0, $7)
-       RETURNING id`,
-      [
-        reference,
-        utilisateurId,
-        data.client_nom,
-        data.client_telephone,
-        data.client_email || null,
-        data.boutique_id,
-        data.date_retrait_prevue || null,
-      ]
-    );
-    const reservationId = resRows[0].id;
-
-    let montantTotal = 0;
-
-    for (const ligne of data.lignes) {
-      const { rows: prixRows } = await client.query(
-        `SELECT prix_vente FROM prix_boutique
-         WHERE produit_id = $1 AND boutique_id = $2 AND actif = true`,
-        [ligne.produit_id, data.boutique_id]
-      );
-      if (prixRows.length === 0) {
-        throw new Error("Produit non disponible dans cette boutique");
-      }
-      const prix = Number(prixRows[0].prix_vente);
-
-      await client.query(
-        `INSERT INTO lignes_reservation (reservation_id, produit_id, quantite, prix_unitaire)
-         VALUES ($1, $2, $3, $4)`,
-        [reservationId, ligne.produit_id, ligne.quantite, prix]
-      );
-
-      // Réserver le stock (atomique, avec contrôle de dispo)
-      await client.query(
-        `SELECT reserver_stock($1::uuid, $2::uuid, $3::integer)`,
-        [ligne.produit_id, data.boutique_id, ligne.quantite]
-      );
-
-      montantTotal += ligne.quantite * prix;
-    }
-
-    await client.query(
-      `UPDATE reservations SET montant_total = $1 WHERE id = $2`,
-      [montantTotal, reservationId]
-    );
-
-    await client.query("COMMIT");
-
-    revalidatePath(`/dashboard/${data.boutique_id}/reservations`);
-    return { success: true, reference, reservationId };
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
-  } finally {
-    client.release();
-  }
+  const resultat = await metier.creerReservation(
+    pool,
+    session ? { ...session, permissions: session.permissions ?? [] } : null,
+    data
+  );
+  revalidatePath(`/dashboard/${data.boutique_id}/reservations`);
+  return resultat;
 }
 
 export async function validerReservation(reservationId: string) {
-  const user = await getSession();
-  if (!user) throw new Error("Non authentifié");
-  if (!aPermission(user, "reservations:gerer")) {
-    throw new Error(
-      "Votre profil n'a pas les droits pour valider une réservation"
-    );
-  }
-
-  const client = await pool.connect();
-
-  try {
-    await client.query("BEGIN");
-
-    const { rows } = await client.query(
-      `SELECT boutique_id FROM reservations WHERE id = $1`,
-      [reservationId]
-    );
-    if (rows.length === 0) throw new Error("Réservation non trouvée");
-    const boutiqueId = rows[0].boutique_id;
-    if (!canAccessBoutique(user, boutiqueId)) {
-      throw new Error("Accès refusé à cette boutique");
-    }
-
-    // Déduction du stock définitive + statut "payee" (fonction atomique en base)
-    await client.query(
-      `SELECT valider_reservation($1::uuid, $2::uuid)`,
-      [reservationId, user.id]
-    );
-
-    await client.query("COMMIT");
-
-    revalidatePath(`/dashboard/${boutiqueId}/reservations`);
-    revalidatePath(`/dashboard/${boutiqueId}/stock`);
-    return { success: true };
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
-  } finally {
-    client.release();
-  }
+  const resultat = await metier.validerReservation(pool, await sessionExigee(), reservationId);
+  revalidatePath(`/dashboard/${resultat.boutique_id}/reservations`);
+  revalidatePath(`/dashboard/${resultat.boutique_id}/stock`);
+  return resultat;
 }
 
 export async function annulerReservation(reservationId: string, motif: string) {
-  const user = await getSession();
-  if (!user) throw new Error("Non authentifié");
-  if (!motif.trim()) throw new Error("Un motif d'annulation est requis");
-  if (!aPermission(user, "reservations:gerer")) {
-    throw new Error(
-      "Votre profil n'a pas les droits pour annuler une réservation"
-    );
-  }
-
-  const client = await pool.connect();
-
-  try {
-    await client.query("BEGIN");
-
-    const { rows: resRows } = await client.query(
-      `SELECT * FROM reservations WHERE id = $1 AND statut IN ('en_attente', 'prete') FOR UPDATE`,
-      [reservationId]
-    );
-    if (resRows.length === 0) {
-      throw new Error("Réservation non trouvée ou non annulable");
-    }
-    const reservation = resRows[0];
-    if (!canAccessBoutique(user, reservation.boutique_id)) {
-      throw new Error("Accès refusé à cette boutique");
-    }
-
-    const { rows: lignes } = await client.query(
-      `SELECT * FROM lignes_reservation WHERE reservation_id = $1`,
-      [reservationId]
-    );
-
-    // Libérer le stock réservé
-    for (const ligne of lignes) {
-      await client.query(
-        `UPDATE stocks
-         SET quantite_reservee = GREATEST(0, quantite_reservee - $1), updated_at = NOW()
-         WHERE produit_id = $2 AND boutique_id = $3`,
-        [ligne.quantite, ligne.produit_id, reservation.boutique_id]
-      );
-    }
-
-    await client.query(
-      `UPDATE reservations SET statut = 'annulee', motif_annulation = $1, updated_at = NOW() WHERE id = $2`,
-      [motif, reservationId]
-    );
-
-    await client.query("COMMIT");
-
-    revalidatePath(`/dashboard/${reservation.boutique_id}/reservations`);
-    return { success: true };
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
-  } finally {
-    client.release();
-  }
+  const resultat = await metier.annulerReservation(pool, await sessionExigee(), reservationId, motif);
+  revalidatePath(`/dashboard/${resultat.boutique_id}/reservations`);
+  return resultat;
 }
 
 export async function confirmerReservation(reservationId: string) {
-  const user = await getSession();
-  if (!user) throw new Error("Non authentifié");
-  if (!aPermission(user, "reservations:gerer")) {
-    throw new Error(
-      "Votre profil n'a pas les droits pour confirmer une réservation"
-    );
-  }
-
-  const client = await pool.connect();
-
-  try {
-    await client.query("BEGIN");
-
-    const { rows: resRows } = await client.query(
-      `SELECT id, boutique_id, statut FROM reservations WHERE id = $1 FOR UPDATE`,
-      [reservationId]
-    );
-    if (resRows.length === 0) throw new Error("Réservation non trouvée");
-    const reservation = resRows[0];
-    if (!canAccessBoutique(user, reservation.boutique_id)) {
-      throw new Error("Accès refusé à cette boutique");
-    }
-    if (reservation.statut !== "en_attente") {
-      throw new Error("Seule une réservation en attente peut être confirmée");
-    }
-
-    await client.query(
-      `UPDATE reservations SET statut = 'prete', updated_at = NOW() WHERE id = $1`,
-      [reservationId]
-    );
-
-    await client.query("COMMIT");
-
-    revalidatePath(`/dashboard/${reservation.boutique_id}/reservations`);
-    return { success: true };
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
-  } finally {
-    client.release();
-  }
+  const resultat = await metier.confirmerReservation(pool, await sessionExigee(), reservationId);
+  revalidatePath(`/dashboard/${resultat.boutique_id}/reservations`);
+  return resultat;
 }
 
-export async function encaisserReservation(
-  reservationId: string,
-  modePaiement: ModePaiement
-) {
-  const user = await getSession();
-  if (!user) throw new Error("Non authentifié");
-  if (!aPermission(user, "reservations:gerer")) {
-    throw new Error(
-      "Votre profil n'a pas les droits pour encaisser une réservation"
-    );
-  }
-
-  const client = await pool.connect();
-
-  try {
-    await client.query("BEGIN");
-
-    const { rows: resRows } = await client.query(
-      `SELECT * FROM reservations WHERE id = $1 FOR UPDATE`,
-      [reservationId]
-    );
-    if (resRows.length === 0) throw new Error("Réservation non trouvée");
-    const reservation = resRows[0];
-    if (!canAccessBoutique(user, reservation.boutique_id)) {
-      throw new Error("Accès refusé à cette boutique");
-    }
-    if (reservation.statut === "payee" || reservation.statut === "retiree") {
-      throw new Error("Cette réservation a déjà été encaissée");
-    }
-    if (reservation.statut === "annulee") {
-      throw new Error("Cette réservation a été annulée");
-    }
-
-    const { rows: lignes } = await client.query(
-      `SELECT * FROM lignes_reservation WHERE reservation_id = $1 ORDER BY created_at`,
-      [reservationId]
-    );
-    if (lignes.length === 0) throw new Error("Aucun article dans cette réservation");
-
-    // Créer la vente (prix officiels en base)
-    const reference = genererReference("VTE");
-    const { rows: venteRows } = await client.query(
-      `INSERT INTO ventes (reference_vente, boutique_id, vendeur_id, mode_paiement, montant_total, statut)
-       VALUES ($1, $2, $3, $4, $5, 'validee')
-       RETURNING id`,
-      [
-        reference,
-        reservation.boutique_id,
-        user.id,
-        modePaiement,
-        Number(reservation.montant_total),
-      ]
-    );
-    const venteId = venteRows[0].id;
-
-    for (const ligne of lignes) {
-      const { rows: prixRows } = await client.query(
-        `SELECT prix_vente, cout_revient FROM prix_boutique
-         WHERE produit_id = $1 AND boutique_id = $2 AND actif = true`,
-        [ligne.produit_id, reservation.boutique_id]
-      );
-      const prixVente =
-        prixRows.length > 0 ? Number(prixRows[0].prix_vente) : Number(ligne.prix_unitaire);
-      const coutUnitaire =
-        prixRows.length > 0 && prixRows[0].cout_revient
-          ? Number(prixRows[0].cout_revient)
-          : null;
-
-      await client.query(
-        `INSERT INTO lignes_vente (vente_id, produit_id, quantite, prix_unitaire, cout_unitaire)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [venteId, ligne.produit_id, ligne.quantite, prixVente, coutUnitaire]
-      );
-
-      const { rows: stockRows } = await client.query(
-        `SELECT quantite FROM stocks WHERE produit_id = $1 AND boutique_id = $2 FOR UPDATE`,
-        [ligne.produit_id, reservation.boutique_id]
-      );
-      const quantiteAvant = stockRows.length ? Number(stockRows[0].quantite) : 0;
-
-      await client.query(
-        `SELECT deduire_stock($1::uuid, $2::uuid, $3::integer)`,
-        [ligne.produit_id, reservation.boutique_id, ligne.quantite]
-      );
-
-      await insererMouvementWithClient(client, {
-        produit_id: ligne.produit_id,
-        boutique_id: reservation.boutique_id,
-        type: "sortie",
-        quantite: ligne.quantite,
-        quantite_avant: quantiteAvant,
-        quantite_apres: quantiteAvant - ligne.quantite,
-        motif: `Vente ${reference} (réservation)`,
-        auteur_id: user.id,
-      });
-    }
-
-    // Libérer le stock réservé + finaliser la réservation
-    await client.query(
-      `UPDATE stocks s
-       SET quantite_reservee = GREATEST(0, s.quantite_reservee - l.quantite), updated_at = NOW()
-       FROM lignes_reservation l
-       WHERE l.reservation_id = $1 AND l.produit_id = s.produit_id AND s.boutique_id = $2`,
-      [reservationId, reservation.boutique_id]
-    );
-
-    await client.query(
-      `UPDATE reservations
-       SET statut = 'retiree', date_retrait_reelle = NOW(), validee_par = $1, updated_at = NOW()
-       WHERE id = $2`,
-      [user.id, reservationId]
-    );
-
-    await client.query("COMMIT");
-
-    revalidatePath(`/dashboard/${reservation.boutique_id}/reservations`);
-    revalidatePath(`/dashboard/${reservation.boutique_id}/ventes`);
-    revalidatePath(`/dashboard/${reservation.boutique_id}/stock`);
-    return {
-      success: true,
-      reference,
-      montantTotal: Number(reservation.montant_total),
-    };
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
-  } finally {
-    client.release();
-  }
+export async function encaisserReservation(reservationId: string, modePaiement: ModePaiement) {
+  const resultat = await metier.encaisserReservation(pool, await sessionExigee(), reservationId, modePaiement);
+  revalidatePath(`/dashboard/${resultat.boutique_id}/reservations`);
+  revalidatePath(`/dashboard/${resultat.boutique_id}/ventes`);
+  revalidatePath(`/dashboard/${resultat.boutique_id}/stock`);
+  return resultat;
 }
+
+
+
+
+
 
 // ============================================================
 // PRODUITS

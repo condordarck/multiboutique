@@ -6,6 +6,7 @@ import type { Config } from "./config";
 import { gestionnaireErreurs } from "./erreurs";
 import { routesAuth } from "./routes/auth";
 import { routesSante } from "./routes/health";
+import { routesReservations, routesVentes } from "./routes/ventes";
 import { securite } from "./securite";
 import { sessions } from "./session/utilisateur";
 
@@ -19,6 +20,17 @@ export interface Dependances {
 export async function construireApp({ pool, config }: Dependances) {
   const app = Fastify({ logger: process.env.NODE_ENV !== "test" });
   app.setErrorHandler(gestionnaireErreurs);
+  // Une action sans données (validation, confirmation…) peut arriver avec un
+  // corps vide et l'en-tête JSON : c'est un corps absent, pas une erreur. Le
+  // reste passe par l'analyseur de Fastify (protégé contre __proto__).
+  const analyseurJson = app.getDefaultJsonParser("error", "error");
+  app.removeContentTypeParser("application/json");
+  app.addContentTypeParser("application/json", { parseAs: "string" }, (requete, corps, fini) => {
+    if (corps === "") return fini(null, undefined);
+    analyseurJson(requete, corps as string, fini);
+  });
+  // Registre des routes métier, partagé par tous les plugins (garde de complétude).
+  app.decorate("registre", []);
   await app.register(securite, { config });
   await app.register(cookie);
   // Limites posées route par route (connexion, inscription), pas globalement.
@@ -26,5 +38,7 @@ export async function construireApp({ pool, config }: Dependances) {
   await app.register(sessions, { db: pool, config });
   await app.register(routesSante, { pool });
   await app.register(routesAuth, { db: pool, config });
+  await app.register(routesVentes, { db: pool });
+  await app.register(routesReservations, { db: pool });
   return app;
 }

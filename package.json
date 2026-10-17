@@ -13,9 +13,11 @@
     "lint": "next lint",
     "db:init": "psql -h ${DB_HOST:-localhost} -U mb -d multiboutique -f db/init.sql",
     "test": "npm run test --workspaces --if-present",
-    "build:workspaces": "npm run build --workspaces --if-present"
+    "build:workspaces": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present"
   },
   "dependencies": {
+    "@multiboutique/metier": "*",
     "@multiboutique/shared": "*",
     "clsx": "^2.1.0",
     "date-fns": "^4.1.0",

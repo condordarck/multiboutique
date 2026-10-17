@@ -35,3 +35,24 @@ describe("GET /health", () => {
     expect(pool.query).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("corps JSON", () => {
+  async function app() {
+    const a = await construireApp({ pool: poolFactice(async () => ({ rows: [] })) as never, config: CONFIG_TEST });
+    a.post("/essai", async (r) => ({ corps: r.body ?? null }));
+    return a;
+  }
+  const entetes = { origin: CONFIG_TEST.origines.backoffice, "content-type": "application/json" };
+
+  it("accepte un corps vide avec l'en-tête JSON", async () => {
+    const r = await (await app()).inject({ method: "POST", url: "/essai", headers: entetes, payload: "" });
+    expect(r.statusCode).toBe(200);
+    expect(r.json()).toEqual({ corps: null });
+  });
+
+  it("refuse un JSON invalide ou une pollution de prototype", async () => {
+    const a = await app();
+    expect((await a.inject({ method: "POST", url: "/essai", headers: entetes, payload: "{" })).statusCode).toBe(400);
+    expect((await a.inject({ method: "POST", url: "/essai", headers: entetes, payload: '{"__proto__":{"x":1}}' })).statusCode).toBe(400);
+  });
+});

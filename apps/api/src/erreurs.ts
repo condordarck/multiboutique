@@ -25,6 +25,10 @@ export function gestionnaireErreurs(erreur: FastifyError | Error, requete: Fasti
   if (code === "P0001") {
     return reponse.code(409).send({ erreur: erreur.message });
   }
+  // Valeur mal formée pour son type (identifiant qui n'est pas un UUID…).
+  if (code === "22P02") {
+    return reponse.code(400).send({ erreur: "Donnée invalide" });
+  }
   // Violation d'unicité : le nom de la contrainte ne regarde pas le client.
   if (code === "23505") {
     return reponse.code(409).send({ erreur: "Cet élément existe déjà" });
