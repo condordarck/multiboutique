@@ -1,5 +1,5 @@
 import type { Utilisateur } from "@multiboutique/metier";
-import type { FastifyInstance, FastifyRequest } from "fastify";
+import type { FastifyContextConfig, FastifyInstance, FastifyRequest } from "fastify";
 import { accesBoutique, administrateur, connecte } from "../session/gardes";
 
 /**
@@ -34,14 +34,16 @@ export function route<G extends Garde>(
   definition: EntreeRegistre & {
     garde: G;
     statut?: number;
+    config?: FastifyContextConfig;
     gerer: (requete: FastifyRequest, utilisateur: UtilisateurSelon<G>) => Promise<unknown>;
   }
 ) {
-  const { gerer, statut = 200, ...entree } = definition;
+  const { gerer, statut = 200, config, ...entree } = definition;
   app.registre.push(entree);
   app.route({
     method: entree.methode,
     url: entree.chemin,
+    config,
     handler: async (requete, reponse) => {
       const utilisateur = garder(requete, entree.garde) as UtilisateurSelon<G>;
       const resultat = await gerer(requete, utilisateur);

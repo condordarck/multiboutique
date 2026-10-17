@@ -15,6 +15,7 @@ import { routesCatalogue } from "./routes/catalogue";
 import { routesClients, routesPromotions } from "./routes/clients";
 import { routesCommandes } from "./routes/commandes";
 import { routesSante } from "./routes/health";
+import { routesUploads } from "./routes/uploads";
 import { routesReservations, routesVentes } from "./routes/ventes";
 import { securite } from "./securite";
 import { sessions } from "./session/utilisateur";
@@ -58,5 +59,6 @@ export async function construireApp({ pool, config }: Dependances) {
   await app.register(lecturesGenerales, { db: pool });
   await app.register(lecturesBoutique, { db: pool });
   await app.register(lecturesAdmin, { db: pool });
+  await app.register(routesUploads, { uploadsDir: config.uploadsDir });
   return app;
 }
