@@ -37,3 +37,49 @@ export const schemaReservation = z.object({
 export const schemaMotif = z.object({ motif: z.string() });
 
 export const schemaEncaissement = z.object({ mode_paiement: modePaiement });
+
+// Produits, stock, prix. Les quantités et prix sont contrôlés par les services
+// (messages métier) : le schéma n'exige ici que des nombres.
+export const schemaProduit = z.object({
+  reference: z.string().trim().min(1, "Référence requise"),
+  nom: z.string().trim().min(1, "Nom requis"),
+  description: z.string().optional(),
+  // Chaîne libre : les formulaires envoient "" pour « sans catégorie ».
+  categorie_id: z.string().optional(),
+  image_url: z.string().optional(),
+  code: z.string().optional(),
+});
+
+export const schemaCreationProduit = z.object({
+  produit: schemaProduit,
+  prix_vente: z.number(),
+  cout_revient: z.number().optional(),
+});
+
+export const schemaMouvementStock = z.object({
+  quantite: z.number().int(),
+  motif: z.string().default(""),
+});
+
+export const schemaTransfert = z.object({
+  boutique_destination_id: identifiant,
+  produit_id: identifiant,
+  quantite: z.number().int(),
+  motif: z.string().default(""),
+});
+
+export const schemaPrix = z.object({
+  prix_vente: z.number(),
+  cout_revient: z.number().optional(),
+});
+
+export const schemaPrixReference = z.object({
+  produit_id: identifiant,
+  prix_vente: z.number(),
+  cout_revient: z.number().nullable().optional(),
+  actif: z.boolean().optional(),
+});
+
+export const schemaApplicationPrixConseilles = z.object({
+  produit_ids: z.array(identifiant).optional(),
+});

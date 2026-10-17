@@ -4,3 +4,4 @@ export { exigerAccesBoutique, exigerAdministrateur, peutAccederBoutique } from "
 
 export * from "./ventes";
 export * from "./reservations";
+export * from "./catalogue";

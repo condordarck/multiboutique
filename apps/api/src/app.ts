@@ -5,6 +5,7 @@ import type { Pool } from "pg";
 import type { Config } from "./config";
 import { gestionnaireErreurs } from "./erreurs";
 import { routesAuth } from "./routes/auth";
+import { routesCatalogue } from "./routes/catalogue";
 import { routesSante } from "./routes/health";
 import { routesReservations, routesVentes } from "./routes/ventes";
 import { securite } from "./securite";
@@ -40,5 +41,6 @@ export async function construireApp({ pool, config }: Dependances) {
   await app.register(routesAuth, { db: pool, config });
   await app.register(routesVentes, { db: pool });
   await app.register(routesReservations, { db: pool });
+  await app.register(routesCatalogue, { db: pool });
   return app;
 }
