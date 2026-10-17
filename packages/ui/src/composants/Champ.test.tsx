@@ -32,6 +32,11 @@ describe("Champ", () => {
     expect(screen.getByLabelText("Prix").getAttribute("inputmode")).toBe("numeric");
   });
 
+  it("en recherche, devient un champ de recherche", () => {
+    render(<Champ libelle="Rechercher un produit" type="recherche" />);
+    expect(screen.getByRole("searchbox", { name: "Rechercher un produit" })).toBeTruthy();
+  });
+
   it("laisse saisir du texte", async () => {
     render(<Champ libelle="Client" />);
     await userEvent.type(screen.getByLabelText("Client"), "Kabila & fils");

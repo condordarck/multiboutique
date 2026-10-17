@@ -1,7 +1,7 @@
 import { clsx } from "clsx";
 import { useId, type InputHTMLAttributes } from "react";
 
-export type TypeChamp = "texte" | "nombre" | "montant";
+export type TypeChamp = "texte" | "nombre" | "montant" | "recherche";
 
 export interface ChampProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "type"> {
   libelle: string;
@@ -17,6 +17,7 @@ const MODES_SAISIE: Record<TypeChamp, InputHTMLAttributes<HTMLInputElement>["inp
   texte: undefined,
   nombre: "numeric",
   montant: "decimal",
+  recherche: undefined,
 };
 
 export function Champ({ libelle, type = "texte", aide, erreur, id, className, ...reste }: ChampProps) {
@@ -33,7 +34,7 @@ export function Champ({ libelle, type = "texte", aide, erreur, id, className, ..
       </label>
       <input
         id={idChamp}
-        type="text"
+        type={type === "recherche" ? "search" : "text"}
         inputMode={MODES_SAISIE[type]}
         aria-invalid={erreur ? true : undefined}
         aria-describedby={descriptions || undefined}
@@ -42,7 +43,7 @@ export function Champ({ libelle, type = "texte", aide, erreur, id, className, ..
           "placeholder:text-texte-discret",
           "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus",
           erreur ? "border-danger" : "border-bordure-forte",
-          type !== "texte" && "tabular-nums",
+          (type === "nombre" || type === "montant") && "tabular-nums",
           className
         )}
         {...reste}
