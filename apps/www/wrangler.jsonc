@@ -1,0 +1,22 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  // Worker sans code : il ne sert que les fichiers statiques du build Vite.
+  // Le niveau racine décrit la production (domaine à venir) ; chaque
+  // environnement porte son propre nom de Worker, pour qu'un déploiement de
+  // recette ne puisse jamais remplacer la production.
+  "name": "mb-www",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./dist",
+    // Toute route inconnue renvoie index.html : le routage est côté client.
+    "not_found_handling": "single-page-application"
+  },
+  "workers_dev": false,
+  "preview_urls": false,
+  "env": {
+    "recette": {
+      "name": "mb-www-recette",
+      "routes": [{ "pattern": "www.morpion.cloud", "custom_domain": true }]
+    }
+  }
+}

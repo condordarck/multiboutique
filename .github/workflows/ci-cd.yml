@@ -129,13 +129,15 @@ jobs:
           exit 1
 
   # ------------------------------------------------------------------
-  # CD recette des PWA : push sur main → Cloudflare Pages
+  # CD recette des PWA : push sur main → Cloudflare Workers (fichiers statiques)
   #
-  # Un projet Pages par front ET par environnement (mb-<front>-recette) : un
-  # déploiement de recette ne peut jamais atteindre la production.
+  # Un Worker par front ET par environnement (mb-<front>-recette, voir
+  # apps/<front>/wrangler.jsonc) : un déploiement de recette ne peut jamais
+  # atteindre la production. Le déploiement crée lui-même le domaine
+  # personnalisé et son enregistrement DNS.
   # ------------------------------------------------------------------
   deploy-fronts-recette:
-    name: Pages recette (${{ matrix.front }})
+    name: Fronts recette (${{ matrix.front }})
     runs-on: ubuntu-latest
     needs: build
     if: github.ref == 'refs/heads/main'
@@ -162,18 +164,20 @@ jobs:
         run: npm run build -w @multiboutique/${{ matrix.front }}
 
       # Hors du _headers versionné, commun aux environnements : seule la
-      # recette doit échapper aux moteurs de recherche. Pages cumule les
+      # recette doit échapper aux moteurs de recherche. Cloudflare cumule les
       # en-têtes de toutes les règles qui correspondent.
       - name: Interdire l'indexation de la recette
         run: |
           printf '\n/*\n  X-Robots-Tag: noindex\n' >> "apps/${{ matrix.front }}/dist/_headers"
 
-      - name: Publier sur Cloudflare Pages
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy apps/${{ matrix.front }}/dist --project-name=mb-${{ matrix.front }}-recette --branch=main
+      # wrangler est épinglé dans le package.json racine : le CI déploie avec
+      # la version testée en local.
+      - name: Publier sur Cloudflare
+        working-directory: apps/${{ matrix.front }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler deploy --env recette
 
   # ------------------------------------------------------------------
   # CD production : tag v* → serveur de production
