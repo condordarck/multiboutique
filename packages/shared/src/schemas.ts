@@ -115,3 +115,21 @@ export const schemaCommande = z.object({
   note: z.string().optional(),
   lignes: z.array(z.object({ produit_id: identifiant, quantite: z.number(), prix_unitaire: z.number() })),
 });
+
+// Fournisseurs et commandes d'achat.
+export const schemaFournisseur = z.object({
+  nom: z.string(),
+  telephone: z.string().optional(),
+  email: z.string().optional(),
+  adresse: z.string().optional(),
+});
+
+export const schemaCommandeFournisseur = z.object({
+  fournisseur_id: z.string(),
+  note: z.string().optional(),
+  lignes: z.array(z.object({ produit_id: identifiant, quantite: z.number(), prix_unitaire: z.number() })),
+});
+
+export const schemaReception = z.object({
+  receptions: z.array(z.object({ ligne_id: identifiant, quantite_recue: z.number() })),
+});

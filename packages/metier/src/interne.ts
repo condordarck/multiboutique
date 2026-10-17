@@ -118,3 +118,14 @@ export async function exigerClientDeLaBoutique(db: Requeteur, clientId: string, 
   }
   return rows[0] as { id: string };
 }
+
+export async function exigerFournisseurDeLaBoutique(db: Requeteur, fournisseurId: string, boutiqueId: string) {
+  const { rows } = await db.query(
+    `SELECT id FROM fournisseurs WHERE id = $1 AND boutique_id = $2`,
+    [fournisseurId, boutiqueId]
+  );
+  if (rows.length === 0) {
+    throw new ErreurMetier("Fournisseur non trouvé dans cette boutique", 404);
+  }
+  return rows[0] as { id: string };
+}
