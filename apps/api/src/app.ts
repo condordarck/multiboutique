@@ -7,6 +7,7 @@ import { gestionnaireErreurs } from "./erreurs";
 import { routesAuth } from "./routes/auth";
 import { routesCatalogue } from "./routes/catalogue";
 import { routesClients, routesPromotions } from "./routes/clients";
+import { routesCommandes } from "./routes/commandes";
 import { routesSante } from "./routes/health";
 import { routesReservations, routesVentes } from "./routes/ventes";
 import { securite } from "./securite";
@@ -45,5 +46,6 @@ export async function construireApp({ pool, config }: Dependances) {
   await app.register(routesCatalogue, { db: pool });
   await app.register(routesClients, { db: pool });
   await app.register(routesPromotions, { db: pool });
+  await app.register(routesCommandes, { db: pool });
   return app;
 }

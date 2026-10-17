@@ -106,3 +106,12 @@ export const schemaCodePromo = z.object({
   date_debut: z.string().nullable().optional(),
   date_fin: z.string().nullable().optional(),
 });
+
+// Commandes grossistes. Le service contrôle le client, les quantités et les prix.
+export const schemaCommande = z.object({
+  client_id: z.string(),
+  terme_paiement: z.enum(["comptant", "credit"]),
+  code_promo: z.string().optional(),
+  note: z.string().optional(),
+  lignes: z.array(z.object({ produit_id: identifiant, quantite: z.number(), prix_unitaire: z.number() })),
+});
