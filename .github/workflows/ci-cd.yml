@@ -27,6 +27,20 @@ jobs:
   build:
     name: Build & vérifications
     runs-on: ubuntu-latest
+    # PostgreSQL réel pour les tests d'intégration de l'API (base clonée par
+    # fichier de test, cf. apps/api/test/base.ts).
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
     steps:
       - name: Récupérer le code
         uses: actions/checkout@v4
@@ -42,6 +56,8 @@ jobs:
 
       - name: Tests des workspaces
         run: npm test
+        env:
+          DATABASE_URL_TEST: postgres://postgres:test@localhost:5432/postgres
 
       - name: Build des workspaces
         run: npm run build:workspaces
