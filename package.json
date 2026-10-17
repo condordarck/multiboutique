@@ -16,12 +16,13 @@
     "build:workspaces": "npm run build --workspaces --if-present"
   },
   "dependencies": {
+    "@multiboutique/shared": "*",
+    "clsx": "^2.1.0",
+    "date-fns": "^4.1.0",
     "next": "15.3.6",
+    "pg": "^8.13.0",
     "react": "^19.1.2",
     "react-dom": "^19.1.2",
-    "pg": "^8.13.0",
-    "date-fns": "^4.1.0",
-    "clsx": "^2.1.0",
     "tailwind-merge": "^3.0.0"
   },
   "devDependencies": {
