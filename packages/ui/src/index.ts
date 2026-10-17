@@ -7,3 +7,10 @@ export { Carte, type CarteProps } from "./composants/Carte";
 export { Champ, type ChampProps, type TypeChamp } from "./composants/Champ";
 export { EtatVide, type EtatVideProps } from "./composants/EtatVide";
 export { TuileChiffre, type TuileChiffreProps, type Variation } from "./composants/TuileChiffre";
+export {
+  ListeAdaptative,
+  type Colonne,
+  type ListeAdaptativeProps,
+} from "./composants/ListeAdaptative";
+
+export { Coque, type ComposantLien, type CoqueProps, type EntreeNavigation } from "./coque/Coque";

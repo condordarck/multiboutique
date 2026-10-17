@@ -146,7 +146,8 @@
   --shadow-action: var(--ombre-action);
 
   /* Points de rupture de la spec (§7.1) : téléphone < 640 px,
-     tablette 640–1180 px, bureau au-delà. */
+     tablette 640–1180 px, bureau au-delà. 1180 px est la largeur d'un iPad
+     en paysage : il reste en tablette, d'où le bureau à 1181 px. */
   --breakpoint-tablette: 40rem;
-  --breakpoint-bureau: 73.75rem;
+  --breakpoint-bureau: 73.8125rem;
 }
