@@ -1,0 +1,152 @@
+/* Thème MultiBoutique — identité « Comptoir, primaire bleue ».
+   Les valeurs --mb-* recopient src/tokens.ts ; les tests vérifient qu'elles
+   restent identiques. Les polices sont auto-hébergées : la CSP interdit les
+   CDN tiers, et la PWA doit les avoir hors ligne. */
+@import "@fontsource-variable/bricolage-grotesque/opsz.css";
+@import "@fontsource-variable/figtree";
+
+:root {
+  color-scheme: light;
+  --mb-fond: #F4F0E8;
+  --mb-surface: #FFFFFF;
+  --mb-surface-relevee: #FBF8F3;
+  --mb-texte: #1F1B16;
+  --mb-texte-discret: #5E564C;
+  --mb-bordure: #E2DACD;
+  --mb-bordure-forte: #8C8174;
+  --mb-primaire: #2B50D9;
+  --mb-primaire-survol: #1F3DAE;
+  --mb-sur-primaire: #FFFFFF;
+  --mb-primaire-fond: #E6ECFA;
+  --mb-accent: #E0A526;
+  --mb-sur-accent: #1F1B16;
+  --mb-succes: #1F7A4D;
+  --mb-succes-fond: #E3F1E9;
+  --mb-alerte: #8F5300;
+  --mb-alerte-fond: #FBEFD6;
+  --mb-danger: #B3261E;
+  --mb-sur-danger: #FFFFFF;
+  --mb-danger-fond: #F8E1DF;
+  --mb-info: #0E6B6B;
+  --mb-info-fond: #DDF0EE;
+  --mb-neutre-fond: #EDE7DD;
+  --mb-focus: #2B50D9;
+  --ombre-carte: 0 1px 2px rgb(31 27 22 / 5%), 0 6px 18px rgb(31 27 22 / 5%);
+  --ombre-action: 0 6px 16px rgb(43 80 217 / 25%);
+}
+
+/* Le sombre suit le système, sauf si l'utilisateur a choisi le clair. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="clair"]) {
+    color-scheme: dark;
+    --mb-fond: #16130F;
+    --mb-surface: #211D18;
+    --mb-surface-relevee: #2B261F;
+    --mb-texte: #F3EEE6;
+    --mb-texte-discret: #B5AA9B;
+    --mb-bordure: #3A332B;
+    --mb-bordure-forte: #7A6F62;
+    --mb-primaire: #8AA8FF;
+    --mb-primaire-survol: #A9C0FF;
+    --mb-sur-primaire: #0E1630;
+    --mb-primaire-fond: #1C2340;
+    --mb-accent: #F0BC4C;
+    --mb-sur-accent: #16130F;
+    --mb-succes: #6CCB97;
+    --mb-succes-fond: #173323;
+    --mb-alerte: #F0BC4C;
+    --mb-alerte-fond: #3A2C10;
+    --mb-danger: #FF8A80;
+    --mb-sur-danger: #2A0D0B;
+    --mb-danger-fond: #3D1A17;
+    --mb-info: #6FD3CB;
+    --mb-info-fond: #143331;
+    --mb-neutre-fond: #2B261F;
+    --mb-focus: #8AA8FF;
+    --ombre-carte: none;
+    --ombre-action: none;
+  }
+}
+
+/* Choix explicite du sombre, quel que soit le réglage du système. */
+:root[data-theme="sombre"] {
+  color-scheme: dark;
+  --mb-fond: #16130F;
+  --mb-surface: #211D18;
+  --mb-surface-relevee: #2B261F;
+  --mb-texte: #F3EEE6;
+  --mb-texte-discret: #B5AA9B;
+  --mb-bordure: #3A332B;
+  --mb-bordure-forte: #7A6F62;
+  --mb-primaire: #8AA8FF;
+  --mb-primaire-survol: #A9C0FF;
+  --mb-sur-primaire: #0E1630;
+  --mb-primaire-fond: #1C2340;
+  --mb-accent: #F0BC4C;
+  --mb-sur-accent: #16130F;
+  --mb-succes: #6CCB97;
+  --mb-succes-fond: #173323;
+  --mb-alerte: #F0BC4C;
+  --mb-alerte-fond: #3A2C10;
+  --mb-danger: #FF8A80;
+  --mb-sur-danger: #2A0D0B;
+  --mb-danger-fond: #3D1A17;
+  --mb-info: #6FD3CB;
+  --mb-info-fond: #143331;
+  --mb-neutre-fond: #2B261F;
+  --mb-focus: #8AA8FF;
+  --ombre-carte: none;
+  --ombre-action: none;
+}
+
+/* Relie Tailwind 4 aux variables : bg-primaire, text-texte-discret, etc.
+   « inline » fait pointer les utilitaires directement sur les variables, pour
+   qu'un changement de thème s'applique sans recompiler. */
+@theme inline {
+  --color-fond: var(--mb-fond);
+  --color-surface: var(--mb-surface);
+  --color-surface-relevee: var(--mb-surface-relevee);
+  --color-texte: var(--mb-texte);
+  --color-texte-discret: var(--mb-texte-discret);
+  --color-bordure: var(--mb-bordure);
+  --color-bordure-forte: var(--mb-bordure-forte);
+  --color-primaire: var(--mb-primaire);
+  --color-primaire-survol: var(--mb-primaire-survol);
+  --color-sur-primaire: var(--mb-sur-primaire);
+  --color-primaire-fond: var(--mb-primaire-fond);
+  --color-accent: var(--mb-accent);
+  --color-sur-accent: var(--mb-sur-accent);
+  --color-succes: var(--mb-succes);
+  --color-succes-fond: var(--mb-succes-fond);
+  --color-alerte: var(--mb-alerte);
+  --color-alerte-fond: var(--mb-alerte-fond);
+  --color-danger: var(--mb-danger);
+  --color-sur-danger: var(--mb-sur-danger);
+  --color-danger-fond: var(--mb-danger-fond);
+  --color-info: var(--mb-info);
+  --color-info-fond: var(--mb-info-fond);
+  --color-neutre-fond: var(--mb-neutre-fond);
+  --color-focus: var(--mb-focus);
+
+  --font-titre: "Bricolage Grotesque Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-texte: "Figtree Variable", ui-sans-serif, system-ui, sans-serif;
+
+  --text-mention: 0.8125rem;
+  --text-libelle: 0.9375rem;
+  --text-courant: 1.0625rem;
+  --text-panneau: 1.3125rem;
+  --text-chiffre: 2rem;
+  --text-ecran: 2.375rem;
+  --text-accueil: 3.5rem;
+
+  --radius-carte: 16px;
+  --radius-bouton: 14px;
+
+  --shadow-carte: var(--ombre-carte);
+  --shadow-action: var(--ombre-action);
+
+  /* Points de rupture de la spec (§7.1) : téléphone < 640 px,
+     tablette 640–1180 px, bureau au-delà. */
+  --breakpoint-tablette: 40rem;
+  --breakpoint-bureau: 73.75rem;
+}
