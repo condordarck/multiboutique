@@ -1,4 +1,5 @@
-import type { TypeMouvementStock } from "@multiboutique/shared";
+import { randomBytes } from "node:crypto";
+import type { RoleUtilisateur, TypeMouvementStock } from "@multiboutique/shared";
 import { ErreurMetier } from "./erreurs";
 
 // Helpers repris de lib/actions/index.ts, partagés par les services.
@@ -128,4 +129,64 @@ export async function exigerFournisseurDeLaBoutique(db: Requeteur, fournisseurId
     throw new ErreurMetier("Fournisseur non trouvé dans cette boutique", 404);
   }
   return rows[0] as { id: string };
+}
+
+// Comptes et rôles, pour l'administration.
+
+export const ROLES_AVEC_BOUTIQUE = new Set([
+  "gerant",
+  "gerant_stock",
+  "comptable",
+  "vendeur",
+]);
+
+// Profils d'équipe créés par défaut à chaque boutique
+export const ROLES_PAR_DEFAUT: { role: RoleUtilisateur; label: string }[] = [
+  { role: "gerant", label: "Gérant" },
+  { role: "gerant_stock", label: "Magasinier" },
+  { role: "comptable", label: "Comptable" },
+  { role: "vendeur", label: "Vendeur" },
+];
+
+export function slugifier(nom: string): string {
+  return (
+    nom
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "boutique"
+  ).slice(0, 24);
+}
+
+export function genererMotDePasse(): string {
+  return randomBytes(9).toString("base64url");
+}
+
+export async function creerComptesParDefaut(
+  db: Requeteur,
+  boutiqueId: string,
+  boutiqueNom: string
+): Promise<{ role: RoleUtilisateur; label: string; email: string; password: string }[]> {
+  const slug = `${slugifier(boutiqueNom)}-${boutiqueId.slice(0, 6)}`;
+  const crees = [];
+  for (const { role, label } of ROLES_PAR_DEFAUT) {
+    const email = `${role}.${slug}@defaut.multiboutique.com`;
+    const { rows } = await db.query(
+      `SELECT 1 FROM utilisateurs
+       WHERE role = $1::role_utilisateur AND boutique_ids @> ARRAY[$2]::uuid[]
+       LIMIT 1`,
+      [role, boutiqueId]
+    );
+    if (rows.length > 0) continue;
+
+    const password = genererMotDePasse();
+    await db.query(
+      `INSERT INTO utilisateurs (email, password_hash, nom_complet, role, boutique_ids, actif)
+       VALUES ($1, crypt($2, gen_salt('bf', 10)), $3, $4::role_utilisateur, $5, true)`,
+      [email, password, `${label} — ${boutiqueNom}`, role, [boutiqueId]]
+    );
+    crees.push({ role, label, email, password });
+  }
+  return crees;
 }

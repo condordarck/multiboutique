@@ -1,7 +1,7 @@
 import { describe, expectTypeOf, it } from "vitest";
 import type { z } from "zod";
-import type { ClientFormData, CodePromoFormData, CommandeFormData, CommandeFournisseurFormData, FournisseurFormData, ModePaiement, ProduitFormData, ReservationFormData, VenteFormData } from "./types";
-import type { schemaClient, schemaCodePromo, schemaCommande, schemaCommandeFournisseur, schemaFournisseur, schemaEncaissement, schemaProduit, schemaReservation, schemaVente } from "./schemas";
+import type { BoutiqueFormData, ClientFormData, GroupeFormData, NouvelUtilisateurData, RegionFormData, RoleUtilisateur, CodePromoFormData, CommandeFormData, CommandeFournisseurFormData, FournisseurFormData, ModePaiement, ProduitFormData, ReservationFormData, VenteFormData } from "./types";
+import type { role, schemaBoutique, schemaGroupe, schemaNouvelUtilisateur, schemaRegion, schemaClient, schemaCodePromo, schemaCommande, schemaCommandeFournisseur, schemaFournisseur, schemaEncaissement, schemaProduit, schemaReservation, schemaVente } from "./schemas";
 
 // Les schémas décrivent les types existants : un champ ajouté d'un côté seulement
 // casse ces tests à la compilation.
@@ -30,5 +30,12 @@ describe("schémas alignés sur les types", () => {
   it("fournisseur et commande d'achat", () => {
     expectTypeOf<z.infer<typeof schemaFournisseur>>().toEqualTypeOf<FournisseurFormData>();
     expectTypeOf<z.infer<typeof schemaCommandeFournisseur>>().toEqualTypeOf<CommandeFournisseurFormData>();
+  });
+  it("administration", () => {
+    expectTypeOf<z.infer<typeof role>>().toEqualTypeOf<RoleUtilisateur>();
+    expectTypeOf<z.infer<typeof schemaNouvelUtilisateur>>().toEqualTypeOf<NouvelUtilisateurData>();
+    expectTypeOf<z.infer<typeof schemaBoutique>>().toEqualTypeOf<BoutiqueFormData>();
+    expectTypeOf<z.infer<typeof schemaGroupe>>().toEqualTypeOf<GroupeFormData>();
+    expectTypeOf<z.infer<typeof schemaRegion>>().toEqualTypeOf<RegionFormData>();
   });
 });

@@ -133,3 +133,55 @@ export const schemaCommandeFournisseur = z.object({
 export const schemaReception = z.object({
   receptions: z.array(z.object({ ligne_id: identifiant, quantite_recue: z.number() })),
 });
+
+// Administration.
+export const role = z.enum([
+  "administrateur",
+  "proprietaire",
+  "directeur_groupe",
+  "directeur_region",
+  "gerant",
+  "gerant_stock",
+  "comptable",
+  "vendeur",
+  "client",
+]);
+
+export const schemaNouvelUtilisateur = z.object({
+  nom_complet: z.string(),
+  email: z.string(),
+  password: z.string(),
+  role,
+  boutique_ids: z.array(identifiant),
+  region_id: z.string().nullable().optional(),
+  groupe_id: z.string().nullable().optional(),
+  telephone: z.string().optional(),
+});
+
+export const schemaMotDePasse = z.object({ mot_de_passe: z.string() });
+
+export const schemaBoutique = z.object({
+  nom: z.string(),
+  adresse: z.string().optional(),
+  telephone: z.string().optional(),
+  email: z.string().optional(),
+  region_id: z.string().nullable().optional(),
+  statut: z.enum(["active", "inactive"]),
+});
+
+export const schemaParametres = z.object({
+  parametres: z.array(z.object({ cle: z.string().min(1), valeur: z.string() })),
+});
+
+export const schemaGroupe = z.object({
+  nom: z.string(),
+  adresse: z.string().optional(),
+  telephone: z.string().optional(),
+  email: z.string().optional(),
+});
+
+export const schemaRegion = z.object({ nom: z.string(), groupe_id: z.string() });
+
+export const schemaCategorie = z.object({ nom: z.string(), description: z.string().optional() });
+
+export const schemaActivationPermission = z.object({ active: z.boolean() });
