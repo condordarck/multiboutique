@@ -2,12 +2,18 @@
   "name": "multiboutique",
   "version": "3.0.0",
   "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "db:init": "psql -h ${DB_HOST:-localhost} -U mb -d multiboutique -f db/init.sql"
+    "db:init": "psql -h ${DB_HOST:-localhost} -U mb -d multiboutique -f db/init.sql",
+    "test": "npm run test --workspaces --if-present",
+    "build:workspaces": "npm run build --workspaces --if-present"
   },
   "dependencies": {
     "next": "15.3.6",

@@ -5,6 +5,10 @@ FROM base AS deps
 WORKDIR /app
 
 COPY package.json package-lock.json ./
+# Les workspaces doivent exister pour que `npm ci` accepte le lockfile. Seuls
+# les manifestes comptent ici ; le code source arrive à l'étape builder.
+COPY apps ./apps
+COPY packages ./packages
 RUN npm ci --fetch-retries=5 --fetch-retry-mintimeout=2000 --fetch-retry-maxtimeout=60000 --fetch-timeout=180000
 
 # Rebuild the source code only when needed

@@ -8,3 +8,7 @@ next-env.d.ts
 
 # Journaux et dumps produits par deploy/backup.sh et deploy/server-deploy.sh
 backups/
+
+# Sorties de build des workspaces
+apps/*/dist/
+packages/*/dist/
