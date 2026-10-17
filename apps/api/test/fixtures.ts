@@ -62,7 +62,13 @@ export async function seConnecter(app: FastifyInstance, compte: Compte, audience
   const r = await app.inject({
     method: "POST",
     url: "/auth/connexion",
-    headers: { origin: ORIGINES[audience], "content-type": "application/json" },
+    // Une adresse par connexion : la limite anti force brute (5 par IP) ne doit
+    // pas bloquer la préparation d'un fichier de test qui connecte beaucoup de comptes.
+    headers: {
+      origin: ORIGINES[audience],
+      "content-type": "application/json",
+      "cf-connecting-ip": `198.51.100.${randomBytes(1)[0]}`,
+    },
     payload: { email: compte.email, mot_de_passe: compte.motDePasse },
   });
   if (r.statusCode !== 200) throw new Error(`Connexion impossible (${r.statusCode}) : ${r.body}`);

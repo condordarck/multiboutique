@@ -1,9 +1,13 @@
 import cookie from "@fastify/cookie";
 import rateLimit from "@fastify/rate-limit";
 import Fastify from "fastify";
+import "./types-pg";
 import type { Pool } from "pg";
 import type { Config } from "./config";
 import { gestionnaireErreurs } from "./erreurs";
+import { lecturesAdmin } from "./lectures/admin";
+import { lecturesBoutique } from "./lectures/boutique";
+import { lecturesGenerales } from "./lectures/generales";
 import { routesAchats } from "./routes/achats";
 import { routesAdministration } from "./routes/administration";
 import { routesAuth } from "./routes/auth";
@@ -51,5 +55,8 @@ export async function construireApp({ pool, config }: Dependances) {
   await app.register(routesCommandes, { db: pool });
   await app.register(routesAchats, { db: pool });
   await app.register(routesAdministration, { db: pool });
+  await app.register(lecturesGenerales, { db: pool });
+  await app.register(lecturesBoutique, { db: pool });
+  await app.register(lecturesAdmin, { db: pool });
   return app;
 }
