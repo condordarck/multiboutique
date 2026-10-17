@@ -1,4 +1,4 @@
-export type StatutErreur = 400 | 403 | 404 | 409;
+export type StatutErreur = 400 | 401 | 403 | 404 | 409;
 
 /**
  * Erreur destinée à l'utilisateur : son message est affiché tel quel. Elle hérite
