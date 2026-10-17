@@ -149,7 +149,7 @@ jobs:
       # le déploiement de l'autre.
       fail-fast: false
       matrix:
-        front: [www, backoffice]
+        front: [www, backoffice, maquettes]
     steps:
       - name: Récupérer le code
         uses: actions/checkout@v4
