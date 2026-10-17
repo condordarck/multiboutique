@@ -10,9 +10,11 @@
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@multiboutique/metier": "*",
     "@multiboutique/shared": "*",
     "fastify": "^5.12.7",
-    "pg": "^8.23.1"
+    "pg": "^8.23.1",
+    "zod": "^4.1.12"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
