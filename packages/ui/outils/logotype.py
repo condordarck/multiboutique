@@ -21,7 +21,7 @@ from fontTools.pens.svgPathPen import SVGPathPen
 from fontTools.pens.transformPen import TransformPen
 from fontTools.ttLib import TTFont
 
-PRIMAIRE, TEXTE, SAFRAN, BLANC = "#2B50D9", "#1F1B16", "#E0A526", "#FFFFFF"
+PRIMAIRE, TEXTE, TEXTE_SOMBRE, SAFRAN, BLANC = "#2B50D9", "#1F1B16", "#F3EEE6", "#E0A526", "#FFFFFF"
 GRAISSE, TAILLE_OPTIQUE, APPROCHE = 800, 96, -0.02
 
 police = TTFont(sys.argv[1])
@@ -67,6 +67,8 @@ def icone():
 
 fichiers = {
     "logo.svg": logotype(TEXTE),
+    # Texte du thème sombre : le composant Logotype bascule de l'un à l'autre.
+    "logo-sombre.svg": logotype(TEXTE_SOMBRE),
     # currentColor : le logo prend la couleur du texte qui l'entoure (fond sombre, impression).
     "logo-monochrome.svg": logotype("currentColor"),
     "icone.svg": icone(),

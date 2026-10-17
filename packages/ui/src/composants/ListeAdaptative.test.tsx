@@ -74,6 +74,26 @@ describe("ListeAdaptative", () => {
     expect(entete.className).toContain("text-right");
   });
 
+  it("place l'action de ligne dans la dernière colonne et au pied de chaque carte", () => {
+    render(
+      <ListeAdaptative
+        legende="Dernières ventes"
+        colonnes={colonnes}
+        lignes={ventes}
+        cleLigne={(v) => v.id}
+        vide="Aucune vente"
+        action={(v) => <button type="button">Voir {v.id}</button>}
+      />
+    );
+    const tableau = screen.getByRole("table");
+    const entetes = within(tableau).getAllByRole("columnheader");
+    expect(entetes).toHaveLength(4);
+    expect(entetes[3]!.textContent).toBe("Actions");
+    expect(within(tableau).getByRole("button", { name: "Voir v1" })).toBeTruthy();
+    const carte = within(screen.getByRole("list")).getAllByRole("listitem")[0]!;
+    expect(carte.lastElementChild!.textContent).toBe("Voir v1");
+  });
+
   it("sans ligne, affiche l'état vide à la place du tableau et des cartes", () => {
     rendre([]);
     expect(screen.getByText("Aucune vente")).toBeTruthy();

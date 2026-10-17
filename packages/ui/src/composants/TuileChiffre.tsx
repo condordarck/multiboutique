@@ -53,7 +53,7 @@ export function TuileChiffre({
             miseEnAvant ? "text-sur-accent" : favorable ? "text-succes" : "text-danger"
           )}
         >
-          {`En ${variation.sens} de ${formatPourcentage.format(variation.pourcentage)} %`}
+          {`En ${variation.sens} de ${formatPourcentage.format(variation.pourcentage)}\u00a0%`}
         </span>
       )}
       {!variation && detail && (

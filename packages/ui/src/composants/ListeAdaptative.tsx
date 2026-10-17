@@ -19,6 +19,11 @@ export interface ListeAdaptativeProps<T> {
   cleLigne: (ligne: T) => string;
   /** Affiché à la place de la liste quand elle est vide. */
   vide: ReactNode;
+  /** Bouton ou lien propre à chaque ligne (« Voir ») : au pied de la carte,
+   *  dans la dernière colonne du tableau. */
+  action?: (ligne: T) => ReactNode;
+  /** En-tête de la colonne d'action, lu par les lecteurs d'écran seulement. */
+  libelleAction?: string;
   className?: string;
 }
 
@@ -34,6 +39,8 @@ export function ListeAdaptative<T>({
   lignes,
   cleLigne,
   vide,
+  action,
+  libelleAction = "Actions",
   className,
 }: ListeAdaptativeProps<T>) {
   if (lignes.length === 0) {
@@ -62,6 +69,7 @@ export function ListeAdaptative<T>({
                 </div>
               ))}
             </dl>
+            {action && <div className="flex justify-end">{action(ligne)}</div>}
           </li>
         ))}
       </ul>
@@ -82,6 +90,11 @@ export function ListeAdaptative<T>({
                 {colonne.libelle}
               </th>
             ))}
+            {action && (
+              <th scope="col" className="px-3 py-2.5">
+                <span className="sr-only">{libelleAction}</span>
+              </th>
+            )}
           </tr>
         </thead>
         <tbody>
@@ -99,6 +112,7 @@ export function ListeAdaptative<T>({
                   {colonne.rendu(ligne)}
                 </td>
               ))}
+              {action && <td className="px-3 text-right">{action(ligne)}</td>}
             </tr>
           ))}
         </tbody>

@@ -11,6 +11,7 @@ export {
 } from "./composants/ChoixSegmente";
 export { Champ, type ChampProps, type TypeChamp } from "./composants/Champ";
 export { EtatVide, type EtatVideProps } from "./composants/EtatVide";
+export { Logotype, type LogotypeProps } from "./composants/Logotype";
 export { Quantite, type QuantiteProps } from "./composants/Quantite";
 export { TuileChiffre, type TuileChiffreProps, type Variation } from "./composants/TuileChiffre";
 export {

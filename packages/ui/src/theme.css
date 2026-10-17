@@ -151,3 +151,17 @@
   --breakpoint-tablette: 40rem;
   --breakpoint-bureau: 73.8125rem;
 }
+
+/* Variante sombre: (sombre:hidden, sombre:block…), qui suit la même règle que
+   les variables ci-dessus : le système, sauf choix explicite. Placée en fin de
+   fichier, après les blocs de variables que les tests relisent. */
+@custom-variant sombre {
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="clair"]) & {
+      @slot;
+    }
+  }
+  :root[data-theme="sombre"] & {
+    @slot;
+  }
+}
