@@ -1,3 +1,5 @@
+// @vitest-environment node
+// Lit theme.css sur le disque : jsdom remplace URL par la sienne, que fs refuse.
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { contraste } from "./contraste";
