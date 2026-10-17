@@ -612,114 +612,36 @@ export async function mettreAJourParametres(
 }
 
 // ============================================================
-// PROMOTIONS — CODES PROMO (grossistes)
+// PROMOTIONS — CODES PROMO (grossistes) — code métier dans packages/metier/src/promotions.ts
 // ============================================================
 
-export async function creerCodePromo(
-  boutiqueId: string,
-  data: CodePromoFormData
-) {
-  const user = await exigerAccesBoutique(boutiqueId, ["promos:gerer"]);
-
-  const code = data.code.trim().toUpperCase();
-  if (!code) throw new Error("Le code est requis");
-
-  const valeur = Number(data.valeur_reduction);
-  if (!valeur || valeur <= 0) {
-    throw new Error("La valeur de réduction doit être positive");
-  }
-
-  await pool.query(
-    `INSERT INTO codes_promo
-       (code, description, type_reduction, valeur_reduction, boutique_id, max_utilisations, date_debut, date_fin, actif, created_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-    [
-      code,
-      data.description?.trim() || null,
-      data.type_reduction,
-      valeur,
-      boutiqueId,
-      data.max_utilisations ? Number(data.max_utilisations) : null,
-      data.date_debut || null,
-      data.date_fin || null,
-      false,
-      user.id,
-    ]
-  );
-
+export async function creerCodePromo(boutiqueId: string, data: CodePromoFormData) {
+  const resultat = await metier.creerCodePromo(pool, await sessionExigee(), boutiqueId, data);
   revalidatePath(`/dashboard/${boutiqueId}/promotions`);
-  return { success: true };
+  return resultat;
 }
 
-export async function modifierCodePromo(
-  codeId: string,
-  data: CodePromoFormData
-) {
-  const { rows } = await pool.query<{ boutique_id: string }>(
-    `SELECT boutique_id FROM codes_promo WHERE id = $1`,
-    [codeId]
-  );
-  if (rows.length === 0) throw new Error("Code promo non trouvé");
-  await exigerAccesBoutique(rows[0].boutique_id, ["promos:gerer"]);
-
-  const code = data.code.trim().toUpperCase();
-  if (!code) throw new Error("Le code est requis");
-  const valeur = Number(data.valeur_reduction);
-  if (!valeur || valeur <= 0) {
-    throw new Error("La valeur de réduction doit être positive");
-  }
-
-  await pool.query(
-    `UPDATE codes_promo
-     SET code = $2, description = $3, type_reduction = $4, valeur_reduction = $5,
-         max_utilisations = $6, date_debut = $7, date_fin = $8, updated_at = NOW()
-     WHERE id = $1`,
-    [
-      codeId,
-      code,
-      data.description?.trim() || null,
-      data.type_reduction,
-      valeur,
-      data.max_utilisations ? Number(data.max_utilisations) : null,
-      data.date_debut || null,
-      data.date_fin || null,
-    ]
-  );
-
-  revalidatePath(`/dashboard/${rows[0].boutique_id}/promotions`);
-  return { success: true };
+export async function modifierCodePromo(codeId: string, data: CodePromoFormData) {
+  const resultat = await metier.modifierCodePromo(pool, await sessionExigee(), codeId, data);
+  revalidatePath(`/dashboard/${resultat.boutique_id}/promotions`);
+  return resultat;
 }
 
 export async function toggleActifCodePromo(codeId: string) {
-  const { rows } = await pool.query<{ boutique_id: string }>(
-    `SELECT boutique_id FROM codes_promo WHERE id = $1`,
-    [codeId]
-  );
-  if (rows.length === 0) throw new Error("Code promo non trouvé");
-  await exigerAccesBoutique(rows[0].boutique_id, ["promos:gerer"]);
-
-  await pool.query(
-    `UPDATE codes_promo SET actif = NOT actif, updated_at = NOW() WHERE id = $1`,
-    [codeId]
-  );
-
-  revalidatePath(`/dashboard/${rows[0].boutique_id}/promotions`);
-  return { success: true };
+  const resultat = await metier.toggleActifCodePromo(pool, await sessionExigee(), codeId);
+  revalidatePath(`/dashboard/${resultat.boutique_id}/promotions`);
+  return resultat;
 }
 
 export async function supprimerCodePromo(codeId: string) {
-  const { rows } = await pool.query<{ boutique_id: string }>(
-    `SELECT boutique_id FROM codes_promo WHERE id = $1`,
-    [codeId]
-  );
-  if (rows.length === 0) throw new Error("Code promo non trouvé");
-  await exigerAccesBoutique(rows[0].boutique_id, ["promos:gerer"]);
-
-  await pool.query(`DELETE FROM codes_promo WHERE id = $1`, [codeId]);
-
-  revalidatePath(`/dashboard/${rows[0].boutique_id}/promotions`);
-  return { success: true };
+  const resultat = await metier.supprimerCodePromo(pool, await sessionExigee(), codeId);
+  revalidatePath(`/dashboard/${resultat.boutique_id}/promotions`);
+  return resultat;
 }
+
+
+
+
 
 // ============================================================
 // ADMIN — ORGANISATION (groupes / régions)
@@ -793,8 +715,42 @@ export async function modifierRegion(regionId: string, data: RegionFormData) {
 }
 
 // ============================================================
-// CLIENTS GROSSISTES
+// CLIENTS GROSSISTES — code métier dans packages/metier/src/clients.ts
 // ============================================================
+
+export async function creerClient(boutiqueId: string, data: ClientFormData) {
+  const resultat = await metier.creerClient(pool, await sessionExigee(), boutiqueId, data);
+  revalidatePath(`/dashboard/${boutiqueId}/clients`);
+  return resultat;
+}
+
+export async function modifierClient(clientId: string, boutiqueId: string, data: ClientFormData) {
+  const resultat = await metier.modifierClient(pool, await sessionExigee(), clientId, boutiqueId, data);
+  revalidatePath(`/dashboard/${boutiqueId}/clients`);
+  return resultat;
+}
+
+export async function toggleActifClient(clientId: string, boutiqueId: string) {
+  const resultat = await metier.toggleActifClient(pool, await sessionExigee(), clientId, boutiqueId);
+  revalidatePath(`/dashboard/${boutiqueId}/clients`);
+  return resultat;
+}
+
+export async function basculerVip(clientId: string, boutiqueId: string) {
+  const resultat = await metier.basculerVip(pool, await sessionExigee(), clientId, boutiqueId);
+  revalidatePath(`/dashboard/${boutiqueId}/clients`);
+  return resultat;
+}
+
+export async function listerRegistre(clientId: string, boutiqueId: string) {
+  return metier.listerRegistre(pool, await sessionExigee(), clientId, boutiqueId);
+}
+
+export async function reglerEncours(clientId: string, boutiqueId: string, montant: number) {
+  const resultat = await metier.reglerEncours(pool, await sessionExigee(), clientId, boutiqueId, montant);
+  revalidatePath(`/dashboard/${boutiqueId}/clients`);
+  return resultat;
+}
 
 async function exigerClientDeLaBoutique(
   clientId: string,
@@ -810,175 +766,11 @@ async function exigerClientDeLaBoutique(
   return rows[0];
 }
 
-export async function creerClient(
-  boutiqueId: string,
-  data: ClientFormData
-) {
-  await exigerAccesBoutique(boutiqueId, ["clients:gerer"]);
-  if (!data.nom.trim()) throw new Error("Le nom du client est requis");
 
-  await pool.query(
-    `INSERT INTO clients (nom, telephone, email, adresse, boutique_id, type_client, plafond_credit, est_vip)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-    [
-      data.nom.trim(),
-      data.telephone?.trim() || null,
-      data.email?.trim() || null,
-      data.adresse?.trim() || null,
-      boutiqueId,
-      data.type_client,
-      data.plafond_credit != null ? Number(data.plafond_credit) : 0,
-      data.est_vip ?? false,
-    ]
-  );
 
-  revalidatePath(`/dashboard/${boutiqueId}/clients`);
-  return { success: true };
-}
 
-export async function modifierClient(
-  clientId: string,
-  boutiqueId: string,
-  data: ClientFormData
-) {
-  await exigerAccesBoutique(boutiqueId, ["clients:gerer"]);
-  await exigerClientDeLaBoutique(clientId, boutiqueId);
-  if (!data.nom.trim()) throw new Error("Le nom du client est requis");
 
-  await pool.query(
-    `UPDATE clients
-     SET nom = $2, telephone = $3, email = $4, adresse = $5,
-         type_client = $6, plafond_credit = $7, est_vip = $8, updated_at = NOW()
-     WHERE id = $1`,
-    [
-      clientId,
-      data.nom.trim(),
-      data.telephone?.trim() || null,
-      data.email?.trim() || null,
-      data.adresse?.trim() || null,
-      data.type_client,
-      data.plafond_credit != null ? Number(data.plafond_credit) : 0,
-      data.est_vip ?? false,
-    ]
-  );
 
-  revalidatePath(`/dashboard/${boutiqueId}/clients`);
-  return { success: true };
-}
-
-export async function toggleActifClient(
-  clientId: string,
-  boutiqueId: string
-) {
-  await exigerAccesBoutique(boutiqueId, ["clients:gerer"]);
-  await exigerClientDeLaBoutique(clientId, boutiqueId);
-
-  await pool.query(
-    `UPDATE clients SET actif = NOT actif, updated_at = NOW() WHERE id = $1`,
-    [clientId]
-  );
-
-  revalidatePath(`/dashboard/${boutiqueId}/clients`);
-  return { success: true };
-}
-
-export async function basculerVip(clientId: string, boutiqueId: string) {
-  await exigerAccesBoutique(boutiqueId, ["clients:gerer"]);
-  await exigerClientDeLaBoutique(clientId, boutiqueId);
-
-  await pool.query(
-    `UPDATE clients SET est_vip = NOT est_vip, updated_at = NOW() WHERE id = $1`,
-    [clientId]
-  );
-
-  revalidatePath(`/dashboard/${boutiqueId}/clients`);
-  return { success: true };
-}
-
-export async function listerRegistre(clientId: string, boutiqueId: string) {
-  await exigerAccesBoutique(boutiqueId, ["clients:voir"]);
-  await exigerClientDeLaBoutique(clientId, boutiqueId);
-
-  const { rows } = await pool.query(
-    `SELECT rc.id, rc.type, rc.libelle, rc.montant, rc.solde_apres,
-            rc.auteur_id, rc.created_at,
-            u.nom_complet AS auteur_nom
-     FROM registre_credits rc
-     LEFT JOIN utilisateurs u ON u.id = rc.auteur_id
-     WHERE rc.client_id = $1 AND rc.boutique_id = $2
-     ORDER BY rc.created_at DESC`,
-    [clientId, boutiqueId]
-  );
-
-  return rows.map((r) => ({
-    id: r.id,
-    type: r.type,
-    libelle: r.libelle,
-    montant: Number(r.montant),
-    soldeApres: Number(r.solde_apres),
-    auteurNom: r.auteur_nom,
-    createdAt: r.created_at,
-  }));
-}
-
-export async function reglerEncours(
-  clientId: string,
-  boutiqueId: string,
-  montant: number
-) {
-  const user = await exigerAccesBoutique(boutiqueId, ["clients:gerer"]);
-  await exigerClientDeLaBoutique(clientId, boutiqueId);
-  const montantRegle = Number(montant);
-  if (!montantRegle || montantRegle <= 0) {
-    throw new Error("Le montant à régler doit être positif");
-  }
-
-  const client = await pool.connect();
-  try {
-    await client.query("BEGIN");
-
-    const { rows } = await client.query(
-      `SELECT id, encours, nom FROM clients WHERE id = $1 AND boutique_id = $2 FOR UPDATE`,
-      [clientId, boutiqueId]
-    );
-    if (rows.length === 0) {
-      throw new Error("Client non trouvé dans cette boutique");
-    }
-    const encoursAvant = Number(rows[0].encours) || 0;
-    const difference = Math.min(montantRegle, encoursAvant);
-
-    const { rows: maj } = await client.query(
-      `UPDATE clients SET encours = GREATEST(0, encours - $2), updated_at = NOW()
-       WHERE id = $1 RETURNING encours`,
-      [clientId, difference]
-    );
-    const nouvelEncours = Number(maj[0].encours);
-
-    await client.query(
-      `INSERT INTO registre_credits
-         (client_id, boutique_id, type, libelle, montant, solde_apres, auteur_id)
-       VALUES ($1, $2, 'versement', $3, $4, $5, $6)`,
-      [
-        clientId,
-        boutiqueId,
-        `Versement de ${difference.toFixed(2)}`,
-        -difference,
-        nouvelEncours,
-        user.id,
-      ]
-    );
-
-    await client.query("COMMIT");
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
-  } finally {
-    client.release();
-  }
-
-  revalidatePath(`/dashboard/${boutiqueId}/clients`);
-  return { success: true };
-}
 
 // ============================================================
 // COMMANDES GROSSISTES (B2B)

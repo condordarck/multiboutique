@@ -83,3 +83,26 @@ export const schemaPrixReference = z.object({
 export const schemaApplicationPrixConseilles = z.object({
   produit_ids: z.array(identifiant).optional(),
 });
+
+// Clients, crédit, codes promo.
+export const schemaClient = z.object({
+  nom: z.string(),
+  telephone: z.string().optional(),
+  email: z.string().optional(),
+  adresse: z.string().optional(),
+  type_client: z.enum(["grossiste", "detaillant"]),
+  plafond_credit: z.number().optional(),
+  est_vip: z.boolean().optional(),
+});
+
+export const schemaReglement = z.object({ montant: z.number() });
+
+export const schemaCodePromo = z.object({
+  code: z.string(),
+  description: z.string().optional(),
+  type_reduction: z.enum(["pourcentage", "montant"]),
+  valeur_reduction: z.number(),
+  max_utilisations: z.number().int().nullable().optional(),
+  date_debut: z.string().nullable().optional(),
+  date_fin: z.string().nullable().optional(),
+});

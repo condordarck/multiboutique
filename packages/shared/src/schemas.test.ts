@@ -1,7 +1,7 @@
 import { describe, expectTypeOf, it } from "vitest";
 import type { z } from "zod";
-import type { ModePaiement, ProduitFormData, ReservationFormData, VenteFormData } from "./types";
-import type { schemaEncaissement, schemaProduit, schemaReservation, schemaVente } from "./schemas";
+import type { ClientFormData, CodePromoFormData, ModePaiement, ProduitFormData, ReservationFormData, VenteFormData } from "./types";
+import type { schemaClient, schemaCodePromo, schemaEncaissement, schemaProduit, schemaReservation, schemaVente } from "./schemas";
 
 // Les schémas décrivent les types existants : un champ ajouté d'un côté seulement
 // casse ces tests à la compilation.
@@ -17,5 +17,11 @@ describe("schémas alignés sur les types", () => {
   });
   it("produit", () => {
     expectTypeOf<z.infer<typeof schemaProduit>>().toEqualTypeOf<ProduitFormData>();
+  });
+  it("client", () => {
+    expectTypeOf<z.infer<typeof schemaClient>>().toEqualTypeOf<ClientFormData>();
+  });
+  it("code promo", () => {
+    expectTypeOf<z.infer<typeof schemaCodePromo>>().toEqualTypeOf<CodePromoFormData>();
   });
 });

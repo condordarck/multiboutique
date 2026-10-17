@@ -107,3 +107,14 @@ export async function appliquerCodePromo(
 
   return { remise, montantFinal, codePromoId: promo.id };
 }
+
+export async function exigerClientDeLaBoutique(db: Requeteur, clientId: string, boutiqueId: string) {
+  const { rows } = await db.query(
+    `SELECT id FROM clients WHERE id = $1 AND boutique_id = $2`,
+    [clientId, boutiqueId]
+  );
+  if (rows.length === 0) {
+    throw new ErreurMetier("Client non trouvé dans cette boutique", 404);
+  }
+  return rows[0] as { id: string };
+}
