@@ -145,6 +145,9 @@ jobs:
     permissions:
       contents: read
     strategy:
+      # Les fronts sont indépendants : l'échec de l'un ne doit pas annuler
+      # le déploiement de l'autre.
+      fail-fast: false
       matrix:
         front: [www, backoffice]
     steps:
