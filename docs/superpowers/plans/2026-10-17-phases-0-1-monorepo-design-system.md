@@ -19,6 +19,15 @@ l'exécution (`npm view <paquet> version`) ; le lockfile les épingle.
 
 **Spec :** `docs/superpowers/specs/2026-10-17-separation-front-api-pwa-design.md`
 
+> **Révision du 2026-10-17, après exécution des tâches 1 à 5.** Les fronts ne sont plus
+> publiés sur Cloudflare Pages mais sur **Workers avec fichiers statiques** : wrangler
+> 4.151 redirige la création de projets Pages vers Workers. Chaque front a un
+> `wrangler.jsonc` (environnement `recette` → Worker `mb-<front>-recette`, domaine
+> personnalisé déclaré dans le fichier), le routage SPA passe par
+> `not_found_handling` et `_redirects` est supprimé. wrangler est épinglé dans le
+> `package.json` racine. Les tâches 6 et 12 ci-dessous tiennent compte de ce changement ;
+> les tâches 4 et 5 décrivent la version Pages initialement exécutée.
+
 ## Global Constraints
 
 - **Le monolithe ne doit pas bouger.** À la fin de chaque tâche : `npm run build` à la
@@ -32,9 +41,9 @@ l'exécution (`npm view <paquet> version`) ; le lockfile les épingle.
   `transpilePackages` ; l'API via son bundler (phase 2).
 - **Nommage :** code, messages et commits en français ; commits au format
   `Préfixe : description`, terminés par la ligne `Co-Authored-By` en vigueur.
-- **Noms des projets Cloudflare Pages :** un projet par front **et par environnement**,
+- **Noms des Workers des fronts :** un Worker par front **et par environnement**,
   pour qu'un déploiement de recette ne puisse jamais toucher la production :
-  `mb-www-recette`, `mb-backoffice-recette`, `mb-maquettes`. Production (plus tard) :
+  `mb-www-recette`, `mb-backoffice-recette`, `mb-maquettes-recette`. Production (plus tard) :
   `mb-www`, `mb-backoffice`.
 - **Domaines de recette :** `www.morpion.cloud`, `backoffice.morpion.cloud`,
   `maquettes.morpion.cloud` (`api.morpion.cloud` arrive en phase 2).
@@ -609,46 +618,32 @@ Ne pas pousser avant la Tâche 6 : sans projets Pages ni secrets, le nouveau job
 
 ---
 
-### Task 6: Projets Pages et domaines de recette
+### Task 6: Workers et domaines de recette
 
 **Prérequis :** zone `morpion.cloud` **active** sur Cloudflare.
-
-Cette tâche mêle actions manuelles de l'utilisateur (tableau de bord Cloudflare et GitHub)
-et vérifications.
 
 - [ ] **Step 1: Vérifier la délégation**
 
 Run: `dig +short NS morpion.cloud`
 Expected: `ishaan.ns.cloudflare.com.` et `zelda.ns.cloudflare.com.`
 
-- [ ] **Step 2: Jeton et identifiant de compte (utilisateur)**
+- [ ] **Step 2: Droits du jeton (utilisateur)**
 
-Jeton API Cloudflare, droits **Account → Cloudflare Pages : Edit** (le DNS et le Tunnel
-viendront en phase 2, avec leur propre jeton). Ajouter dans l'environnement GitHub
-`recette` les secrets `CLOUDFLARE_API_TOKEN` et `CLOUDFLARE_ACCOUNT_ID`.
+Le jeton `CLOUDFLARE_API_TOKEN` de l'environnement GitHub `recette` doit porter :
+**Account → Workers Scripts : Edit**, **Zone (morpion.cloud) → Workers Routes : Edit**
+et **Zone (morpion.cloud) → DNS : Edit**. `CLOUDFLARE_ACCOUNT_ID` est aussi requis.
 
 Run: `gh api repos/condordarck/multiboutique/environments/recette/secrets -q '.secrets[].name' | grep CLOUDFLARE`
 Expected: les deux noms.
 
-- [ ] **Step 3: Créer les projets**
-
-```bash
-npx wrangler pages project create mb-www-recette --production-branch=main
-npx wrangler pages project create mb-backoffice-recette --production-branch=main
-```
-
-(`npx wrangler login` au préalable, ou `CLOUDFLARE_API_TOKEN` exporté.)
-
-- [ ] **Step 4: Pousser et publier**
+- [ ] **Step 3: Pousser et publier**
 
 Run: `git push origin main`, puis `gh run watch --exit-status`
-Expected: `build`, `deploy-recette` et les deux `deploy-fronts-recette` au vert.
+Expected: `build`, `deploy-recette` et les deux `deploy-fronts-recette` au vert. Le premier
+déploiement crée les Workers `mb-www-recette` et `mb-backoffice-recette` et leurs
+domaines personnalisés.
 
-- [ ] **Step 5: Domaines personnalisés (utilisateur)**
-
-Tableau de bord → Workers & Pages → `mb-www-recette` → Custom domains → `www.morpion.cloud` ;
-idem `mb-backoffice-recette` → `backoffice.morpion.cloud`. Cloudflare crée lui-même les
-CNAME, la zone étant chez lui.
+- [ ] **Step 4: Vérifier les domaines**
 
 Run:
 ```bash
@@ -902,7 +897,8 @@ git commit -m "UI : coque responsive et liste adaptative"
 **Files:**
 - Create: `apps/maquettes/` (Vite + React + `@multiboutique/ui`), `apps/maquettes/src/donnees.ts`,
   `apps/maquettes/src/ecrans/{NouvelleVente,Stock,Catalogue}.tsx`
-- Modify: `.github/workflows/ci-cd.yml` (ajout de `maquettes` à la matrice Pages, projet `mb-maquettes`)
+- Create: `apps/maquettes/wrangler.jsonc` (environnement `recette` → Worker `mb-maquettes-recette`, domaine `maquettes.morpion.cloud`)
+- Modify: `.github/workflows/ci-cd.yml` (ajout de `maquettes` à la matrice du job des fronts)
 
 Trois écrans, choisis pour couvrir les cas difficiles :
 
@@ -927,9 +923,8 @@ thèmes. Aucun défilement horizontal, aucune cible tactile sous 44 px.
 
 - [ ] **Step 3: Publier**
 
-Créer le projet `npx wrangler pages project create mb-maquettes --production-branch=main`,
-ajouter `maquettes` à la matrice du job Pages, pousser. Domaine personnalisé
-`maquettes.morpion.cloud` (utilisateur).
+Ajouter `maquettes` à la matrice du job des fronts et pousser : le déploiement crée le
+Worker et le domaine `maquettes.morpion.cloud`.
 
 ```bash
 git add apps/maquettes .github/workflows/ci-cd.yml package.json package-lock.json

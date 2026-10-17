@@ -6,7 +6,7 @@ Date : 2026-10-17 · État : choix validés en échange, spec à relire avant pl
 
 Sortir MultiBoutique du monolithe Next.js pour obtenir :
 
-- **deux PWA** statiques hébergées sur **Cloudflare Pages** : la vitrine/espace client
+- **deux PWA** statiques hébergées sur **Cloudflare Workers** (fichiers statiques, sans code serveur) : la vitrine/espace client
   (`www`) et le backoffice (`backoffice`) ;
 - **une API dédiée** sur le VPS (`api`), seule à parler à PostgreSQL, **sans aucun port
   public** : elle n'est joignable qu'à travers Cloudflare ;
@@ -45,7 +45,7 @@ Choix arrêtés :
                          Cloudflare (proxy, WAF, rate limiting, cache)
    ┌─────────────────────┬─────────────────────────┬──────────────────────────┐
    │ www.<base>          │ backoffice.<base>       │ api.<base>               │
-   │ Pages : SPA PWA     │ Pages : SPA PWA         │ hôte public du Tunnel    │
+   │ Worker : SPA PWA    │ Worker : SPA PWA        │ hôte public du Tunnel    │
    └─────────┬───────────┴────────────┬────────────┴────────────┬─────────────┘
              └──── fetch credentials: include ──────────────────┘
                                                                 │ Cloudflare Tunnel
@@ -58,13 +58,19 @@ Choix arrêtés :
 | recette | `morpion.cloud` (zone Cloudflare, domaine enregistré chez OVH) |
 | production | domaine à acquérir |
 
-Les deux fronts sont des projets Cloudflare Pages auxquels on rattache un **domaine
-personnalisé** (`www.<base>`, `backoffice.<base>`). L'adresse `*.pages.dev` attribuée
-par Cloudflare n'est pas utilisée par les applications.
+Chaque front est un **Worker sans code qui ne sert que des fichiers statiques**
+(`apps/<front>/wrangler.jsonc`), un par environnement (`mb-<front>-recette`, puis
+`mb-<front>`). Le domaine personnalisé (`www.<base>`, `backoffice.<base>`) est déclaré
+dans ce fichier : le déploiement crée lui-même l'enregistrement DNS. Les adresses
+`*.workers.dev` et les URL de prévisualisation sont désactivées.
+
+Cloudflare Pages a été écarté à l'exécution : depuis wrangler 4.15x, la création d'un
+projet Pages est redirigée vers Workers, que Cloudflare présente comme la nouvelle
+version de Pages. Partir sur l'ancienne aurait imposé une migration plus tard.
 
 **Pourquoi un même domaine parent.** Les trois hôtes sont alors *same-site* : le cookie de
 session de l'API, `HttpOnly`, accompagne les `fetch` des fronts sans être un cookie tiers.
-Sur `*.pages.dev` (Public Suffix List), chaque projet serait un site distinct et Safari,
+Sur `*.pages.dev` ou `*.workers.dev` (Public Suffix List), chaque front serait un site distinct et Safari,
 donc tout navigateur sur iPad, bloquerait ce cookie.
 
 ### 3.1 Dépôt : monorepo npm workspaces
@@ -141,7 +147,7 @@ Cloudflare**. Sinon un attaquant contourne le proxy en visant directement l'IP.
 - Règles Cloudflare : rate limiting sur `/auth/*` et sur les écritures, WAF managé.
 - L'API lit l'IP réelle dans `CF-Connecting-IP`, fiable puisque seul Cloudflare peut
   l'atteindre, pour son propre rate-limit.
-- Les fronts étant statiques sur Pages, ils restent servis même VPS à terre ; la PWA
+- Les fronts étant statiques sur Cloudflare, ils restent servis même VPS à terre ; la PWA
   affiche alors les données en cache (§6.3).
 
 ## 6. Fronts PWA
@@ -150,7 +156,8 @@ Cloudflare**. Sinon un attaquant contourne le proxy en visant directement l'IP.
 
 Vite, React 19, React Router, TanStack Query, Tailwind, `packages/ui`.
 `VITE_API_URL` injectée au build (une valeur par environnement).
-Cloudflare Pages : `_redirects` (`/* /index.html 200`) pour le routage SPA, `_headers`
+Routage SPA par `not_found_handling: "single-page-application"` (toute route inconnue
+renvoie `index.html`) ; `_headers`
 pour la CSP (`connect-src` limité à `api.<base>`) et les en-têtes de sécurité. Les déploiements de
 recette portent `X-Robots-Tag: noindex`.
 
@@ -211,8 +218,8 @@ Chaque phase se déploie en recette et laisse l'application utilisable.
 Déploiement : l'image de l'API remplace celle de l'application dans
 `deploy/docker-compose.prod.yml` (mêmes sauvegardes, migrations, supervision), qui gagne
 le service `cloudflared` ; les
-fronts sont publiés par `wrangler pages deploy` depuis le workflow, un projet Pages par
-front, avec les environnements GitHub `recette` et `production` existants.
+fronts sont publiés par `wrangler deploy --env <environnement>` depuis le workflow, un
+Worker par front et par environnement, avec les environnements GitHub `recette` et `production` existants.
 
 ## 9. Prérequis et questions ouvertes
 
@@ -222,8 +229,9 @@ Prérequis de la recette :
    ses serveurs DNS par ceux qu'indique Cloudflare. Le domaine reste enregistré chez
    OVH. Les enregistrements par défaut d'OVH (parking, MX, SPF) sont inutilisés et
    peuvent être abandonnés.
-2. Un jeton API Cloudflare pour le CI, avec les droits Pages (déploiement), DNS et
-   Tunnel sur cette zone.
+2. Un jeton API Cloudflare pour le CI : **Workers Scripts : Edit** sur le compte ;
+   **Workers Routes : Edit** et **DNS : Edit** sur la zone (domaines personnalisés) ;
+   Tunnel en phase 2.
 
 Question ouverte :
 
