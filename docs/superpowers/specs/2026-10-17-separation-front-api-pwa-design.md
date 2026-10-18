@@ -213,7 +213,26 @@ contrôlable et effaçable.
 
 ### 6.4 Vitrine et référencement
 
-Non requis : la vitrine reste une SPA, sans pré-rendu.
+Non requis : la vitrine reste une SPA, sans pré-rendu (`noindex`).
+
+Décisions de la phase 4 (vitrine) :
+
+- **Paquet commun `packages/front`** : client de l'API, session, écritures, formats
+  et saisie, formulaires, persistance hors ligne et bandeaux, amorçage de
+  l'application (`creerApplication`), en-têtes et CSP, configuration Vite partagée,
+  outils de test et serveur des parcours (un ou deux fronts, une seule API). Les deux
+  fronts n'ont plus en propre que leurs écrans, leur coque et leurs gardes.
+- **Pages** : `/` (accueil et boutiques réunis), `/boutiques/:id` (catalogue, panier,
+  réservation), `/reservations/:id` (suivi public, sans téléphone ni e-mail),
+  `/connexion`, `/inscription`, `/espace` (seule page protégée).
+- **Comptes du personnel refusés sur `www`**, avec un lien vers le backoffice
+  (`VITE_BACKOFFICE_URL`, exigée au build comme `VITE_API_URL`).
+- **Panier** : par boutique, dans `sessionStorage` ; il survit à un rechargement et
+  ne quitte jamais l'appareil.
+- **Gardes** : `apps/www/src/completude.test.ts` (la vitrine appelle exactement ses
+  services ; chaque page publique ou client du monolithe a sa route) et
+  `packages/front/src/couverture.test.ts` (tout service de `metier` est couvert par
+  un front, sauf `validerReservation`, en attente de décision).
 
 ## 7. Refonte visuelle
 
@@ -247,7 +266,7 @@ Chaque phase se déploie en recette et laisse l'application utilisable.
 | 1 | Design system et maquettes | maquettes validées |
 | 2 | API : auth, lectures, écritures, tests d'intégration sur Postgres réel en CI | parité fonctionnelle avec les 50 actions et les 25 pages — **réalisée** (branche `phase-2-api`) ; mise en ligne après création du tunnel |
 | 3 | Backoffice PWA | parcours métier complets en recette — **réalisée** (branche `phase-3-backoffice`), mise en recette après fusion |
-| 4 | www PWA | vitrine, réservation, espace client en recette |
+| 4 | www PWA | vitrine, réservation, espace client en recette — **réalisée** (branche `phase-4-www`), mise en recette après fusion |
 | 5 | Bascule : tunnel en production, retrait du monolithe Next | ancien domaine redirigé vers `www.<base>` |
 
 Déploiement : l'image de l'API s'ajoute à celle du monolithe dans
