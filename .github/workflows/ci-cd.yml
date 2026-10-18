@@ -71,11 +71,6 @@ jobs:
           VITE_API_URL: https://api.exemple.invalid
           VITE_BACKOFFICE_URL: https://backoffice.exemple.invalid
 
-      - name: Build Next.js (inclut le typecheck)
-        run: npm run build
-        env:
-          NODE_OPTIONS: "--max-old-space-size=4096"
-
   # ------------------------------------------------------------------
   # Parcours de bout en bout du backoffice : Chromium, vraie API, vraie base
   # ------------------------------------------------------------------
@@ -151,11 +146,11 @@ jobs:
       - name: Récupérer le code
         uses: actions/checkout@v4
 
-      - name: Métadonnées (tags image)
-        id: meta
+      - name: Métadonnées (tags image API)
+        id: meta-api
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-api
           tags: |
             type=semver,pattern={{version}}
             type=raw,value=main,enable={{is_default_branch}}
@@ -171,31 +166,8 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build & push de l'image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: Dockerfile
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Métadonnées (tags image API)
-        id: meta-api
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-api
-          tags: |
-            type=semver,pattern={{version}}
-            type=raw,value=main,enable={{is_default_branch}}
-            type=sha,format=short
-
-      # Un échec ici ne doit pas empêcher le déploiement du monolithe : API_IMAGE
-      # n'est alors pas transmis et server-deploy.sh ne déploie pas l'API.
+      # L'API est désormais tout le serveur : sans image, rien ne se déploie.
       - name: Build & push de l'image API
-        id: build-api
-        continue-on-error: true
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -218,41 +190,14 @@ jobs:
             # Sans échec ici, une image neuve se déploierait sur un checkout
             # périmé : ancien compose, anciennes migrations, anciens scripts.
             git pull --ff-only origin main
-            export IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}"
-            export API_IMAGE="${{ steps.build-api.outcome == 'success' && format('{0}/{1}-api:{2}', env.REGISTRY, env.IMAGE_NAME, steps.meta-api.outputs.version) || '' }}"
+            export API_IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-api:${{ steps.meta-api.outputs.version }}"
             bash deploy/server-deploy.sh up
 
-      - name: Vérifier la santé de l'application
-        run: |
-          for tentative in 1 2 3 4 5 6; do
-            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 \
-              "https://${{ vars.DOMAIN }}/api/health")
-            echo "Tentative ${tentative} : HTTP ${code}"
-            if [ "$code" = "200" ]; then
-              echo "Application saine."
-              exit 0
-            fi
-            sleep 10
-          done
-          echo "L'application ne répond pas 200 sur /api/health après déploiement." >&2
-          exit 1
-
-      # Tant que API_DOMAIN n'est pas défini (tunnel pas encore créé), l'API n'est
-      # pas déployée par server-deploy.sh : rien à vérifier.
-      - name: Vérifier la santé de l'API
-        if: vars.API_DOMAIN != ''
-        run: |
-          for tentative in 1 2 3 4 5 6; do
-            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "https://${{ vars.API_DOMAIN }}/health")
-            echo "Tentative ${tentative} : HTTP ${code}"
-            if [ "$code" = "200" ]; then
-              echo "API saine."
-              exit 0
-            fi
-            sleep 10
-          done
-          echo "L'API ne répond pas 200 sur /health après déploiement." >&2
-          exit 1
+      # L'API par le tunnel, et les deux PWA (déployées par le job voisin).
+      - name: Vérifier l'API et les fronts
+        run: bash deploy/ci/verifier-sante.sh
+        env:
+          API_DOMAIN: ${{ vars.API_DOMAIN }}
 
   # ------------------------------------------------------------------
   # CD recette des PWA : push sur main → Cloudflare Workers (fichiers statiques)
@@ -324,17 +269,35 @@ jobs:
         run: npx wrangler deploy --env recette
 
   # ------------------------------------------------------------------
-  # CD production : tag v* → serveur de production
+  # CD production : tag v* → serveur de production et PWA de production
   #
-  # Ce job duplique volontairement deploy-recette : les deux ne diffèrent que
-  # par l'environnement, la condition et la stratégie de checkout (pull de main
-  # contre checkout détaché du tag). TOUTE correction apportée à l'un doit être
-  # reportée ici, sous peine de voir la production diverger de la recette.
+  # Préparé, pas activé : la garde refuse tant que l'environnement GitHub
+  # « production » (API_DOMAIN) et les env.production des wrangler.jsonc ne sont
+  # pas configurés (docs/bascule-recette.md, section « Production »).
+  # Ces jobs dupliquent volontairement ceux de la recette : toute correction
+  # apportée à l'un doit être reportée sur l'autre.
   # ------------------------------------------------------------------
+  garde-production:
+    name: Garde production
+    runs-on: ubuntu-latest
+    needs: [build, e2e]
+    if: startsWith(github.ref, 'refs/tags/v')
+    environment: production
+    permissions:
+      contents: read
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v4
+
+      - name: La production est-elle configurée ?
+        run: bash deploy/ci/garde-production.sh
+        env:
+          API_DOMAIN: ${{ vars.API_DOMAIN }}
+
   deploy-production:
     name: Déploiement production
     runs-on: ubuntu-latest
-    needs: [build, e2e]
+    needs: [garde-production]
     if: startsWith(github.ref, 'refs/tags/v')
     environment: production
     permissions:
@@ -344,14 +307,13 @@ jobs:
       - name: Récupérer le code
         uses: actions/checkout@v4
 
-      - name: Métadonnées (tags image)
-        id: meta
+      - name: Métadonnées (tags image API)
+        id: meta-api
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-api
           tags: |
             type=semver,pattern={{version}}
-            type=raw,value=main,enable={{is_default_branch}}
             type=sha,format=short
 
       - name: BuildKit
@@ -364,31 +326,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build & push de l'image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: Dockerfile
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Métadonnées (tags image API)
-        id: meta-api
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-api
-          tags: |
-            type=semver,pattern={{version}}
-            type=raw,value=main,enable={{is_default_branch}}
-            type=sha,format=short
-
-      # Un échec ici ne doit pas empêcher le déploiement du monolithe : API_IMAGE
-      # n'est alors pas transmis et server-deploy.sh ne déploie pas l'API.
       - name: Build & push de l'image API
-        id: build-api
-        continue-on-error: true
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -417,38 +355,66 @@ jobs:
             cd "${{ vars.APP_DIR || '/var/www/multiboutique' }}"
             git fetch origin --tags --force
             git checkout --detach "$TAG"
-            export IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}"
-            export API_IMAGE="${{ steps.build-api.outcome == 'success' && format('{0}/{1}-api:{2}', env.REGISTRY, env.IMAGE_NAME, steps.meta-api.outputs.version) || '' }}"
+            export API_IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-api:${{ steps.meta-api.outputs.version }}"
             bash deploy/server-deploy.sh up
 
-      - name: Vérifier la santé de l'application
-        run: |
-          for tentative in 1 2 3 4 5 6; do
-            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 \
-              "https://${{ vars.DOMAIN }}/api/health")
-            echo "Tentative ${tentative} : HTTP ${code}"
-            if [ "$code" = "200" ]; then
-              echo "Application saine."
-              exit 0
-            fi
-            sleep 10
-          done
-          echo "L'application ne répond pas 200 sur /api/health après déploiement." >&2
-          exit 1
+  deploy-fronts-production:
+    name: Fronts production (${{ matrix.front }})
+    runs-on: ubuntu-latest
+    needs: [garde-production]
+    if: startsWith(github.ref, 'refs/tags/v')
+    environment: production
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        front: [www, backoffice]
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v4
 
-      # Tant que API_DOMAIN n'est pas défini (tunnel pas encore créé), l'API n'est
-      # pas déployée par server-deploy.sh : rien à vérifier.
-      - name: Vérifier la santé de l'API
-        if: vars.API_DOMAIN != ''
-        run: |
-          for tentative in 1 2 3 4 5 6; do
-            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "https://${{ vars.API_DOMAIN }}/health")
-            echo "Tentative ${tentative} : HTTP ${code}"
-            if [ "$code" = "200" ]; then
-              echo "API saine."
-              exit 0
-            fi
-            sleep 10
-          done
-          echo "L'API ne répond pas 200 sur /health après déploiement." >&2
-          exit 1
+      - name: Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Installer les dépendances
+        run: npm ci
+
+      - name: Adresses des fronts
+        run: echo "VITE_BACKOFFICE_URL=https://backoffice.${API_DOMAIN#api.}" >> "$GITHUB_ENV"
+        env:
+          API_DOMAIN: ${{ vars.API_DOMAIN }}
+
+      - name: Build
+        run: npm run build -w @multiboutique/${{ matrix.front }}
+        env:
+          VITE_API_URL: https://${{ vars.API_DOMAIN }}
+
+      # Pas de X-Robots-Tag ici : seule la recette en porte un. Les pages gardent
+      # leur meta robots « noindex » (référencement non requis, spec §6.4).
+      - name: Publier sur Cloudflare
+        working-directory: apps/${{ matrix.front }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx wrangler deploy --env production
+
+  sante-production:
+    name: Santé production
+    runs-on: ubuntu-latest
+    needs: [deploy-production, deploy-fronts-production]
+    if: startsWith(github.ref, 'refs/tags/v')
+    environment: production
+    permissions:
+      contents: read
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v4
+
+      - name: Vérifier l'API et les fronts
+        run: bash deploy/ci/verifier-sante.sh
+        env:
+          API_DOMAIN: ${{ vars.API_DOMAIN }}
