@@ -138,3 +138,23 @@ export interface ResultatVente {
   remise: number;
   reste: number;
 }
+
+/** GET /categories */
+export interface CategorieResumee {
+  id: string;
+  nom: string;
+  code: string | null;
+}
+
+/** GET /boutiques/:id/mouvements-stock */
+export interface Mouvement {
+  id: string;
+  type: "entree" | "sortie" | "ajustement" | "transfert";
+  produit_nom: string;
+  quantite: number;
+  quantite_avant: number;
+  quantite_apres: number;
+  auteur_nom: string | null;
+  motif: string | null;
+  created_at: string;
+}

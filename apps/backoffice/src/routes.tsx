@@ -4,6 +4,8 @@ import { CoqueAdmin } from "./coque/CoqueAdmin";
 import { CoqueBackoffice } from "./coque/CoqueBackoffice";
 import { Accueil } from "./ecrans/Accueil";
 import { Connexion } from "./ecrans/Connexion";
+import { Produits } from "./ecrans/catalogue/Produits";
+import { Stock } from "./ecrans/catalogue/Stock";
 import { Introuvable } from "./ecrans/Introuvable";
 import { Consolidation } from "./ecrans/tableaux/Consolidation";
 import { TableauDeBord } from "./ecrans/tableaux/TableauDeBord";
@@ -22,6 +24,8 @@ export const routesBoutique: RouteObject[] = [
   { path: "ventes", element: <Ventes /> },
   { path: "ventes/nouvelle", element: <Caisse /> },
   { path: "ventes/:venteId", element: <DetailVente /> },
+  { path: "produits", element: <Produits /> },
+  { path: "stock", element: <Stock /> },
   { path: "*", element: sectionIntrouvable },
 ];
 

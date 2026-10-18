@@ -19,17 +19,17 @@ const EXCLUS = new Set([
 // Écritures pas encore branchées : chaque tâche d'écran du plan en retire ;
 // la tâche 14 vide la liste.
 const MANQUES_ATTENDUS = new Set<string>([
-  "ajusterStock", "annulerCommande", "annulerCommandeFournisseur", "annulerReservation",
+  "annulerCommande", "annulerCommandeFournisseur", "annulerReservation",
   "appliquerPrixConseilles", "basculerVip", "confirmerCommande", "confirmerReservation", "creerBoutique",
   "creerCategorie", "creerClient", "creerCodePromo", "creerCommande", "creerCommandeFournisseur",
-  "creerFournisseur", "creerGroupe", "creerProduit", "creerRegion", "creerUtilisateur",
-  "creerUtilisateursDefaut", "encaisserReservation", "entrerStock", "listerComptesBoutique",
+  "creerFournisseur", "creerGroupe", "creerRegion", "creerUtilisateur",
+  "creerUtilisateursDefaut", "encaisserReservation", "listerComptesBoutique",
   "listerRegistre", "livrerCommande", "mettreAJourParametres", "modifierBoutique", "modifierCategorie",
-  "modifierClient", "modifierCodePromo", "modifierFournisseur", "modifierGroupe", "modifierPrix",
+  "modifierClient", "modifierCodePromo", "modifierFournisseur", "modifierGroupe", 
   "modifierRegion", "publierPrixReference", "recevoirCommandeFournisseur", "reglerEncours",
   "reinitialiserMotDePasse", "supprimerCategorie", "supprimerCodePromo", "toggleActifClient",
   "toggleActifCodePromo", "toggleActifFournisseur", "toggleActifUtilisateur", "togglePermissionRole",
-  "transfertStock", "validerReservation",
+  "validerReservation",
 ]);
 
 const B = "11111111-1111-1111-1111-111111111111";
@@ -62,8 +62,6 @@ const PAGES: Record<string, string> = {
 
 // Pages pas encore reprises : chaque tâche d'écran en retire ; la tâche 14 vide la liste.
 const PAGES_MANQUANTES = new Set<string>([
-  "(dashboard)/dashboard/[boutiqueId]/produits/page.tsx",
-  "(dashboard)/dashboard/[boutiqueId]/stock/page.tsx",
   "(dashboard)/dashboard/[boutiqueId]/clients/page.tsx",
   "(dashboard)/dashboard/[boutiqueId]/promotions/page.tsx",
   "(dashboard)/dashboard/[boutiqueId]/commandes/page.tsx",

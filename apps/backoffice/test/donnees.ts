@@ -173,3 +173,31 @@ export const DETAIL_VENTE: DetailVente = {
     { produit_nom: "Riz 25 kg", produit_reference: "RIZ-25", produit_code: "CER-0001", quantite: 2, prix_unitaire: 22 },
   ],
 };
+
+export function ligneStock(surcharge: Partial<import("@multiboutique/shared").LigneStock> = {}): import("@multiboutique/shared").LigneStock {
+  return {
+    ...RESUME_BOUTIQUE.alertes_stock[0]!,
+    id: "s-riz",
+    produit_id: "p-riz",
+    produit_nom: "Riz 25 kg",
+    produit_reference: "RIZ-25",
+    quantite: 18,
+    quantite_reservee: 2,
+    disponible: 16,
+    seuil_alerte: 8,
+    statut_stock: "ok",
+    prix_vente: 22,
+    ...surcharge,
+  };
+}
+
+export const STOCK = [
+  ligneStock(),
+  ligneStock({ id: "s-huile", produit_id: "p-huile", produit_nom: "Huile de palme 5 L", produit_reference: "HUI-5", quantite: 0, quantite_reservee: 0, disponible: 0, statut_stock: "rupture" }),
+  ligneStock({ id: "s-lait", produit_id: "p-lait", produit_nom: "Lait en poudre 400 g", produit_reference: "LAI-400", quantite: 3, quantite_reservee: 0, disponible: 3, seuil_alerte: 12, statut_stock: "alerte" }),
+];
+
+export const MOUVEMENTS: import("@multiboutique/shared").Mouvement[] = [
+  { id: "m1", type: "entree", produit_nom: "Riz 25 kg", quantite: 20, quantite_avant: 0, quantite_apres: 20, auteur_nom: "Awa Gérante", motif: "Stock initial", created_at: "2026-10-17T07:00:00Z" },
+  { id: "m2", type: "sortie", produit_nom: "Riz 25 kg", quantite: 2, quantite_avant: 20, quantite_apres: 18, auteur_nom: null, motif: null, created_at: "2026-10-17T09:00:00Z" },
+];
