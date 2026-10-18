@@ -1,18 +1,18 @@
 import { expect, test } from "@playwright/test";
-import { COMPTES, seConnecter } from "./outils";
+import { BOUTIQUE_1, COMPTES, seConnecter } from "./outils";
 
-test("le propriétaire se connecte, garde sa session au rechargement, puis se déconnecte", async ({ page }) => {
-  await seConnecter(page, "proprietaire");
-  await expect(page).toHaveURL(/\/tableau-de-bord$/);
+test("la gérante se connecte, garde sa session au rechargement, puis se déconnecte", async ({ page }) => {
+  await seConnecter(page, "gerant");
+  await expect(page).toHaveURL(new RegExp(`/b/${BOUTIQUE_1}$`));
   await page.reload();
-  await expect(page).toHaveURL(/\/tableau-de-bord$/);
+  await expect(page).toHaveURL(new RegExp(`/b/${BOUTIQUE_1}$`));
   await expect(page.getByRole("heading", { name: "Connexion" })).toHaveCount(0);
 
-  await page.getByRole("button", { name: /Propriétaire/ }).click();
+  await page.getByRole("button", { name: /Awa Gérante/ }).click();
   await page.getByRole("button", { name: "Se déconnecter" }).click();
   await expect(page).toHaveURL(/\/connexion/);
-  await page.goto("/tableau-de-bord");
-  await expect(page).toHaveURL(/\/connexion\?retour=%2Ftableau-de-bord/);
+  await page.goto(`/b/${BOUTIQUE_1}/stock`);
+  await expect(page).toHaveURL(/\/connexion\?retour=%2Fb%2F/);
 });
 
 test("un compte client est refusé avec le message de l'API", async ({ page }) => {

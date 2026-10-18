@@ -18,3 +18,24 @@ export async function seConnecter(page: Page, compte: keyof typeof COMPTES) {
   await page.getByRole("button", { name: "Se connecter" }).click();
   await expect(page).not.toHaveURL(/\/connexion/);
 }
+
+export const FORMATS = [
+  { nom: "telephone", largeur: 390, hauteur: 844 },
+  { nom: "tablette-portrait", largeur: 820, hauteur: 1180 },
+  { nom: "tablette-paysage", largeur: 1180, hauteur: 820 },
+  { nom: "bureau", largeur: 1440, hauteur: 900 },
+] as const;
+
+/**
+ * Vérifie l'écran courant aux quatre largeurs de la spec : aucun défilement
+ * horizontal, et une capture par format (dans test-results, pour la revue).
+ */
+export async function verifierFormats(page: Page, nomEcran: string) {
+  for (const format of FORMATS) {
+    await page.setViewportSize({ width: format.largeur, height: format.hauteur });
+    await page.waitForTimeout(100);
+    const debordement = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    expect(debordement, `${nomEcran} déborde horizontalement à ${format.largeur} px`).toBeLessThanOrEqual(0);
+    await page.screenshot({ path: `test-results/captures/${nomEcran}-${format.nom}.png`, fullPage: true });
+  }
+}

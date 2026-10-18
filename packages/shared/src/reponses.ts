@@ -20,3 +20,17 @@ export interface ReponseErreur {
   erreur: string;
   champs?: { chemin: string; message: string }[];
 }
+
+/** GET /parametres (public) : clé → valeur, avec les valeurs par défaut. */
+export type Parametres = Record<string, string> & { monnaie: string; nom_application: string };
+
+/** GET /me/boutiques : boutiques actives du périmètre (lignes de `boutiques`). */
+export interface BoutiqueResumee {
+  id: string;
+  nom: string;
+  statut: string;
+  adresse?: string | null;
+  telephone?: string | null;
+  email?: string | null;
+  region_id?: string | null;
+}

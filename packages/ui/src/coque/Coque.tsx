@@ -98,9 +98,10 @@ export function Coque({ entrees, marque, enTete, composantLien: Lien = "a", chil
               // Les entrées qui débordent sont cachées sur téléphone (le panneau
               // « Plus » les reprend) et réapparaissent à partir de la tablette.
               index >= nbVisiblesTelephone ? "hidden tablette:flex" : "flex",
-              "min-h-16 flex-1 flex-col items-center justify-center gap-1 rounded-bouton text-mention font-semibold no-underline",
+              // Libellé centré sous l'icône ; sur deux lignes au besoin dans le rail (« Vue d'ensemble »).
+              "min-h-16 flex-1 flex-col items-center justify-center gap-1 rounded-bouton px-1 text-center text-mention leading-tight font-semibold no-underline",
               "tablette:w-[84px] tablette:flex-none",
-              "bureau:w-full bureau:flex-row bureau:justify-start bureau:gap-3 bureau:px-4 bureau:text-courant",
+              "bureau:w-full bureau:flex-row bureau:justify-start bureau:gap-3 bureau:px-4 bureau:text-left bureau:text-courant",
               entree.actif
                 ? "bg-primaire-fond font-bold text-primaire"
                 : "text-texte-discret hover:bg-surface-relevee",

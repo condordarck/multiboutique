@@ -3,7 +3,7 @@ import { FournisseurNotifications } from "@multiboutique/ui";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
-import { routes } from "../src/App";
+import { routes } from "../src/routes";
 import type { FauxApi } from "./faux-api";
 
 /** Rend l'application entière à l'adresse donnée, sur le faux serveur. */

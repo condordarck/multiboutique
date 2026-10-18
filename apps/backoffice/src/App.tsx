@@ -1,34 +1,9 @@
 import { FournisseurNotifications } from "@multiboutique/ui";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { createBrowserRouter, Outlet, RouterProvider, type RouteObject } from "react-router";
-import { Accueil } from "./ecrans/Accueil";
-import { Connexion } from "./ecrans/Connexion";
-import { Introuvable } from "./ecrans/Introuvable";
-import { GardeSession } from "./session/GardeSession";
-import { FournisseurSession } from "./session/Session";
+import { createBrowserRouter, RouterProvider } from "react-router";
+import { routes } from "./routes";
 
-export const routes: RouteObject[] = [
-  {
-    element: (
-      <FournisseurSession>
-        <Outlet />
-      </FournisseurSession>
-    ),
-    children: [
-      { path: "/connexion", element: <Connexion /> },
-      {
-        element: <GardeSession />,
-        children: [
-          { index: true, element: <Accueil /> },
-          // Écrans ajoutés par les tâches suivantes du plan.
-          { path: "b/:boutiqueId/*", element: <Outlet /> },
-        ],
-      },
-      { path: "*", element: <Introuvable /> },
-    ],
-  },
-];
-
+export { routes };
 export function creerClientRequetes() {
   return new QueryClient({
     defaultOptions: {

@@ -49,7 +49,11 @@ const config = lireConfig({
   UPLOADS_DIR: mkdtempSync(join(tmpdir(), "mb-e2e-uploads-")),
 });
 const pool = new pg.Pool({ connectionString: config.databaseUrl, max: 5 });
+// Journal de l'API coupé (comme dans ses tests) : il noierait la sortie de Playwright.
+const environnement = process.env.NODE_ENV;
+process.env.NODE_ENV = "test";
 const api = await construireApp({ pool, config });
+process.env.NODE_ENV = environnement;
 await api.listen({ host: "127.0.0.1", port: config.port });
 
 // Devant l'API, le rôle de Cloudflare : chaque requête arrive avec sa propre
