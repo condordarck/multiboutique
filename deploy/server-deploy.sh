@@ -119,6 +119,10 @@ if docker inspect "$MONOLITHE" >/dev/null 2>&1; then
   docker stop "$MONOLITHE" >/dev/null
   docker rm -f "$MONOLITHE" >/dev/null
   echo "[deploy] Ancien conteneur ${MONOLITHE} (monolithe) arrêté et supprimé."
+  # Jusqu'ici, le monolithe tournait encore : redémarré dans l'intervalle, il a
+  # pu recréer public/uploads (source de son montage). Second passage : les
+  # restes vides disparaissent ; une image écrite là entre-temps fait refuser.
+  deplacer_uploads "$ROOT"
 fi
 
 # 9. Nettoyage des images orphelines.
