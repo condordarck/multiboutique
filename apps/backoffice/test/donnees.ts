@@ -246,3 +246,38 @@ export function codePromo(surcharge: Partial<import("@multiboutique/shared").Cod
     ...surcharge,
   };
 }
+
+export function commande(surcharge: Partial<import("@multiboutique/shared").CommandeListee> = {}): import("@multiboutique/shared").CommandeListee {
+  return {
+    id: "cmd1",
+    reference_commande: "CMD-0001",
+    boutique_id: BOUTIQUE_1,
+    client_id: "c1",
+    statut: "en_attente",
+    montant_brut: 440,
+    remise: 44,
+    montant_total: 396,
+    code_promo_id: "cp1",
+    terme_paiement: "credit",
+    note: null,
+    validee_par: null,
+    client_nom: "Quincaillerie Ade",
+    client_type: "grossiste",
+    code_promo: "GROSSISTE10",
+    nb_lignes: 2,
+    date_livraison: null,
+    created_at: "2026-10-17T08:00:00Z",
+    updated_at: "2026-10-17T08:00:00Z",
+    ...surcharge,
+  };
+}
+
+export function reservation(
+  surcharge: Partial<import("@multiboutique/shared").ReservationDetaillee> = {}
+): import("@multiboutique/shared").ReservationDetaillee {
+  return {
+    ...RESUME_BOUTIQUE.reservations_en_attente[0]!,
+    lignes: [{ id: "lr1", reservation_id: "r1", produit_nom: "Riz 25 kg", quantite: 1, prix_unitaire: 22 }, { id: "lr2", reservation_id: "r1", produit_nom: "Sucre 1 kg", quantite: 4, prix_unitaire: 2 }],
+    ...surcharge,
+  };
+}

@@ -12,6 +12,10 @@ export interface TicketProps {
   reference: string;
   date: string;
   vendeur: string;
+  /** « Vendeur » par défaut ; « Caissier » pour une réservation encaissée. */
+  libelleVendeur?: string;
+  /** Lignes d'en-tête supplémentaires (« Réservation : R-0007 »). */
+  mentions?: string[];
   paiement: string;
   client?: string | null;
   lignes: LigneTicket[];
@@ -55,7 +59,14 @@ export function Ticket(t: TicketProps) {
           <span className="font-semibold text-texte">N° {t.reference}</span>
           <span>{t.date}</span>
         </div>
-        <p className="m-0 mt-1">Vendeur : {t.vendeur}</p>
+        {t.mentions?.map((m) => (
+          <p key={m} className="m-0 mt-1">
+            {m}
+          </p>
+        ))}
+        <p className="m-0 mt-1">
+          {t.libelleVendeur ?? "Vendeur"} : {t.vendeur}
+        </p>
         <p className="m-0">Paiement : {t.paiement}</p>
         {t.client && <p className="m-0 font-semibold text-texte">Client : {t.client}</p>}
       </div>

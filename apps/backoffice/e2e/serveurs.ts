@@ -10,7 +10,7 @@ import pg from "pg";
 import { build, preview } from "vite";
 import { construireApp } from "../../api/src/app";
 import { lireConfig } from "../../api/src/config";
-import { PORT_API, PORT_FRONT } from "./ports";
+import { ORIGINE_WWW, PORT_API, PORT_FRONT } from "./ports";
 
 const RACINE = fileURLToPath(new URL("../../../", import.meta.url));
 const BASE = "mb_e2e";
@@ -44,7 +44,7 @@ const config = lireConfig({
   PORT: String(PORT_API + 1),
   DATABASE_URL: await preparerBase(urlServeur),
   API_JWT_SECRET: "e2e-".repeat(16),
-  ORIGINE_WWW: "http://localhost:5199",
+  ORIGINE_WWW,
   ORIGINE_BACKOFFICE: origineFront,
   UPLOADS_DIR: mkdtempSync(join(tmpdir(), "mb-e2e-uploads-")),
 });

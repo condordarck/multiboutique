@@ -1,7 +1,7 @@
 // Formes des réponses de l'API, telles que les fronts les reçoivent. Types
 // seuls : l'API renvoie les lignes PostgreSQL, montants et comptages en nombres.
 // Les champs listés sont ceux que les écrans lisent ; une ligne peut en porter d'autres.
-import type { Client, Reservation, ResumeJour, RoleUtilisateur, StockDisponible, Vente } from "./types";
+import type { Client, Commande, Reservation, ResumeJour, RoleUtilisateur, StockDisponible, Vente } from "./types";
 
 /** GET /auth/session, POST /auth/connexion → { utilisateur } */
 export interface SessionUtilisateur {
@@ -175,4 +175,17 @@ export interface LigneRegistre {
   soldeApres: number;
   auteurNom: string | null;
   createdAt: string;
+}
+
+/** GET /boutiques/:id/commandes */
+export interface CommandeListee extends Commande {
+  client_nom: string;
+  client_type: string;
+  code_promo: string | null;
+  nb_lignes: number;
+}
+
+/** GET /boutiques/:id/reservations : lignes renseignées pour celles à traiter. */
+export interface ReservationDetaillee extends Reservation {
+  lignes: { id: string; reservation_id: string; produit_nom: string; quantite: number; prix_unitaire: number }[];
 }

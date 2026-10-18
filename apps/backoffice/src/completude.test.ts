@@ -14,21 +14,22 @@ const OUTILS = new Set(["ErreurMetier", "exigerAccesBoutique", "exigerAdministra
 // Services qui ne relèvent pas du backoffice.
 const EXCLUS = new Set([
   "creerReservation", // réservation de la vitrine : phase 4
+  // « Payée » et stock déduit sans vente : aucun écran dans le monolithe, recoupe
+  // encaisserReservation. Non exposé tant que le besoin n'est pas décidé.
+  "validerReservation",
 ]);
 
 // Écritures pas encore branchées : chaque tâche d'écran du plan en retire ;
 // la tâche 14 vide la liste.
 const MANQUES_ATTENDUS = new Set<string>([
-  "annulerCommande", "annulerCommandeFournisseur", "annulerReservation",
-  "appliquerPrixConseilles", "confirmerCommande", "confirmerReservation", "creerBoutique",
-  "creerCategorie", "creerCommande", "creerCommandeFournisseur",
+  "annulerCommandeFournisseur", "appliquerPrixConseilles", "creerBoutique",
+  "creerCategorie", "creerCommandeFournisseur",
   "creerFournisseur", "creerGroupe", "creerRegion", "creerUtilisateur",
-  "creerUtilisateursDefaut", "encaisserReservation", "listerComptesBoutique",
-  "livrerCommande", "mettreAJourParametres", "modifierBoutique", "modifierCategorie",
+  "creerUtilisateursDefaut", "listerComptesBoutique",
+  "mettreAJourParametres", "modifierBoutique", "modifierCategorie",
   "modifierFournisseur", "modifierGroupe", 
   "modifierRegion", "publierPrixReference", "recevoirCommandeFournisseur", "reinitialiserMotDePasse", "supprimerCategorie", "toggleActifFournisseur", "toggleActifUtilisateur", "togglePermissionRole",
-  "validerReservation",
-]);
+  ]);
 
 const B = "11111111-1111-1111-1111-111111111111";
 
@@ -60,8 +61,6 @@ const PAGES: Record<string, string> = {
 
 // Pages pas encore reprises : chaque tâche d'écran en retire ; la tâche 14 vide la liste.
 const PAGES_MANQUANTES = new Set<string>([
-  "(dashboard)/dashboard/[boutiqueId]/commandes/page.tsx",
-  "(dashboard)/dashboard/[boutiqueId]/reservations/page.tsx",
   "(dashboard)/dashboard/[boutiqueId]/achats/page.tsx",
   "(dashboard)/dashboard/[boutiqueId]/prix-conseilles/page.tsx",
   "(dashboard)/dashboard/[boutiqueId]/rapports/page.tsx",
