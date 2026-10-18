@@ -201,3 +201,48 @@ export const MOUVEMENTS: import("@multiboutique/shared").Mouvement[] = [
   { id: "m1", type: "entree", produit_nom: "Riz 25 kg", quantite: 20, quantite_avant: 0, quantite_apres: 20, auteur_nom: "Awa Gérante", motif: "Stock initial", created_at: "2026-10-17T07:00:00Z" },
   { id: "m2", type: "sortie", produit_nom: "Riz 25 kg", quantite: 2, quantite_avant: 20, quantite_apres: 18, auteur_nom: null, motif: null, created_at: "2026-10-17T09:00:00Z" },
 ];
+
+export function client(surcharge: Partial<import("@multiboutique/shared").Client> = {}): import("@multiboutique/shared").Client {
+  return {
+    id: "c1",
+    nom: "Quincaillerie Ade",
+    telephone: "+243 900 000 002",
+    email: null,
+    adresse: null,
+    boutique_id: BOUTIQUE_1,
+    type_client: "grossiste",
+    plafond_credit: 500,
+    encours: 460,
+    est_vip: true,
+    actif: true,
+    created_at: "2026-09-01T00:00:00Z",
+    updated_at: "2026-09-01T00:00:00Z",
+    ...surcharge,
+  };
+}
+
+export const DOSSIERS = {
+  clients: [client(), client({ id: "c2", nom: "Mme Bola", type_client: "detaillant" as const, plafond_credit: 0, encours: 0, est_vip: false, actif: false })],
+  relances: [{ client_id: "c1", jours: 45 }],
+  delai_relance: 30,
+};
+
+export function codePromo(surcharge: Partial<import("@multiboutique/shared").CodePromo> = {}): import("@multiboutique/shared").CodePromo {
+  return {
+    id: "cp1",
+    code: "GROSSISTE10",
+    description: "Remise grossiste",
+    type_reduction: "pourcentage",
+    valeur_reduction: 10,
+    boutique_id: BOUTIQUE_1,
+    max_utilisations: 100,
+    nombre_utilisations: 4,
+    date_debut: "2026-10-01",
+    date_fin: null,
+    actif: true,
+    created_by: null,
+    created_at: "2026-10-01T00:00:00Z",
+    updated_at: "2026-10-01T00:00:00Z",
+    ...surcharge,
+  };
+}

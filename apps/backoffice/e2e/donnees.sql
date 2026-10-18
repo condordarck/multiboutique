@@ -21,3 +21,6 @@ INSERT INTO stocks (produit_id, boutique_id, quantite, seuil_alerte) VALUES
   ('aaaaaaaa-0000-4000-8000-000000000002', '11111111-1111-1111-1111-111111111111', 25, 10),
   ('aaaaaaaa-0000-4000-8000-000000000003', '11111111-1111-1111-1111-111111111111', 60, 20),
   ('aaaaaaaa-0000-4000-8000-000000000001', '22222222-2222-2222-2222-222222222222', 5, 5);
+
+INSERT INTO clients (id, nom, boutique_id, type_client, plafond_credit, encours) VALUES
+  ('cccccccc-0000-4000-8000-000000000001', 'Quincaillerie Ade', '11111111-1111-1111-1111-111111111111', 'grossiste', 500, 0);

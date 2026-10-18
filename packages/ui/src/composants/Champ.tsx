@@ -1,7 +1,7 @@
 import { clsx } from "clsx";
 import { useId, type InputHTMLAttributes } from "react";
 
-export type TypeChamp = "texte" | "nombre" | "montant" | "recherche" | "email" | "motDePasse";
+export type TypeChamp = "texte" | "nombre" | "montant" | "recherche" | "email" | "motDePasse" | "date";
 
 export interface ChampProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "type"> {
   libelle: string;
@@ -20,6 +20,7 @@ const MODES_SAISIE: Record<TypeChamp, InputHTMLAttributes<HTMLInputElement>["inp
   recherche: undefined,
   email: undefined,
   motDePasse: undefined,
+  date: undefined,
 };
 
 const TYPES_HTML: Record<TypeChamp, string> = {
@@ -29,6 +30,7 @@ const TYPES_HTML: Record<TypeChamp, string> = {
   recherche: "search",
   email: "email",
   motDePasse: "password",
+  date: "date",
 };
 
 export function Champ({ libelle, type = "texte", aide, erreur, id, className, ...reste }: ChampProps) {

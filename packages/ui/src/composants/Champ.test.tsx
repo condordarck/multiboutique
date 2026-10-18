@@ -43,6 +43,11 @@ describe("Champ", () => {
     expect(screen.getByLabelText("Mot de passe").getAttribute("type")).toBe("password");
   });
 
+  it("propose le sélecteur de date du système", () => {
+    render(<Champ libelle="Date de fin" type="date" />);
+    expect(screen.getByLabelText("Date de fin").getAttribute("type")).toBe("date");
+  });
+
   it("en recherche, devient un champ de recherche", () => {
     render(<Champ libelle="Rechercher un produit" type="recherche" />);
     expect(screen.getByRole("searchbox", { name: "Rechercher un produit" })).toBeTruthy();

@@ -31,3 +31,4 @@ export { FournisseurNotifications, useNotifier, type Notifier } from "./composan
 export { Panneau, type PanneauProps } from "./composants/Panneau";
 export { Selecteur, type OptionSelecteur, type SelecteurProps } from "./composants/Selecteur";
 export { ZoneTexte, type ZoneTexteProps } from "./composants/ZoneTexte";
+export { CaseACocher, type CaseACocherProps } from "./composants/CaseACocher";

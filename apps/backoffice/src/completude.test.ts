@@ -20,15 +20,13 @@ const EXCLUS = new Set([
 // la tâche 14 vide la liste.
 const MANQUES_ATTENDUS = new Set<string>([
   "annulerCommande", "annulerCommandeFournisseur", "annulerReservation",
-  "appliquerPrixConseilles", "basculerVip", "confirmerCommande", "confirmerReservation", "creerBoutique",
-  "creerCategorie", "creerClient", "creerCodePromo", "creerCommande", "creerCommandeFournisseur",
+  "appliquerPrixConseilles", "confirmerCommande", "confirmerReservation", "creerBoutique",
+  "creerCategorie", "creerCommande", "creerCommandeFournisseur",
   "creerFournisseur", "creerGroupe", "creerRegion", "creerUtilisateur",
   "creerUtilisateursDefaut", "encaisserReservation", "listerComptesBoutique",
-  "listerRegistre", "livrerCommande", "mettreAJourParametres", "modifierBoutique", "modifierCategorie",
-  "modifierClient", "modifierCodePromo", "modifierFournisseur", "modifierGroupe", 
-  "modifierRegion", "publierPrixReference", "recevoirCommandeFournisseur", "reglerEncours",
-  "reinitialiserMotDePasse", "supprimerCategorie", "supprimerCodePromo", "toggleActifClient",
-  "toggleActifCodePromo", "toggleActifFournisseur", "toggleActifUtilisateur", "togglePermissionRole",
+  "livrerCommande", "mettreAJourParametres", "modifierBoutique", "modifierCategorie",
+  "modifierFournisseur", "modifierGroupe", 
+  "modifierRegion", "publierPrixReference", "recevoirCommandeFournisseur", "reinitialiserMotDePasse", "supprimerCategorie", "toggleActifFournisseur", "toggleActifUtilisateur", "togglePermissionRole",
   "validerReservation",
 ]);
 
@@ -62,8 +60,6 @@ const PAGES: Record<string, string> = {
 
 // Pages pas encore reprises : chaque tâche d'écran en retire ; la tâche 14 vide la liste.
 const PAGES_MANQUANTES = new Set<string>([
-  "(dashboard)/dashboard/[boutiqueId]/clients/page.tsx",
-  "(dashboard)/dashboard/[boutiqueId]/promotions/page.tsx",
   "(dashboard)/dashboard/[boutiqueId]/commandes/page.tsx",
   "(dashboard)/dashboard/[boutiqueId]/reservations/page.tsx",
   "(dashboard)/dashboard/[boutiqueId]/achats/page.tsx",
