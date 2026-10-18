@@ -121,11 +121,8 @@ function Contenu({ boutiqueId, catalogue }: { boutiqueId: string; catalogue: Cat
                 const auPanier = lignes.find((l) => l.produit_id === a.produit_id)?.quantite ?? 0;
                 return (
                   <li key={a.produit_id} className="flex flex-col gap-2 rounded-carte bg-surface p-4 shadow-carte">
-                    {a.produit_image ? (
-                      <img src={urlImage(a.produit_image)} alt="" className="aspect-[4/3] w-full rounded-bouton object-cover" />
-                    ) : (
-                      <div aria-hidden="true" className="aspect-[4/3] w-full rounded-bouton bg-surface-relevee" />
-                    )}
+                    {/* Pas de cadre vide sans photo : sur téléphone, il doublerait la hauteur de la carte. */}
+                    {a.produit_image && <img src={urlImage(a.produit_image)} alt="" className="aspect-[4/3] w-full rounded-bouton object-cover" />}
                     <h3 className="m-0 text-courant font-semibold">{a.produit_nom}</h3>
                     <p className="m-0 text-mention text-texte-discret">{[a.produit_reference, a.produit_code].filter(Boolean).join(" · ")}</p>
                     <p className="m-0 text-panneau font-bold tabular-nums">{formatMontant(a.prix_vente, monnaie)}</p>

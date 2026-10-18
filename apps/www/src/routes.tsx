@@ -6,6 +6,7 @@ import { Catalogue } from "./ecrans/catalogue/Catalogue";
 import { Connexion } from "./ecrans/Connexion";
 import { Inscription } from "./ecrans/Inscription";
 import { Introuvable } from "./ecrans/Introuvable";
+import { Reservation } from "./ecrans/Reservation";
 import { GardeClient } from "./session/GardeClient";
 import { persistance } from "./hors-ligne/instance";
 
@@ -25,6 +26,7 @@ export const routes: RouteObject[] = [
         children: [
           { index: true, element: <Accueil /> },
           { path: "boutiques/:boutiqueId", element: <Catalogue /> },
+          { path: "reservations/:reservationId", element: <Reservation /> },
           { path: "connexion", element: <Connexion /> },
           { path: "inscription", element: <Inscription /> },
           {
