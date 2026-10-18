@@ -46,9 +46,9 @@ async function preparerBase(urlServeur: string): Promise<string> {
   const base = new pg.Client({ connectionString: url.toString() });
   await base.connect();
   const sql = (chemin: string) => readFileSync(join(RACINE, chemin), "utf8");
-  await base.query(sql("db/init.sql"));
-  for (const f of readdirSync(join(RACINE, "db/migrations")).filter((f) => f.endsWith(".sql")).sort()) {
-    await base.query(sql(`db/migrations/${f}`));
+  await base.query(sql("apps/api/db/init.sql"));
+  for (const f of readdirSync(join(RACINE, "apps/api/db/migrations")).filter((f) => f.endsWith(".sql")).sort()) {
+    await base.query(sql(`apps/api/db/migrations/${f}`));
   }
   await base.query(readFileSync(new URL("donnees.sql", import.meta.url), "utf8"));
   await base.end();

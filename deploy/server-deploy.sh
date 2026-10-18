@@ -98,7 +98,7 @@ timeout 60 bash -c "until docker compose -f '$COMPOSE_FILE' exec -T db pg_isread
 echo "[deploy] Base de données prête."
 
 # 5. Appliquer les migrations manquantes
-bash db/migrate.sh
+bash apps/api/db/migrate.sh
 
 # 6. API et tunnel, une fois la base migrée : l'API ne démarre jamais sur un
 # schéma en retard.

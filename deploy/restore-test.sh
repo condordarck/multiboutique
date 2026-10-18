@@ -23,7 +23,7 @@ export AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY:-}"
 
 IMAGE_RESTIC="${RESTIC_IMAGE:-restic/restic:0.17.3}"
 CONTENEUR="multiboutique-restore-test"
-# db/init.sql alimente toujours ces deux tables ; `produits` peut légitimement
+# apps/api/db/init.sql alimente toujours ces deux tables ; `produits` peut légitimement
 # être vide sur une instance neuve et ne constitue donc pas un témoin fiable.
 TABLES=(boutiques utilisateurs)
 

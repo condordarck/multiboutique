@@ -2,11 +2,11 @@ import { readdirSync, readFileSync } from "node:fs";
 import pg from "pg";
 import { BASE_MODELE, PREFIXE_BASES, urlBase, urlServeurDeTest } from "./connexion";
 
-const DOSSIER_DB = new URL("../../../db/", import.meta.url);
+const DOSSIER_DB = new URL("../db/", import.meta.url);
 
 /**
  * Construit une fois la base modèle (schéma, seed et migrations, comme un premier
- * démarrage suivi de db/migrate.sh), que chaque fichier de test clone ensuite.
+ * démarrage suivi de apps/api/db/migrate.sh), que chaque fichier de test clone ensuite.
  */
 export default async function preparer() {
   const urlServeur = urlServeurDeTest();

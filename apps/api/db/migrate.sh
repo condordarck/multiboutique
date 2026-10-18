@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Applique les migrations db/migrations/*.sql dans l'ordre, sans jamais
+# Applique les migrations apps/api/db/migrations/*.sql dans l'ordre, sans jamais
 # ré-appliquer une migration déjà enregistrée dans la table schema_migrations.
 #
 # Usage :
-#   ./db/migrate.sh                     # docker exec sur le conteneur multiboutique-db
-#   ./db/migrate.sh --baseline          # marque l'état actuel comme déjà migré
+#   apps/api/db/migrate.sh                   # docker exec sur le conteneur multiboutique-db
+#   apps/api/db/migrate.sh --baseline        # marque l'état actuel comme déjà migré
 #                                       #   (adoption d'une base préexistante migrée à la main)
 #
 # Variables optionnelles : CONTAINER, DB_USER, DB_NAME

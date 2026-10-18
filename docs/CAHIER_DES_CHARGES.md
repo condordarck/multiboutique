@@ -561,9 +561,9 @@ certbot en recette, cf. `deploy/setup-vhost.sh`). Limites mémoire : 640 Mo pour
 
 ### 10.4 Migrations
 
-- `db/init.sql` est joué au **premier** démarrage de la base (schéma + seed).
-- Les évolutions `db/migrations/002 → 011` sont **idempotentes** et appliquées par
-  `db/migrate.sh` (suivi dans la table `schema_migrations`, transaction atomique). Option
+- `apps/api/db/init.sql` est joué au **premier** démarrage de la base (schéma + seed).
+- Les évolutions `apps/api/db/migrations/002 → 011` sont **idempotentes** et appliquées par
+  `apps/api/db/migrate.sh` (suivi dans la table `schema_migrations`, transaction atomique). Option
   `--baseline` pour adopter une base migrée manuellement.
 
 ### 10.5 CI/CD (GitHub Actions)
@@ -616,7 +616,7 @@ docker inspect -f '{{.State.Health.Status}}' multiboutique-prod
 docker logs multiboutique-prod --tail 50
 
 # Appliquer les migrations
-bash db/migrate.sh
+bash apps/api/db/migrate.sh
 
 # Sauvegarde et contrôle de restauration
 bash deploy/backup.sh
@@ -673,7 +673,7 @@ Scénarios vérifiés de bout en bout (environnement local `:3001`).
 | Administrateur | `admin@multiboutique.com` |
 | Propriétaire | `proprietaire@multiboutique.com` |
 
-Leurs mots de passe initiaux figurent en clair dans `db/init.sql`, qui est
+Leurs mots de passe initiaux figurent en clair dans `apps/api/db/init.sql`, qui est
 versionné. Ils doivent être remplacés au premier déploiement de chaque
 environnement par `bash deploy/rotate-seed-passwords.sh`, qui tire des valeurs
 aléatoires et ne les affiche qu'une fois.
