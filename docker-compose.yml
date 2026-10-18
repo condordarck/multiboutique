@@ -1,0 +1,37 @@
+# Développement local : PostgreSQL seul. L'API et les fronts tournent sur l'hôte
+# (npm run dev). Pour le serveur, voir deploy/docker-compose.prod.yml.
+#
+#   npm run db:dev    # démarre la base, applique les migrations
+#
+# Premier démarrage du volume : apps/api/db/init.sql (schéma et comptes de départ),
+# puis apps/api/db/migrate.sh. Réinitialiser : docker compose down -v.
+
+# Nom distinct du projet de serveur (« multiboutique ») : un `down -v` ici ne
+# touche jamais une base de recette lancée sur la même machine.
+name: multiboutique-dev
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: multiboutique-dev-db
+    environment:
+      POSTGRES_USER: mb
+      # Base de développement, joignable seulement depuis cette machine.
+      POSTGRES_PASSWORD: dev
+      POSTGRES_DB: multiboutique
+    ports:
+      - "127.0.0.1:55433:5432"
+    volumes:
+      - pgdata-dev:/var/lib/postgresql/data
+      - ./apps/api/db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      # En TCP : pendant le premier démarrage, le serveur temporaire qui joue
+      # init.sql n'écoute que sur le socket Unix. Sans -h, la base paraît prête
+      # et les migrations sont coupées par son arrêt.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U mb -d multiboutique"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  pgdata-dev:

@@ -23,7 +23,9 @@ services:
     # Aucun port publié : la base n'est joignable que par le réseau Docker.
     # Les pg_dump passent par `docker compose exec`.
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U mb -d multiboutique"]
+      # En TCP : pendant le premier démarrage, le serveur temporaire qui joue
+      # init.sql n'écoute que sur le socket Unix (cf. server-deploy.sh).
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U mb -d multiboutique"]
       interval: 5s
       timeout: 5s
       retries: 12

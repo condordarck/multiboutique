@@ -84,9 +84,11 @@ fi
 # 3. Images des produits : public/uploads (monolithe) → donnees/uploads.
 deplacer_uploads "$ROOT"
 
-# 4. Base démarrée et prête.
+# 4. Base démarrée et prête. En TCP : au premier démarrage, le serveur
+# temporaire qui joue init.sql répond déjà sur le socket Unix, et des migrations
+# lancées à ce moment seraient coupées par son arrêt.
 docker compose -f "$COMPOSE_FILE" up -d db
-timeout 60 bash -c "until docker compose -f '$COMPOSE_FILE' exec -T db pg_isready -U mb -d multiboutique >/dev/null 2>&1; do sleep 2; done"
+timeout 60 bash -c "until docker compose -f '$COMPOSE_FILE' exec -T db pg_isready -h 127.0.0.1 -U mb -d multiboutique >/dev/null 2>&1; do sleep 2; done"
 echo "[deploy] Base de données prête."
 
 # 5. Migrations manquantes : l'API ne démarre jamais sur un schéma en retard.

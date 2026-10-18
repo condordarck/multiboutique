@@ -1,248 +1,154 @@
-# MultiBoutique — Application de Gestion Multi-Boutiques
+# MultiBoutique
 
-Application web de gestion de 3 boutiques alimentaires : ventes, stock, réservations en ligne, avec traçabilité complète (« qui a fait quoi ») pour le propriétaire.
+Gestion de boutiques alimentaires : ventes, stock, réservations en ligne, avec
+traçabilité complète (« qui a fait quoi ») pour le propriétaire. Le cahier des
+charges est dans `docs/CAHIER_DES_CHARGES.md`.
 
-**Hébergement : 100% local.** La base de données PostgreSQL tourne dans un conteneur Docker sur ton propre serveur. Aucune donnée (coûts de revient, marges, ventes) ne quitte ta machine.
+## Architecture
 
-## Prérequis
-
-- Docker + Docker Compose
-- Un port libre pour l'application (`APP_PORT`, 3002 en recette)
-- Le reverse proxy (80/443) est fourni par l'hôte, pas par le compose
-
-## Démarrage rapide (local)
-
-`POSTGRES_PASSWORD` et `JWT_SECRET` sont **tous deux obligatoires** — il n'existe
-plus aucune valeur par défaut, ni dans le compose, ni dans `lib/db.ts` :
-
-```bash
-cat > .env <<'EOF'
-POSTGRES_PASSWORD=
-JWT_SECRET=
-EOF
-# openssl rand -hex 16  →  POSTGRES_PASSWORD
-# openssl rand -hex 32  →  JWT_SECRET
-
-docker compose up -d db app
+```
+       Cloudflare Workers (fichiers statiques)                 VPS (Docker)
+ ┌───────────────────────────┐  ┌──────────────────────┐   ┌──────────────────────────┐
+ │ www.<base>                │  │ backoffice.<base>    │   │ cloudflared ─▶ api:4000  │
+ │ apps/www : vitrine,       │  │ apps/backoffice :    │   │ apps/api (Fastify)       │
+ │ réservation, espace client│  │ personnel, admin     │   │          │               │
+ └─────────────┬─────────────┘  └──────────┬───────────┘   │ PostgreSQL 16 (db)       │
+               └──── fetch + cookie ───────┴── api.<base> ▶└──────────────────────────┘
 ```
 
-L'application est accessible sur `http://localhost:3001`.
+- **`apps/api`** : l'API (Fastify), seul point d'accès à la base. Joignable
+  uniquement par le tunnel Cloudflare : aucun port n'est ouvert sur le VPS.
+  Schéma, seed et migrations dans `apps/api/db/`.
+- **`apps/www`** et **`apps/backoffice`** : deux PWA Vite/React, servies par
+  Cloudflare Workers. Chacune a son cookie de session (`__Host-mb_session_www`,
+  `__Host-mb_session_bo`) et sa CSP, générée au build depuis `VITE_API_URL`.
+- **`packages/metier`** : règles métier ; **`packages/shared`** : schémas et types
+  communs à l'API et aux fronts ; **`packages/front`** : client API, session,
+  cache hors ligne et outils de test des deux PWA ; **`packages/ui`** : composants.
+- **`apps/maquettes`** : maquettes de référence de l'interface.
 
-> Pour un déploiement serveur, ce n'est pas ce compose-ci : voir
-> *Déploiement GitHub + CI/CD* et `deploy/docker-compose.prod.yml`.
+Monorepo en workspaces npm (Node 22).
 
-### Comptes par défaut
+## Développement local
 
-`db/init.sql` crée deux comptes : `admin@multiboutique.com` (administrateur) et
-`proprietaire@multiboutique.com` (propriétaire).
+Prérequis : Node 22, Docker.
 
-**Leurs mots de passe initiaux sont publics dans `db/init.sql`.** Sur toute
-instance joignable depuis un réseau, lancer `bash deploy/rotate-seed-passwords.sh`
-au premier déploiement : le script les remplace par des valeurs aléatoires et les
-affiche une seule fois.
+```bash
+npm ci
+npm run db:dev     # PostgreSQL sur 127.0.0.1:55433 : schéma, seed, migrations
+npm run dev        # API :4000, backoffice :5174, vitrine :5175 (Ctrl+C arrête tout)
+```
 
-### Rôles et interfaces
+- Backoffice : http://localhost:5174, vitrine : http://localhost:5175.
+- `npm run dev:api`, `dev:backoffice` et `dev:www` lancent un seul service.
+- Au premier lancement, `npm run dev` crée `apps/api/.env` depuis
+  `apps/api/.env.exemple`, avec un `API_JWT_SECRET` aléatoire.
+- La base vient de `docker-compose.yml` (projet `multiboutique-dev`, distinct de
+  celui du serveur). Réinitialiser : `docker compose down -v && npm run db:dev`.
+- Images des produits : `donnees/uploads/` (ignoré par git).
 
-| Rôle | Accès |
+### Comptes de départ
+
+`apps/api/db/init.sql` crée `admin@multiboutique.com` (administrateur, mot de passe
+`admin123`) et `proprietaire@multiboutique.com` (propriétaire, `proprietaire123`).
+**Ces mots de passe sont publics** : sur toute instance joignable depuis un réseau,
+`bash deploy/rotate-seed-passwords.sh` les remplace par des valeurs aléatoires,
+affichées une seule fois.
+
+### Rôles
+
+| Rôle | Front |
 |------|-------|
-| `administrateur` | `/admin` : utilisateurs, boutiques, paramètres généraux (monnaie, seuil d'alerte). Pas d'accès aux données commerciales. |
-| `proprietaire` | `/dashboard` : vue globale + gestion de toutes les boutiques (ventes, stock, réservations). |
-| `gerant`, `gerant_stock`, `comptable`, `vendeur` | `/dashboard/[boutique]` : uniquement **sa** boutique (ajout produit, prix, stock). |
-| `client` | `/client` : « Mes réservations ». Compte créable via `/register`. |
+| `administrateur` | backoffice : utilisateurs, boutiques, rôles, paramètres. Pas de données commerciales. |
+| `proprietaire`, `directeur_groupe`, `directeur_region` | backoffice : les boutiques de leur périmètre. |
+| `gerant`, `gerant_stock`, `comptable`, `vendeur` | backoffice : leur boutique, selon leurs permissions. |
+| `client` | vitrine : catalogue, réservation, « Mes réservations ». |
 
-## Configuration
-
-### Variable `JWT_SECRET`
-
-Le secret de session est **requis** (absence de défaut) et lu par le conteneur **au démarrage** (`${JWT_SECRET:?...}` dans `docker-compose.yml`). Il doit faire au moins 32 caractères :
+## Tests
 
 ```bash
-openssl rand -hex 32   # à placer dans .env (JWT_SECRET=...)
+npm test             # tous les workspaces (Vitest)
+npm run typecheck
+npm run build:workspaces
 ```
 
-> ⚠️ Le secret ne doit **jamais** être commité : `.env` est dans `.gitignore` et `.dockerignore`.
+- Les tests de l'API demandent un PostgreSQL :
+  `DATABASE_URL_TEST=postgres://postgres:<mdp>@127.0.0.1:<port>/postgres`
+  (une base modèle est construite une fois, puis clonée par fichier de test).
+- Parcours de bout en bout (Playwright, Chromium), avec la même variable :
+  `npm run e2e -w @multiboutique/backoffice` et `npm run e2e -w @multiboutique/www`.
+  Ils construisent les fronts, démarrent l'API sur une base `mb_e2e` neuve et
+  servent les fronts avec leurs vrais en-têtes.
+- Scripts de déploiement : `bash deploy/test/<script>.test.sh`.
 
-### Identifiants de connexion à la base
+## Variables d'environnement
 
-- Hôte : `db` (dans le réseau Docker), `localhost` (depuis l'hôte)
-- Base : `multiboutique`
-- Utilisateur : `mb`
-- Mot de passe : valeur de `POSTGRES_PASSWORD` (aucun défaut, à définir dans `deploy/.env`)
+**API** (`apps/api/.env` en local, `deploy/.env` sur le serveur) :
 
-## Sauvegardes
-
-`deploy/backup.sh` s'exécute chaque nuit à 02h30 : dump PostgreSQL **et**
-`public/uploads` (les photos produits n'ont aucune autre copie), chiffrés par
-restic avant envoi sur Cloudflare R2. Rétention : 7 quotidiennes, 4
-hebdomadaires, 6 mensuelles.
-
-> **`RESTIC_PASSWORD` doit être conservé hors du serveur** (gestionnaire de mots
-> de passe). C'est la clé de chiffrement du dépôt : perdue, les sauvegardes sont
-> définitivement irrécupérables.
-
-`deploy/restore-test.sh`, mensuel, restaure le dernier snapshot dans un
-PostgreSQL jetable et vérifie que les tables répondent. Journaux dans
-`backups/`.
-
-Restauration manuelle. **restic conserve les chemins absolus** : le contenu
-atterrit sous `restauration/data/`, pas à la racine de la cible.
-
-```bash
-set -a; . deploy/.env; set +a
-
-docker run --rm -e RESTIC_REPOSITORY -e RESTIC_PASSWORD \
-  -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY \
-  -v "$PWD/restauration:/restore" restic/restic:0.17.3 \
-  restore latest --tag multiboutique --target /restore
-
-# Repérer le dump restauré (un seul par snapshot) :
-ls -l restauration/data/
-DUMP=$(ls -1 restauration/data/multiboutique-*.dump | tail -1)
-
-# Base :
-docker compose -f deploy/docker-compose.prod.yml exec -T db \
-  pg_restore -U mb -d multiboutique --clean --no-owner < "$DUMP"
-
-# Photos produits :
-cp -a restauration/data/uploads/. public/uploads/
-```
-
-## Mode développement (hot reload)
-
-```bash
-docker compose up -d db dev
-```
-
-Accessible sur `http://localhost:3002` — le code local est monté dans le conteneur, les modifications sont rechargées automatiquement. Ne pas lancer `dev` et `app` en même temps.
-
-## Schéma de la base
-
-`db/init.sql` est exécuté automatiquement au **premier** démarrage du conteneur `db` (création des tables, fonctions SQL, triggers d'audit, vues et données de départ).
-
-Pour réinitialiser la base : `docker compose down -v` puis relancer.
-
-## Rôles
-
-| Rôle | Description |
-|------|-------------|
-| `proprietaire` | Vue globale sur toutes les boutiques |
-| `gerant` | Gère sa boutique (ventes, stock, prix) |
-| `gerant_stock` | Suit les stocks et mouvements |
-| `comptable` | Lecture seule sur ventes et mouvements |
-| `vendeur` | Enregistre les ventes au comptoir |
-| `client` | Consulte le catalogue et réserve en ligne |
-
-## Structure du projet
-
-```
-multiboutique/
-├── app/
-│   ├── (auth)/            # Connexion / inscription
-│   ├── (dashboard)/       # Dashboard protégé (gérant + propriétaire)
-│   │   └── dashboard/     # URLs /dashboard et /dashboard/[boutiqueId]
-│   ├── (public)/          # Catalogue public + réservation
-│   └── api/auth/          # API login / register / logout
-├── lib/
-│   ├── db.ts              # Connexion PostgreSQL (pool pg)
-│   ├── session.ts         # JWT signé (WebCrypto HMAC-SHA256)
-│   ├── auth.ts            # Sessions, permissions par rôle
-│   └── actions/           # Server Actions (ventes, stock, réservations)
-├── db/init.sql            # Schéma PostgreSQL complet (source de vérité)
-├── components/dashboard/  # Composants du dashboard
-├── types/                 # Types TypeScript
-└── hooks/                 # Hooks React custom
-```
-
-## Reverse proxy et HTTPS
-
-Le reverse proxy n'est pas dans le compose : il est fourni par l'hôte. Sur le
-serveur de recette, Apache et certbot sont déjà installés et servent les autres
-projets de la machine.
-
-```bash
-sudo bash deploy/setup-vhost.sh
-```
-
-Le script lit `DOMAIN` et `APP_PORT` dans `deploy/.env`, vérifie que le DNS
-pointe bien sur la machine, crée le vhost sur le modèle des vhosts existants puis
-délivre le certificat Let's Encrypt. Il est idempotent : relançable sans risque.
-
-## Déploiement GitHub + CI/CD
-
-Chaîne de bout en bout : **push sur `main` → GitHub Actions build l'image → push sur GHCR → SSH sur le serveur → sauvegarde BDD + migrations + redémarrage → vérification de `/api/health`**. Un tag `v*` suit le même chemin vers l'environnement de production.
-
-### 1. Pousser le code
-
-```bash
-cd multiboutique
-git init -b main
-git add .
-git commit -m "Initial commit"
-git remote add origin https://github.com/<TOI>/multiboutique.git
-git branch -M main
-git push -u origin main
-```
-
-### 2. Environnements GitHub (repo → Settings → Environments)
-
-La chaîne distingue deux environnements : **`recette`** (déclenché par un push sur
-`main`) et **`production`** (déclenché par un tag `v*`). Les secrets sont portés
-par environnement, jamais au niveau du dépôt : c'est ce cloisonnement qui empêche
-un push sur `main` d'atteindre la production.
-
-| Secret / variable | Valeur |
+| Variable | Rôle |
 |---|---|
-| `SERVER_HOST` | IP du serveur |
-| `SERVER_PORT` | Port SSH |
-| `SERVER_USER` | Utilisateur SSH |
-| `SERVER_SSH_KEY` | Clé privée SSH (format PEM) |
-| `APP_DIR` *(variable)* | Chemin du dépôt sur le serveur, ex. `/var/www/multiboutique` |
-| `DOMAIN` *(variable)* | Hôte interrogé par le smoke test, ex. `multiboutique.dev4future.space` |
-| `GHCR_USER` / `GHCR_TOKEN` | **Optionnel** : uniquement si le paquet GHCR est privé |
+| `DATABASE_URL` | Connexion PostgreSQL (composée par le compose sur le serveur). |
+| `API_JWT_SECRET` | Signature des sessions, 32 caractères minimum (`openssl rand -hex 32`). |
+| `ORIGINE_WWW`, `ORIGINE_BACKOFFICE` | Origines des deux fronts. `https` en production ; `http://localhost` seulement hors production. |
+| `UPLOADS_DIR` | Dossier des images des produits. |
+| `PORT` | 4000 par défaut. |
 
-Après déploiement, le job interroge `https://$DOMAIN/api/health` et échoue si la
-réponse n'est pas 200 : un déploiement qui laisse l'application cassée ne passe
-plus en vert.
+**Fronts** (lues au build) : `VITE_API_URL` (les deux), `VITE_BACKOFFICE_URL`
+(vitrine, lien « Espace professionnel »).
 
-> **Protéger l'environnement `production`.** Le cloisonnement par environnement
-> empêche un push sur `main` d'atteindre la production, mais **pas** un tag
-> `v*` poussé depuis n'importe quelle branche par n'importe quel contributeur.
-> Dans Settings → Environments → `production`, ajouter une règle *Deployment
-> branches and tags* limitée à `v*` et au moins un *Required reviewer*. Sans
-> ça, l'environnement est un coffre à secrets, pas une porte.
+**Serveur** (`deploy/.env`, modèle dans `deploy/.env.example`) :
+`POSTGRES_PASSWORD`, `API_IMAGE`, `API_JWT_SECRET`, `TUNNEL_TOKEN`, `ORIGINE_WWW`,
+`ORIGINE_BACKOFFICE`, les variables `RESTIC_*` et `AWS_*` des sauvegardes, et en
+option `BACKUP_PING_URL`, `HEALTH_PING_URL`, `GHCR_USER` et `GHCR_TOKEN`.
 
-### 3. Préparer le serveur (une seule fois)
+## Déploiement
+
+| Déclencheur | Environnement GitHub | Effet |
+|---|---|---|
+| push sur `main` | `recette` | image API sur GHCR → SSH → `deploy/server-deploy.sh up` ; fronts publiés sur Cloudflare (`wrangler deploy --env recette`) ; santé de l'API et des fronts vérifiée. |
+| tag `v*` | `production` | même chemin, derrière une garde qui refuse tant que la production n'est pas configurée (`docs/bascule-recette.md`, section « Production »). |
+
+Recette : `www.morpion.cloud`, `backoffice.morpion.cloud`, `api.morpion.cloud`.
+
+### Secrets et variables GitHub (par environnement)
+
+| Nom | Valeur |
+|---|---|
+| `SERVER_HOST`, `SERVER_PORT`, `SERVER_USER`, `SERVER_SSH_KEY` | Accès SSH au serveur. |
+| `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | Publication des fronts. |
+| `API_DOMAIN` *(variable)* | `api.<base>`, dont se déduisent les adresses des fronts. |
+| `APP_DIR` *(variable)* | Chemin du dépôt sur le serveur (`/var/www/multiboutique` par défaut). |
+
+> **Protéger l'environnement `production`** : *Deployment branches and tags*
+> limité à `v*` et au moins un *Required reviewer*. Sinon un tag poussé depuis
+> n'importe quelle branche atteint la production.
+
+### Ce que fait `deploy/server-deploy.sh up`
+
+1. Vérifie les variables obligatoires et nomme celles qui manquent, avant tout effet.
+2. Sauvegarde la base (10 dernières dans `backups/`).
+3. Déplace les images de `public/uploads` (ancien monolithe) vers `donnees/uploads`.
+4. Démarre la base et applique les migrations (`apps/api/db/migrate.sh`).
+5. Démarre l'API et le tunnel, puis attend `/health` ; en cas d'échec, s'arrête là.
+6. Seulement alors, arrête l'ancien conteneur du monolithe s'il existe encore.
+
+### Préparer un serveur (une fois)
 
 ```bash
-# Sur un VPS Linux avec Docker + compose plugin. Le dépôt vit dans /var/www,
-# mais il doit appartenir à l'utilisateur de déploiement, sinon le CI ne peut
-# pas y faire git pull :
-sudo mkdir -p /var/www/multiboutique
-sudo chown -R "$USER":"$USER" /var/www/multiboutique
-git clone https://github.com/<TOI>/multiboutique.git /var/www/multiboutique
+sudo mkdir -p /var/www/multiboutique && sudo chown -R "$USER":"$USER" /var/www/multiboutique
+git clone https://github.com/<compte>/multiboutique.git /var/www/multiboutique
 cd /var/www/multiboutique
-
-cp deploy/.env.example deploy/.env
-chmod 600 deploy/.env
-# puis renseigner POSTGRES_PASSWORD, JWT_SECRET, APP_PORT, DOMAIN et les
-# variables RESTIC_*/AWS_* (cf. section Sauvegardes).
-
-IMAGE=ghcr.io/<TOI>/multiboutique:main bash deploy/server-deploy.sh up
-bash deploy/rotate-seed-passwords.sh                 # noter les identifiants
-sudo bash deploy/setup-vhost.sh                      # vhost Apache + certificat
-
-crontab -e   # ajouter les trois entrées ci-dessous
+cp deploy/.env.example deploy/.env && chmod 600 deploy/.env   # puis le renseigner
+API_IMAGE=ghcr.io/<compte>/multiboutique-api:main bash deploy/server-deploy.sh up
+bash deploy/rotate-seed-passwords.sh                          # noter les identifiants
 ```
 
-> **L'ordre compte.** La rotation des mots de passe vient *avant* le vhost :
-> dans l'autre sens, l'instance est joignable en HTTPS public avec `admin123`
-> pendant tout l'intervalle.
+Le tunnel se crée dans Cloudflare Zero Trust (Networks → Tunnels) : nom d'hôte
+public `api.<base>` → `http://api:4000`, jeton dans `TUNNEL_TOKEN`.
 
-> `deploy/.env` contient `JWT_SECRET` (permet de forger n'importe quelle
-> session), le mot de passe de la base, les clés R2 et `RESTIC_PASSWORD` (permet
-> de déchiffrer toutes les sauvegardes). Sur une machine partagée, `chmod 600`
-> n'est pas une précaution de confort. Les scripts posent `chmod 700` sur
-> `backups/`, qui contient des dumps SQL en clair.
+> `deploy/.env` permet de forger des sessions (`API_JWT_SECRET`) et de déchiffrer
+> les sauvegardes (`RESTIC_PASSWORD`) : `chmod 600` n'est pas une option.
+> `POSTGRES_PASSWORD` n'est lu qu'au premier démarrage du volume `pgdata`.
 
 ```cron
 30 2 * * *   cd /var/www/multiboutique && bash deploy/backup.sh           >> backups/cron.log 2>&1
@@ -250,26 +156,41 @@ crontab -e   # ajouter les trois entrées ci-dessous
 0 4 1 * *    cd /var/www/multiboutique && bash deploy/restore-test.sh     >> backups/cron.log 2>&1
 ```
 
-> **Propriété du répertoire.** `/var/www/multiboutique` doit appartenir à
-> l'utilisateur SSH du déploiement. `sudo` est interactif sur la cible : le CI ne
-> peut pas l'utiliser, donc tout ce qu'il fait — `git pull`, `docker compose` —
-> doit passer sans élévation. Seules la création du répertoire et l'installation
-> du vhost demandent `sudo`, une fois chacune.
+### Migrations
 
-> ⚠️ `POSTGRES_PASSWORD` n'est lu qu'au **premier** démarrage du volume `pgdata`.
+`apps/api/db/migrations/*.sql`, appliquées dans l'ordre à chaque déploiement
+(table `schema_migrations`). Une migration jouée n'est jamais modifiée : on en
+écrit une nouvelle. Adopter une base migrée à la main :
+`bash apps/api/db/migrate.sh --baseline`.
 
-### 4. Migrations automatiques
+## Sauvegardes
 
-Les migrations `db/migrations/*.sql` sont appliquées automatiquement à chaque déploiement par `db/migrate.sh` (table `schema_migrations`, transaction atomique). Pour adopter une base existante migrée à la main : `bash db/migrate.sh --baseline`.
+`deploy/backup.sh`, chaque nuit : dump PostgreSQL **et** `donnees/uploads` (les
+photos produits n'ont aucune autre copie), chiffrés par restic vers Cloudflare R2.
+Rétention : 7 quotidiennes, 4 hebdomadaires, 6 mensuelles. `deploy/restore-test.sh`,
+chaque mois, restaure le dernier snapshot dans un PostgreSQL jetable et vérifie
+que les tables répondent. Journaux dans `backups/`.
 
-### 5. Vérifier
+> **`RESTIC_PASSWORD` doit être conservé hors du serveur.** Perdu, les
+> sauvegardes sont irrécupérables.
+
+Restauration manuelle (restic conserve les chemins absolus : le contenu atterrit
+sous `restauration/data/`) :
 
 ```bash
-curl -sI https://$DOMAIN | head -1                                  # 200 ou 301
-curl -s -o /dev/null -w "%{http_code}\n" https://$DOMAIN/api/health # 200
-ss -tln | grep -E "0\.0\.0\.0:($APP_PORT|5432)" && echo ECHEC || echo "aucun bind public"
-bash deploy/backup.sh && bash deploy/restore-test.sh                # sauvegarde + restauration
+set -a; . deploy/.env; set +a
+docker run --rm -e RESTIC_REPOSITORY -e RESTIC_PASSWORD \
+  -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY \
+  -v "$PWD/restauration:/restore" restic/restic:0.17.3 \
+  restore latest --tag multiboutique --target /restore
+
+DUMP=$(ls -1 restauration/data/multiboutique-*.dump | tail -1)
+docker compose -f deploy/docker-compose.prod.yml exec -T db \
+  pg_restore -U mb -d multiboutique --clean --no-owner < "$DUMP"
+cp -a restauration/data/uploads/. donnees/uploads/
 ```
 
-- Catalogue et connexion : `https://$DOMAIN`
-- Tableau de bord : `https://$DOMAIN/login`
+## Bascule et retour arrière
+
+La bascule de la recette (retrait du monolithe Next.js, de son vhost et de son
+domaine) et le retour arrière sont décrits dans `docs/bascule-recette.md`.
