@@ -65,9 +65,11 @@ jobs:
       - name: Build des workspaces
         run: npm run build:workspaces
         env:
-          # Le backoffice refuse de se construire sans l'hôte de son API (CSP) :
-          # ici une valeur fictive, le build n'est pas déployé.
+          # Les fronts refusent de se construire sans l'hôte de leur API (CSP) et,
+          # pour la vitrine, sans l'adresse du backoffice : ici des valeurs
+          # fictives, ces builds ne sont pas déployés.
           VITE_API_URL: https://api.exemple.invalid
+          VITE_BACKOFFICE_URL: https://backoffice.exemple.invalid
 
       - name: Build Next.js (inclut le typecheck)
         run: npm run build
@@ -114,6 +116,13 @@ jobs:
         env:
           DATABASE_URL_TEST: postgres://postgres:test@localhost:5432/postgres
 
+      # La vitrine, avec le backoffice pour les parcours croisés.
+      - name: Parcours de la vitrine
+        if: success() || failure()
+        run: npm run e2e -w @multiboutique/www
+        env:
+          DATABASE_URL_TEST: postgres://postgres:test@localhost:5432/postgres
+
       - name: Rapport en cas d'échec
         if: failure()
         uses: actions/upload-artifact@v4
@@ -122,6 +131,8 @@ jobs:
           path: |
             apps/backoffice/playwright-report
             apps/backoffice/test-results
+            apps/www/playwright-report
+            apps/www/test-results
           retention-days: 7
 
   # ------------------------------------------------------------------
@@ -278,11 +289,17 @@ jobs:
       - name: Installer les dépendances
         run: npm ci
 
+      # api.<base> → backoffice.<base> : la vitrine mène à l'espace professionnel.
+      - name: Adresses des fronts
+        run: echo "VITE_BACKOFFICE_URL=https://backoffice.${API_DOMAIN#api.}" >> "$GITHUB_ENV"
+        env:
+          API_DOMAIN: ${{ vars.API_DOMAIN }}
+
       - name: Build
         run: npm run build -w @multiboutique/${{ matrix.front }}
         env:
-          # Hôte de l'API de l'environnement : le backoffice l'écrit dans sa CSP
-          # (connect-src, img-src) ; sans lui, son build échoue.
+          # Hôte de l'API de l'environnement : les fronts l'écrivent dans leur CSP
+          # (connect-src, img-src) ; sans lui, leur build échoue.
           VITE_API_URL: https://${{ vars.API_DOMAIN }}
 
       # Hors du _headers versionné, commun aux environnements : seule la

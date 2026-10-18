@@ -1,8 +1,15 @@
-import { render, screen } from "@testing-library/react";
-import { expect, it } from "vitest";
-import { App } from "./App";
+import { fauxApi, type FauxApi } from "@multiboutique/front/test/faux-api";
+import { screen } from "@testing-library/react";
+import { afterEach, expect, it } from "vitest";
+import { rendreApp, visiteur } from "../test/rendu";
 
-it("affiche le nom de l'application", () => {
-  render(<App />);
-  expect(screen.getByRole("heading", { level: 1 }).textContent).toContain("MultiBoutique");
+let api: FauxApi;
+afterEach(() => api.restaurer());
+
+it("une adresse inconnue affiche « Page introuvable » et ramène à l'accueil", async () => {
+  api = fauxApi();
+  visiteur(api);
+  rendreApp("/inconnu");
+  expect(await screen.findByRole("heading", { level: 1, name: "Page introuvable" })).toBeTruthy();
+  expect(screen.getByRole("link", { name: "Retour à l'accueil" }).getAttribute("href")).toBe("/");
 });

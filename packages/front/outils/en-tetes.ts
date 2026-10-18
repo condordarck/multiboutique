@@ -1,19 +1,24 @@
 import type { Plugin } from "vite";
 import { loadEnv } from "vite";
 
-/** Origine de l'API exigée au build : https, ou http://localhost pour le développement et les parcours. */
-export function origineApi(valeur: string | undefined): string {
-  if (!valeur) throw new Error("VITE_API_URL est requis pour construire le backoffice (ex. https://api.morpion.cloud).");
+/** Une origine exigée au build : https, ou http://localhost pour le développement et les parcours. */
+export function origineExigee(nom: string, valeur: string | undefined): string {
+  if (!valeur) throw new Error(`${nom} est requis pour construire ce front (ex. https://api.morpion.cloud).`);
   let url: URL;
   try {
     url = new URL(valeur);
   } catch {
-    throw new Error(`VITE_API_URL n'est pas une URL : « ${valeur} ».`);
+    throw new Error(`${nom} n'est pas une URL : « ${valeur} ».`);
   }
   if (url.protocol !== "https:" && !(url.protocol === "http:" && url.hostname === "localhost")) {
-    throw new Error(`VITE_API_URL doit être en https (http seulement pour localhost) : « ${valeur} ».`);
+    throw new Error(`${nom} doit être en https (http seulement pour localhost) : « ${valeur} ».`);
   }
   return url.origin;
+}
+
+/** Origine de l'API exigée au build. */
+export function origineApi(valeur: string | undefined): string {
+  return origineExigee("VITE_API_URL", valeur);
 }
 
 /**
@@ -56,14 +61,19 @@ export function enTetes(api: string): string {
 `;
 }
 
-/** Écrit dist/_headers à partir de VITE_API_URL ; refuse de construire sans. */
-export function pluginEnTetes(): Plugin {
+/**
+ * Écrit dist/_headers à partir de VITE_API_URL ; refuse de construire sans.
+ * `exigees` : autres adresses VITE_* sans lesquelles le front ne doit pas partir.
+ */
+export function pluginEnTetes({ exigees = [] }: { exigees?: string[] } = {}): Plugin {
   let api = "";
   return {
     name: "mb-en-tetes",
     apply: "build",
     configResolved(config) {
-      api = origineApi(loadEnv(config.mode, config.envDir || config.root, "VITE_").VITE_API_URL);
+      const env = loadEnv(config.mode, config.envDir || config.root, "VITE_");
+      api = origineApi(env.VITE_API_URL);
+      for (const nom of exigees) origineExigee(nom, env[nom]);
     },
     generateBundle() {
       this.emitFile({ type: "asset", fileName: "_headers", source: enTetes(api) });

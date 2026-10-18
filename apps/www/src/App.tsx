@@ -1,8 +1,7 @@
-export function App() {
-  return (
-    <main>
-      <h1>MultiBoutique</h1>
-      <p>Espace client — en construction</p>
-    </main>
-  );
-}
+import { creerApplication } from "@multiboutique/front";
+import { persistance } from "./hors-ligne/instance";
+import { routes } from "./routes";
+
+export { routes };
+
+export const App = creerApplication(routes, persistance);

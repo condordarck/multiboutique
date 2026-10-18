@@ -7,7 +7,8 @@
     ".": "./src/index.ts",
     "./en-tetes": "./outils/en-tetes.ts",
     "./test/*": "./test/*.ts",
-    "./e2e/serveurs": "./e2e/serveurs.ts"
+    "./e2e/serveurs": "./e2e/serveurs.ts",
+    "./vite": "./outils/vite.ts"
   },
   "scripts": {
     "test": "vitest run",
@@ -16,7 +17,8 @@
   "dependencies": {
     "@multiboutique/shared": "*",
     "@tanstack/query-async-storage-persister": "^5.104.4",
-    "idb-keyval": "^6.3.0"
+    "idb-keyval": "^6.3.0",
+    "@tanstack/react-query-persist-client": "^5.104.4"
   },
   "peerDependencies": {
     "@multiboutique/ui": "*",

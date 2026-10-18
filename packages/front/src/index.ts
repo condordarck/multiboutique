@@ -25,3 +25,4 @@ export { BandeauHorsLigne } from "./hors-ligne/BandeauHorsLigne";
 export { GardeProprietaire } from "./hors-ligne/GardeProprietaire";
 export { MiseAJour } from "./hors-ligne/MiseAJour";
 export { CLE_CACHE, CLE_PROPRIETAIRE, creerPersistance, DUREE_CACHE_MS, verifierProprietaire } from "./hors-ligne/persistance";
+export { creerApplication, creerClientRequetes } from "./application";

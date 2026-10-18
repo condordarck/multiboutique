@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { enTetes, origineApi } from "./en-tetes";
+import { enTetes, origineApi, origineExigee } from "./en-tetes";
 
 describe("en-têtes du backoffice", () => {
   it("une seule CSP, l'API seule autorisée en connect-src et img-src", () => {
@@ -28,5 +28,11 @@ describe("en-têtes du backoffice", () => {
     expect(() => origineApi("pas une url")).toThrow("VITE_API_URL");
     expect(origineApi("http://localhost:4100")).toBe("http://localhost:4100");
     expect(origineApi("https://api.morpion.cloud/")).toBe("https://api.morpion.cloud");
+  });
+
+  it("une autre adresse exigée (lien vers le backoffice) suit la même règle, en la nommant", () => {
+    expect(() => origineExigee("VITE_BACKOFFICE_URL", undefined)).toThrow("VITE_BACKOFFICE_URL");
+    expect(() => origineExigee("VITE_BACKOFFICE_URL", "http://backoffice.morpion.cloud")).toThrow("VITE_BACKOFFICE_URL");
+    expect(origineExigee("VITE_BACKOFFICE_URL", "https://backoffice.morpion.cloud")).toBe("https://backoffice.morpion.cloud");
   });
 });
