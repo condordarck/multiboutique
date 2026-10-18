@@ -64,7 +64,7 @@ describe("inscription", () => {
   async function remplir(motDePasse = "secret123") {
     await userEvent.type(await screen.findByLabelText("Nom complet"), "Mme Ade");
     await userEvent.type(screen.getByLabelText("Téléphone (facultatif)"), "+243 900 000 001");
-    await userEvent.type(screen.getByLabelText("E-mail"), "ade@exemple.org");
+    await userEvent.type(screen.getByLabelText("E-mail"), "Ade@Exemple.org");
     await userEvent.type(screen.getByLabelText("Mot de passe"), motDePasse);
     await userEvent.click(screen.getByRole("button", { name: "Créer mon compte" }));
   }

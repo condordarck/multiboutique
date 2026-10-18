@@ -2,6 +2,7 @@ import { useSession, useUtilisateur } from "@multiboutique/front";
 import { clsx } from "clsx";
 import { useEffect, useId, useRef, useState } from "react";
 import { useNavigate } from "react-router";
+import { viderTousLesPaniers } from "../panier";
 
 const FOCUS = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus";
 
@@ -45,6 +46,7 @@ export function MenuCompte() {
         <button
           type="button"
           onClick={async () => {
+            viderTousLesPaniers();
             await deconnecter();
             // La vitrine reste ouverte aux visiteurs : retour à l'accueil.
             navigate("/", { replace: true });

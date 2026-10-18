@@ -27,7 +27,8 @@ function disponibilite(n: number) {
 export function Catalogue() {
   const { boutiqueId = "" } = useParams();
   const catalogue = useCatalogue(boutiqueId);
-  return <Lecture requete={catalogue}>{(c) => <Contenu boutiqueId={boutiqueId} catalogue={c} />}</Lecture>;
+  // La clé repart de zéro si l'on passe d'une boutique à une autre (panier, filtres).
+  return <Lecture requete={catalogue}>{(c) => <Contenu key={boutiqueId} boutiqueId={boutiqueId} catalogue={c} />}</Lecture>;
 }
 
 function Contenu({ boutiqueId, catalogue }: { boutiqueId: string; catalogue: CataloguePublic }) {
@@ -53,11 +54,29 @@ function Contenu({ boutiqueId, catalogue }: { boutiqueId: string; catalogue: Cat
     });
   }
 
-  // ?reserve=<produit> : l'article arrive déjà au panier (lien partagé).
-  const reserve = parametres.get("reserve");
+  // Le panier suit le catalogue lu : prix et disponible à jour, quantités
+  // ramenées au disponible, articles qui ne sont plus proposés retirés.
   useEffect(() => {
+    setLignes((actuelles) =>
+      actuelles.flatMap((l) => {
+        const a = catalogue.produits.find((p) => p.produit_id === l.produit_id);
+        if (!a) return [];
+        const quantite = Math.min(l.quantite, a.disponible);
+        return quantite > 0 ? [{ ...l, produit_nom: a.produit_nom, prix_vente: Number(a.prix_vente), disponible: a.disponible, quantite }] : [];
+      })
+    );
+  }, [catalogue.produits]);
+
+  // ?reserve=<produit> : l'article arrive au panier (lien partagé), une seule fois :
+  // le retirer ensuite ne doit pas le voir revenir à la relecture du catalogue.
+  const reserve = parametres.get("reserve");
+  const reserveTraite = useRef<string | null>(null);
+  useEffect(() => {
+    if (!reserve || reserveTraite.current === reserve) return;
     const article = catalogue.produits.find((p) => p.produit_id === reserve);
-    if (article) setLignes((actuelles) => (actuelles.some((l) => l.produit_id === article.produit_id) ? actuelles : [...actuelles, { produit_id: article.produit_id, produit_nom: article.produit_nom, quantite: 1, disponible: article.disponible, prix_vente: Number(article.prix_vente) }]));
+    if (!article) return;
+    reserveTraite.current = reserve;
+    setLignes((actuelles) => (actuelles.some((l) => l.produit_id === article.produit_id) ? actuelles : [...actuelles, { produit_id: article.produit_id, produit_nom: article.produit_nom, quantite: 1, disponible: article.disponible, prix_vente: Number(article.prix_vente) }]));
   }, [reserve, catalogue.produits]);
 
   const affiches = useMemo(() => {

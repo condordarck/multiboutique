@@ -33,7 +33,8 @@ export function Inscription() {
     if (f.motDePasse.length < 6) return setErreur("Le mot de passe doit contenir au moins 6 caractères");
     if (f.motDePasse.length > 72) return setErreur("Le mot de passe ne doit pas dépasser 72 caractères");
     setErreur(null);
-    const email = f.email.trim();
+    // L'API enregistre l'adresse en minuscules et compare la connexion telle quelle.
+    const email = f.email.trim().toLowerCase();
     const ok = await inscription.envoyer({
       nom_complet: f.nom.trim(),
       email,

@@ -31,10 +31,12 @@ describe("coque de la vitrine", () => {
     await waitFor(() => expect(within(nav).getByRole("link", { name: "Mes réservations" }).getAttribute("href")).toBe("/espace"));
     expect(within(nav).queryByRole("link", { name: "Connexion" })).toBeNull();
     app.client.setQueryData(["public", "boutiques"], [{ id: "x" }]);
+    sessionStorage.setItem("mb-panier-b1", JSON.stringify([{ produit_id: "p", produit_nom: "P", quantite: 1, disponible: 2, prix_vente: 1 }]));
     await userEvent.click(within(nav).getByRole("button", { name: /Mme Ade/ }));
     await userEvent.click(screen.getByRole("button", { name: "Se déconnecter" }));
     await waitFor(() => expect(app.adresse()).toBe("/"));
     expect(app.client.getQueryData(["public", "boutiques"])).toBeUndefined();
+    expect(sessionStorage.getItem("mb-panier-b1")).toBeNull();
     expect(api.ecritures().map((a) => a.chemin)).toEqual(["/auth/deconnexion"]);
   });
 

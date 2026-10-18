@@ -291,7 +291,12 @@ jobs:
 
       # api.<base> → backoffice.<base> : la vitrine mène à l'espace professionnel.
       - name: Adresses des fronts
-        run: echo "VITE_BACKOFFICE_URL=https://backoffice.${API_DOMAIN#api.}" >> "$GITHUB_ENV"
+        run: |
+          # Sinon le lien « Espace professionnel » pointerait au mauvais endroit, sans erreur.
+          case "$API_DOMAIN" in
+            api.*) echo "VITE_BACKOFFICE_URL=https://backoffice.${API_DOMAIN#api.}" >> "$GITHUB_ENV" ;;
+            *) echo "::error::API_DOMAIN doit être de la forme api.<base> (reçu : « $API_DOMAIN »)"; exit 1 ;;
+          esac
         env:
           API_DOMAIN: ${{ vars.API_DOMAIN }}
 

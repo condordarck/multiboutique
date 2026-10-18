@@ -1,7 +1,7 @@
 import { useParametres, useSession } from "@multiboutique/front";
 import { Logotype, Panneau, SelecteurTheme } from "@multiboutique/ui";
 import { clsx } from "clsx";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router";
 import { URL_BACKOFFICE } from "../config";
 import { MenuCompte } from "./MenuCompte";
@@ -44,6 +44,8 @@ export function CoqueVitrine() {
   const [menu, setMenu] = useState(false);
   const { pathname } = useLocation();
   const client = !!utilisateur;
+  // Le menu du téléphone se ferme à chaque changement d'adresse (lien, déconnexion).
+  useEffect(() => setMenu(false), [pathname]);
 
   return (
     <div className="flex min-h-dvh flex-col bg-fond font-texte text-texte">
@@ -79,8 +81,7 @@ export function CoqueVitrine() {
       </footer>
       {menu && (
         <Panneau ouvert titre="Menu" onFermer={() => setMenu(false)}>
-          {/* Fermé à chaque navigation : la clé suit l'adresse. */}
-          <nav key={pathname} aria-label="Menu de la vitrine" className="flex flex-col gap-2" onClick={(e) => (e.target as HTMLElement).closest("a") && setMenu(false)}>
+          <nav aria-label="Menu de la vitrine" className="flex flex-col gap-2" onClick={(e) => (e.target as HTMLElement).closest("a") && setMenu(false)}>
             <Liens client={client} compte={client && <MenuCompte />} />
           </nav>
         </Panneau>

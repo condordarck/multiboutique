@@ -47,6 +47,8 @@ test("la déconnexion vide le cache de l'appareil", async ({ page }) => {
   await seConnecter(page, COMPTES.client.email, COMPTES.client.motDePasse);
   await expect(page.getByRole("heading", { level: 1, name: /^Bonjour/ })).toBeVisible();
   await expect.poll(() => lireIdb(page, "mb-cache-proprietaire"), { timeout: 5000 }).toBeTruthy();
+  // Les réservations du client sont bien dans le cache avant la déconnexion…
+  await expect.poll(async () => String((await lireIdb(page, "mb-cache-requetes")) ?? ""), { timeout: 5000 }).toContain('"reservations"');
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.getByRole("banner").getByRole("button", { name: "Client Vitrine" }).click();
   await page.getByRole("button", { name: "Se déconnecter" }).click();

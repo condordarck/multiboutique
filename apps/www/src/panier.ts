@@ -10,13 +10,37 @@ export interface LignePanier {
   prix_vente: number;
 }
 
-const cle = (boutiqueId: string) => `mb-panier-${boutiqueId}`;
+const PREFIXE = "mb-panier-";
+const cle = (boutiqueId: string) => `${PREFIXE}${boutiqueId}`;
+
+function estLigne(l: unknown): l is LignePanier {
+  const x = l as Partial<LignePanier> | null;
+  return (
+    !!x &&
+    typeof x.produit_id === "string" &&
+    typeof x.produit_nom === "string" &&
+    Number.isInteger(x.quantite) &&
+    (x.quantite ?? 0) > 0 &&
+    typeof x.disponible === "number" &&
+    typeof x.prix_vente === "number"
+  );
+}
+
+/** À la déconnexion : l'onglet peut servir à quelqu'un d'autre. */
+export function viderTousLesPaniers() {
+  try {
+    for (const k of Object.keys(sessionStorage)) if (k.startsWith(PREFIXE)) sessionStorage.removeItem(k);
+  } catch {
+    // Stockage indisponible : rien à vider.
+  }
+}
 
 export function lirePanier(boutiqueId: string): LignePanier[] {
   try {
     const brut = sessionStorage.getItem(cle(boutiqueId));
     const lignes: unknown = brut ? JSON.parse(brut) : [];
-    return Array.isArray(lignes) ? (lignes as LignePanier[]) : [];
+    // Seules les lignes bien formées sont gardées : le stockage peut avoir été altéré.
+    return Array.isArray(lignes) ? lignes.filter(estLigne) : [];
   } catch {
     return [];
   }

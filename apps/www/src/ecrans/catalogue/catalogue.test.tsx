@@ -116,6 +116,41 @@ describe("catalogue", () => {
     expect(sessionStorage.getItem(`mb-panier-${BOUTIQUE_1}`)).toBeNull();
   });
 
+  it("?reserve= ne remet pas au panier un article retiré quand le catalogue est relu", async () => {
+    preparer();
+    const app = rendreApp(`${PAGE}?reserve=p-suc-1`);
+    await grille();
+    await userEvent.click(within(panier()).getByRole("button", { name: "Vider" }));
+    // Une vente ailleurs change le stock : le catalogue relu est différent.
+    api.repondre("GET", `/public/boutiques/${BOUTIQUE_1}/catalogue`, 200, {
+      ...CATALOGUE,
+      produits: CATALOGUE.produits.map((p) => ({ ...p, disponible: p.disponible - 1 })),
+    });
+    await app.client.invalidateQueries();
+    // Le catalogue relu est affiché (Riz : 40 → 39 disponibles)…
+    expect(await within(await grille()).findByText("39 disponibles")).toBeTruthy();
+    // …et l'article retiré n'est pas revenu.
+    expect(within(panier()).getByText("Votre panier est vide.")).toBeTruthy();
+  });
+
+  it("un panier restauré suit le catalogue : prix et disponible à jour, article disparu retiré", async () => {
+    preparer();
+    sessionStorage.setItem(
+      `mb-panier-${BOUTIQUE_1}`,
+      JSON.stringify([
+        { produit_id: "p-riz-25", produit_nom: "Riz 25 kg", quantite: 50, disponible: 99, prix_vente: 10 },
+        { produit_id: "p-disparu", produit_nom: "Disparu", quantite: 1, disponible: 5, prix_vente: 1 },
+        { pas: "une ligne" },
+      ])
+    );
+    rendreApp(PAGE);
+    await grille();
+    expect(within(panier()).queryByText("Disparu")).toBeNull();
+    // 40 disponibles à 22 $ : quantité ramenée à 40, prix du catalogue.
+    expect(within(panier()).getByRole("group", { name: "Quantité de Riz 25 kg" }).textContent).toContain("40");
+    expect(espaces(within(panier()).getByTestId("total").textContent)).toBe("880 $");
+  });
+
   it("le panier survit à un rechargement", async () => {
     preparer();
     let app = rendreApp(PAGE);
