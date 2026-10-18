@@ -77,3 +77,64 @@ export interface Consolidation {
   regions: CumulConsolidation[];
   groupes: CumulConsolidation[];
 }
+
+/** GET /boutiques/:id/produits : produits à prix actif dans la boutique. */
+export interface ProduitBoutique {
+  id: string;
+  produit_id: string;
+  produit_nom: string;
+  produit_reference: string;
+  produit_code: string | null;
+  produit_image: string | null;
+  produit_description: string | null;
+  produit_actif: boolean;
+  categorie_nom: string | null;
+  prix_vente: number;
+  /** Absent sans prix:gerer. */
+  cout_revient?: number | null;
+  quantite: number | null;
+  quantite_reservee: number | null;
+  seuil_alerte: number | null;
+}
+
+/** GET /boutiques/:id/clients?actifs=1 */
+export interface ClientActif {
+  id: string;
+  nom: string;
+  telephone: string | null;
+  type_client: string;
+  encours: number;
+  plafond_credit: number;
+  est_vip: boolean;
+}
+
+/** GET /boutiques/:id/ventes/statistiques */
+export interface StatistiquesVentes {
+  ventes_jour: number;
+  ca_jour: number;
+  ventes_mois: number;
+  ca_mois: number;
+}
+
+export interface LigneRecu {
+  produit_nom: string;
+  produit_reference: string;
+  produit_code: string | null;
+  quantite: number;
+  prix_unitaire: number;
+}
+
+/** GET /boutiques/:id/ventes/:venteId */
+export interface DetailVente {
+  vente: VenteAvecVendeur & { client_nom: string | null };
+  lignes: LigneRecu[];
+}
+
+/** POST /boutiques/:id/ventes */
+export interface ResultatVente {
+  success: true;
+  reference: string;
+  montantTotal: number;
+  remise: number;
+  reste: number;
+}

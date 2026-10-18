@@ -8,6 +8,9 @@ import { Introuvable } from "./ecrans/Introuvable";
 import { Consolidation } from "./ecrans/tableaux/Consolidation";
 import { TableauDeBord } from "./ecrans/tableaux/TableauDeBord";
 import { VueBoutique } from "./ecrans/tableaux/VueBoutique";
+import { Caisse } from "./ecrans/ventes/Caisse";
+import { DetailVente } from "./ecrans/ventes/DetailVente";
+import { Ventes } from "./ecrans/ventes/Ventes";
 import { GardeSession } from "./session/GardeSession";
 import { FournisseurSession } from "./session/Session";
 
@@ -16,6 +19,9 @@ const sectionIntrouvable = <EtatVide message="Page introuvable" description="Cet
 /** Écrans d'une boutique, sous /b/:boutiqueId. */
 export const routesBoutique: RouteObject[] = [
   { index: true, element: <VueBoutique /> },
+  { path: "ventes", element: <Ventes /> },
+  { path: "ventes/nouvelle", element: <Caisse /> },
+  { path: "ventes/:venteId", element: <DetailVente /> },
   { path: "*", element: sectionIntrouvable },
 ];
 

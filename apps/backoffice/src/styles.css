@@ -10,3 +10,21 @@
     @apply m-0 bg-fond font-texte text-texte antialiased;
   }
 }
+
+/* Impression d'un reçu ou d'un rapport : seule la zone marquée sort, sur toute
+   la largeur, sans la coque (navigation, en-tête, boutons). */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .zone-impression,
+  .zone-impression * {
+    visibility: visible;
+  }
+  .zone-impression {
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+    box-shadow: none;
+  }
+}

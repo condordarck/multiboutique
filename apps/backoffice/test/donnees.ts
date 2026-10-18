@@ -1,5 +1,5 @@
 // Données fictives des tests d'écran, typées comme les réponses de l'API.
-import type { Consolidation, ResumeBoutique, ResumeJour } from "@multiboutique/shared";
+import type { ClientActif, Consolidation, DetailVente, ProduitBoutique, ResumeBoutique, ResumeJour } from "@multiboutique/shared";
 import { BOUTIQUE_1, BOUTIQUE_2 } from "./rendu";
 
 export function resumeJour(surcharge: Partial<ResumeJour> = {}): ResumeJour {
@@ -133,5 +133,43 @@ export const CONSOLIDATION: Consolidation = {
   groupes: [
     { nom: "Groupe Ouest", ca: 1240.5, ventes: 12, boutiques: ["Boutique 1"] },
     { nom: "Sans groupe", ca: 0, ventes: 0, boutiques: ["Boutique 2"] },
+  ],
+};
+
+
+export function produit(surcharge: Partial<ProduitBoutique> = {}): ProduitBoutique {
+  return {
+    id: "pb-riz",
+    produit_id: "p-riz",
+    produit_nom: "Riz 25 kg",
+    produit_reference: "RIZ-25",
+    produit_code: "CER-0001",
+    produit_image: null,
+    produit_description: null,
+    produit_actif: true,
+    categorie_nom: "Céréales",
+    prix_vente: 22,
+    cout_revient: 18,
+    quantite: 18,
+    quantite_reservee: 0,
+    seuil_alerte: 8,
+    ...surcharge,
+  };
+}
+
+export const PRODUITS = [
+  produit(),
+  produit({ id: "pb-sucre", produit_id: "p-sucre", produit_nom: "Sucre 1 kg", produit_reference: "SUC-1", prix_vente: 1.5, quantite: 60 }),
+  produit({ id: "pb-huile", produit_id: "p-huile", produit_nom: "Huile de palme 5 L", produit_reference: "HUI-5", prix_vente: 20.5, quantite: 2, quantite_reservee: 2 }),
+];
+
+export const CLIENTS_ACTIFS: ClientActif[] = [
+  { id: "c1", nom: "Quincaillerie Ade", telephone: null, type_client: "grossiste", encours: 120, plafond_credit: 500, est_vip: false },
+];
+
+export const DETAIL_VENTE: DetailVente = {
+  vente: { ...RESUME_BOUTIQUE.dernieres_ventes[0]!, remise: 0, montant_paye: 44, client_nom: null },
+  lignes: [
+    { produit_nom: "Riz 25 kg", produit_reference: "RIZ-25", produit_code: "CER-0001", quantite: 2, prix_unitaire: 22 },
   ],
 };

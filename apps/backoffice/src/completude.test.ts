@@ -19,11 +19,11 @@ const EXCLUS = new Set([
 // Écritures pas encore branchées : chaque tâche d'écran du plan en retire ;
 // la tâche 14 vide la liste.
 const MANQUES_ATTENDUS = new Set<string>([
-  "ajusterStock", "annulerCommande", "annulerCommandeFournisseur", "annulerReservation", "annulerVente",
+  "ajusterStock", "annulerCommande", "annulerCommandeFournisseur", "annulerReservation",
   "appliquerPrixConseilles", "basculerVip", "confirmerCommande", "confirmerReservation", "creerBoutique",
   "creerCategorie", "creerClient", "creerCodePromo", "creerCommande", "creerCommandeFournisseur",
   "creerFournisseur", "creerGroupe", "creerProduit", "creerRegion", "creerUtilisateur",
-  "creerUtilisateursDefaut", "creerVente", "encaisserReservation", "entrerStock", "listerComptesBoutique",
+  "creerUtilisateursDefaut", "encaisserReservation", "entrerStock", "listerComptesBoutique",
   "listerRegistre", "livrerCommande", "mettreAJourParametres", "modifierBoutique", "modifierCategorie",
   "modifierClient", "modifierCodePromo", "modifierFournisseur", "modifierGroupe", "modifierPrix",
   "modifierRegion", "publierPrixReference", "recevoirCommandeFournisseur", "reglerEncours",
@@ -62,8 +62,6 @@ const PAGES: Record<string, string> = {
 
 // Pages pas encore reprises : chaque tâche d'écran en retire ; la tâche 14 vide la liste.
 const PAGES_MANQUANTES = new Set<string>([
-  "(dashboard)/dashboard/[boutiqueId]/ventes/page.tsx",
-  "(dashboard)/dashboard/[boutiqueId]/ventes/[venteId]/page.tsx",
   "(dashboard)/dashboard/[boutiqueId]/produits/page.tsx",
   "(dashboard)/dashboard/[boutiqueId]/stock/page.tsx",
   "(dashboard)/dashboard/[boutiqueId]/clients/page.tsx",
