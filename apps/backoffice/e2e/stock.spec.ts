@@ -11,6 +11,8 @@ function ligne(page: Page, produit: string) {
 
 async function disponible(page: Page, boutique: string, produit: string): Promise<string> {
   await page.goto(`/b/${boutique}/stock`);
+  // Le cache local s'affiche d'abord ; on lit après la relecture de l'API.
+  await page.waitForLoadState("networkidle");
   return (await ligne(page, produit).getByRole("cell").nth(4).textContent()) ?? "";
 }
 

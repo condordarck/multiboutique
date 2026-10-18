@@ -3,11 +3,21 @@ import { BOUTIQUE_1, seConnecter, verifierFormats } from "./outils";
 
 const espaces = (t: string | null) => (t ?? "").replace(/[  ]/g, " ");
 
+/** Disponible affiché en caisse. Au chargement, le cache local s'affiche avant la relecture de l'API. */
+async function lireDisponibleRiz(page: Page): Promise<number> {
+  const texte = espaces(await page.getByRole("button", { name: /^Riz 25 kg/ }).textContent());
+  return Number(/(\d[\d ]*) dispo\./.exec(texte)![1]!.replace(/ /g, ""));
+}
+
 async function disponibleRiz(page: Page): Promise<number> {
   await page.goto(`/b/${BOUTIQUE_1}/ventes/nouvelle`);
-  const carte = page.getByRole("button", { name: /^Riz 25 kg/ });
-  const texte = espaces(await carte.textContent());
-  return Number(/(\d[\d ]*) dispo\./.exec(texte)![1]!.replace(/ /g, ""));
+  await page.waitForLoadState("networkidle");
+  return lireDisponibleRiz(page);
+}
+
+async function attendreDisponibleRiz(page: Page, attendu: number) {
+  await page.goto(`/b/${BOUTIQUE_1}/ventes/nouvelle`);
+  await expect.poll(() => lireDisponibleRiz(page)).toBe(attendu);
 }
 
 test("un vendeur encaisse, la gérante annule : le stock suit", async ({ browser }) => {
@@ -29,7 +39,7 @@ test("un vendeur encaisse, la gérante annule : le stock suit", async ({ browser
   const recu = vendeur.getByRole("region", { name: /^Reçu / });
   await expect(recu).toBeVisible();
   const reference = (await recu.getAttribute("aria-label"))!.replace("Reçu ", "");
-  expect(await disponibleRiz(vendeur)).toBe(avant - 2);
+  await attendreDisponibleRiz(vendeur, avant - 2);
 
   await vendeur.goto(`/b/${BOUTIQUE_1}/ventes`);
   // 1180 px : format tablette, l'historique est en cartes.
@@ -46,7 +56,7 @@ test("un vendeur encaisse, la gérante annule : le stock suit", async ({ browser
   await gerante.getByRole("button", { name: "Confirmer l'annulation" }).click();
   await expect(gerante.getByText("VENTE ANNULÉE — Erreur de saisie")).toBeVisible();
 
-  expect(await disponibleRiz(vendeur)).toBe(avant);
+  await attendreDisponibleRiz(vendeur, avant);
 });
 
 test("un refus de l'API garde le panier", async ({ page }) => {

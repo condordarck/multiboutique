@@ -3,6 +3,8 @@ import { BOUTIQUE_1, seConnecter, verifierFormats } from "./outils";
 
 async function stockHuile(page: Page): Promise<number> {
   await page.goto(`/b/${BOUTIQUE_1}/stock`);
+  // Le cache local s'affiche d'abord ; on lit après la relecture de l'API.
+  await page.waitForLoadState("networkidle");
   const ligne = page.getByRole("table", { name: "État du stock" }).getByRole("row").filter({ hasText: "Huile d'arachide 1 L" });
   return Number((await ligne.getByRole("cell").nth(2).textContent())?.replace(/\D/g, ""));
 }
