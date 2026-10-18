@@ -5,6 +5,7 @@ import { Accueil } from "./ecrans/Accueil";
 import { Catalogue } from "./ecrans/catalogue/Catalogue";
 import { Connexion } from "./ecrans/Connexion";
 import { Inscription } from "./ecrans/Inscription";
+import { Espace } from "./ecrans/Espace";
 import { Introuvable } from "./ecrans/Introuvable";
 import { Reservation } from "./ecrans/Reservation";
 import { GardeClient } from "./session/GardeClient";
@@ -31,8 +32,7 @@ export const routes: RouteObject[] = [
           { path: "inscription", element: <Inscription /> },
           {
             element: <GardeClient />,
-            // L'espace client arrive à la tâche 8 du plan.
-            children: [{ path: "espace", element: <h1>Mes réservations</h1> }],
+            children: [{ path: "espace", element: <Espace /> }],
           },
           { path: "*", element: <Introuvable /> },
         ],
