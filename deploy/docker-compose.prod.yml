@@ -78,8 +78,8 @@ services:
       db:
         condition: service_healthy
     volumes:
-      # Même dossier que le monolithe : les images restent communes pendant la migration.
-      - ../public/uploads:/donnees/uploads
+      # Images des produits, hors du dépôt (ignoré par Git), cf. deploy/lib/uploads.sh.
+      - ../donnees/uploads:/donnees/uploads
     mem_limit: 384m
     networks:
       - multiboutique

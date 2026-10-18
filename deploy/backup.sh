@@ -75,17 +75,21 @@ journaliser "Dump produit : ${TAILLE} octets"
 
 # 2. Photos produits : aucune autre copie n'existe, elles ne sont pas en base.
 mkdir -p "$SCRATCH/uploads"
-if [ -d public/uploads ]; then
+# donnees/uploads depuis la phase 5 ; public/uploads tant que le premier
+# déploiement sans monolithe n'a pas déplacé les images.
+DOSSIER_UPLOADS=donnees/uploads
+[ -d "$DOSSIER_UPLOADS" ] || DOSSIER_UPLOADS=public/uploads
+if [ -d "$DOSSIER_UPLOADS" ]; then
   # Les fichiers sont écrits par le conteneur (uid 1001) et la sauvegarde
   # tourne sous l'utilisateur de déploiement : une photo illisible doit faire
   # échouer la sauvegarde, pas disparaître en silence du snapshot.
-  if ! cp -a public/uploads/. "$SCRATCH/uploads/" 2>"$SCRATCH/cp.err"; then
+  if ! cp -a "$DOSSIER_UPLOADS/." "$SCRATCH/uploads/" 2>"$SCRATCH/cp.err"; then
     journaliser "Copie des uploads en échec : $(tr '\n' ' ' < "$SCRATCH/cp.err")"
     echouer "copie des uploads"
   fi
   rm -f "$SCRATCH/cp.err"
 
-  ATTENDUS="$(find public/uploads -type f | wc -l)"
+  ATTENDUS="$(find "$DOSSIER_UPLOADS" -type f | wc -l)"
   COPIES="$(find "$SCRATCH/uploads" -type f | wc -l)"
   if [ "$COPIES" -ne "$ATTENDUS" ]; then
     echouer "uploads incomplets : ${COPIES} fichiers copiés sur ${ATTENDUS}"

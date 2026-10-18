@@ -10,3 +10,6 @@ backups/
 # Sorties de build des workspaces
 apps/*/dist/
 packages/*/dist/
+
+# Données du serveur (images des produits), hors du dépôt.
+donnees/
