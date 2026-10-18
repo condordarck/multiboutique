@@ -2,6 +2,7 @@ import { BandeauHorsLigne, FournisseurSession, GardeProprietaire, MiseAJour } fr
 import { Outlet, type RouteObject } from "react-router";
 import { CoqueVitrine } from "./coque/CoqueVitrine";
 import { Accueil } from "./ecrans/Accueil";
+import { Catalogue } from "./ecrans/catalogue/Catalogue";
 import { Connexion } from "./ecrans/Connexion";
 import { Inscription } from "./ecrans/Inscription";
 import { Introuvable } from "./ecrans/Introuvable";
@@ -23,6 +24,7 @@ export const routes: RouteObject[] = [
         element: <CoqueVitrine />,
         children: [
           { index: true, element: <Accueil /> },
+          { path: "boutiques/:boutiqueId", element: <Catalogue /> },
           { path: "connexion", element: <Connexion /> },
           { path: "inscription", element: <Inscription /> },
           {
