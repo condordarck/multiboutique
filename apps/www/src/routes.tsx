@@ -1,5 +1,6 @@
 import { BandeauHorsLigne, FournisseurSession, GardeProprietaire, MiseAJour } from "@multiboutique/front";
 import { Outlet, type RouteObject } from "react-router";
+import { CoqueVitrine } from "./coque/CoqueVitrine";
 import { Introuvable } from "./ecrans/Introuvable";
 import { persistance } from "./hors-ligne/instance";
 
@@ -13,6 +14,11 @@ export const routes: RouteObject[] = [
         <Outlet />
       </FournisseurSession>
     ),
-    children: [{ path: "*", element: <Introuvable /> }],
+    children: [
+      {
+        element: <CoqueVitrine />,
+        children: [{ path: "*", element: <Introuvable /> }],
+      },
+    ],
   },
 ];
