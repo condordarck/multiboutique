@@ -104,6 +104,7 @@ export function Utilisateurs() {
                 aria-label={`${u.actif ? "Désactiver" : "Activer"} ${u.nom_complet}`}
                 // On ne se désactive pas soi-même.
                 disabled={u.id === moi.id || activation.desactivee}
+                chargement={activation.enCours}
                 onClick={() => void activation.envoyer({ id: u.id })}
               >
                 {u.actif ? "Désactiver" : "Activer"}
@@ -132,6 +133,7 @@ function NouvelUtilisateur({ donnees, onFermer }: { donnees: NonNullable<ReturnT
   const avecBoutiques = ROLES_AVEC_BOUTIQUE.includes(f.role);
 
   async function envoyer() {
+    setMessage(null);
     const ok = await creation.envoyer({
       nom_complet: f.nom,
       email: f.email,

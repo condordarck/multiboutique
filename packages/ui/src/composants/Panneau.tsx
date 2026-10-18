@@ -23,6 +23,9 @@ export function Panneau({ ouvert, titre, onFermer, pied, className, children }: 
   const idTitre = useId();
   // L'élément qui avait le focus à l'ouverture : il le retrouve à la fermeture.
   const declencheur = useRef<Element | null>(null);
+  // Le voile n'est cliqué que si l'appui *et* le relâché y ont lieu : une
+  // sélection de texte qui finit hors du panneau ne le ferme pas.
+  const appuiSurVoile = useRef(false);
 
   useEffect(() => {
     const dialogue = ref.current;
@@ -46,9 +49,13 @@ export function Panneau({ ouvert, titre, onFermer, pied, className, children }: 
         evenement.preventDefault();
         onFermer();
       }}
+      onPointerDown={(evenement) => {
+        appuiSurVoile.current = evenement.target === evenement.currentTarget;
+      }}
       onClick={(evenement) => {
         // Un clic sur le <dialog> lui-même, hors de son contenu, est un clic sur le voile.
-        if (evenement.target === evenement.currentTarget) onFermer();
+        if (evenement.target === evenement.currentTarget && appuiSurVoile.current) onFermer();
+        appuiSurVoile.current = false;
       }}
       className={clsx(
         "m-0 mt-auto flex max-h-[92dvh] w-full max-w-none flex-col rounded-t-carte bg-surface p-0 text-texte",

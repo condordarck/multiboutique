@@ -6,15 +6,17 @@ import { cles, useParametres } from "../../api/generales";
 import { EnTeteEcran } from "../../commun/EnTeteEcran";
 import { Formulaire } from "../../commun/Formulaire";
 import { Lecture } from "../../commun/Lecture";
+import { lireEntier } from "../../commun/saisie";
 import { useEcriture } from "../../commun/useEcriture";
 
 /** app/(admin)/admin/parametres/page.tsx */
 export function ParametresAdmin() {
-  const parametres = useParametres();
+  // Relus à l'ouverture : un autre administrateur a pu les changer entre-temps.
+  const parametres = useParametres({ refetchOnMount: "always" });
   return (
     <div className="flex flex-col gap-6 pb-6">
       <EnTeteEcran titre="Paramètres généraux" sousTitre="Configuration générale de l'application appliquée partout." />
-      <Lecture requete={parametres}>{(p) => <FormulaireParametres initial={p} />}</Lecture>
+      <Lecture requete={parametres}>{(p) => <FormulaireParametres key={parametres.dataUpdatedAt} initial={p} />}</Lecture>
     </div>
   );
 }
@@ -27,21 +29,26 @@ function FormulaireParametres({ initial }: { initial: Parametres }) {
     seuil: initial.seuil_alerte_defaut || "10",
     delai: initial.relance_delai_jours || "30",
   });
+  const [erreur, setErreur] = useState<string | null>(null);
   const maj = (cle: keyof typeof f) => (e: { target: { value: string } }) => setF((x) => ({ ...x, [cle]: e.target.value }));
 
   return (
     <Carte className="max-w-2xl">
       <Formulaire
         libelleEnvoyer="Enregistrer"
-        onEnvoyer={() =>
+        onEnvoyer={() => {
+          // Le seuil est relu en entier par la création de produit (::integer).
+          if (Number.isNaN(lireEntier(f.seuil, 0))) return setErreur("Le seuil d'alerte doit être un entier positif ou nul");
+          if (Number.isNaN(lireEntier(f.delai, 1))) return setErreur("Le délai de relance doit être un entier d'au moins 1 jour");
+          setErreur(null);
           void ecriture.envoyer([
             { cle: "monnaie", valeur: f.monnaie },
             { cle: "nom_application", valeur: f.nom },
             { cle: "seuil_alerte_defaut", valeur: f.seuil },
             { cle: "relance_delai_jours", valeur: f.delai },
-          ])
-        }
-        erreur={ecriture.erreur}
+          ]);
+        }}
+        erreur={erreur ?? ecriture.erreur}
         enCours={ecriture.enCours}
         desactivee={ecriture.desactivee}
       >

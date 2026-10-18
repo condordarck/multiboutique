@@ -7,11 +7,12 @@ export const cles = {
   mesBoutiques: ["me", "boutiques"] as const,
 };
 
-export function useParametres() {
+export function useParametres(options: { refetchOnMount?: "always" } = {}) {
   return useQuery({
     queryKey: cles.parametres,
     queryFn: () => appeler<Parametres>("GET", "/parametres"),
     staleTime: 5 * 60_000,
+    ...options,
   });
 }
 

@@ -55,6 +55,12 @@ describe("lireConfig", () => {
     expect(() => lireConfig({ ...VALIDE, ORIGINE_WWW: "http://localhost:5174/x" })).toThrow("ORIGINE_WWW");
   });
 
+  it("refuse localhost en production", () => {
+    expect(() => lireConfig({ ...VALIDE, NODE_ENV: "production", ORIGINE_BACKOFFICE: "http://localhost:5174" })).toThrow(
+      "ORIGINE_BACKOFFICE"
+    );
+  });
+
   it("refuse un port invalide", () => {
     expect(() => lireConfig({ ...VALIDE, PORT: "quatre" })).toThrow("PORT");
   });

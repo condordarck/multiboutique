@@ -129,6 +129,7 @@ function FicheBoutique({ boutique, regions, onFermer }: { boutique: LigneBoutiqu
       if (await modification.envoyer({ ...saisie, id: boutique.id })) onFermer();
       return;
     }
+    setCrees([]);
     const resultat = await creation.envoyer(saisie);
     if (resultat) {
       // La boutique est créée avec ses profils d'équipe ; le panneau reste ouvert sur leurs accès.

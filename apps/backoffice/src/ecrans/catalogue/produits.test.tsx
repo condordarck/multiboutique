@@ -95,6 +95,35 @@ describe("produits", () => {
     expect((await within(panneau).findByRole("alert")).textContent).toBe("Ce code produit existe déjà");
   });
 
+  it("refuse une quantité initiale décimale avant de créer quoi que ce soit", async () => {
+    preparer();
+    rendreApp(PAGE);
+    await userEvent.click(await screen.findByRole("button", { name: "Nouveau produit" }));
+    const panneau = screen.getByRole("dialog", { name: "Nouveau produit" });
+    await userEvent.type(within(panneau).getByLabelText("Nom du produit"), "Sel");
+    await userEvent.type(within(panneau).getByLabelText("Prix de vente"), "1");
+    await userEvent.type(within(panneau).getByLabelText("Quantité initiale en stock"), "2,5");
+    await userEvent.click(within(panneau).getByRole("button", { name: "Ajouter le produit" }));
+    expect(within(panneau).getByRole("alert").textContent).toBe("La quantité initiale doit être un nombre entier");
+    expect(api.ecritures()).toEqual([]);
+  });
+
+  it("si l'entrée de stock initiale échoue, le dit et rafraîchit la liste (le produit existe)", async () => {
+    preparer();
+    api.repondre("POST", `/boutiques/${BOUTIQUE_1}/produits`, 201, { success: true, produitId: "p-neuf" });
+    api.repondre("POST", `/boutiques/${BOUTIQUE_1}/stock/p-neuf/entrees`, 404, { erreur: "Stock introuvable" });
+    rendreApp(PAGE);
+    await userEvent.click(await screen.findByRole("button", { name: "Nouveau produit" }));
+    const panneau = screen.getByRole("dialog", { name: "Nouveau produit" });
+    await userEvent.type(within(panneau).getByLabelText("Nom du produit"), "Sel");
+    await userEvent.type(within(panneau).getByLabelText("Prix de vente"), "1");
+    await userEvent.type(within(panneau).getByLabelText("Quantité initiale en stock"), "5");
+    const lecturesAvant = api.appels().filter((a) => a.chemin.endsWith("/produits") && a.methode === "GET").length;
+    await userEvent.click(within(panneau).getByRole("button", { name: "Ajouter le produit" }));
+    expect((await within(panneau).findByRole("alert")).textContent).toMatch(/^Produit créé, mais l'entrée de stock initiale a échoué : Stock introuvable/);
+    await waitFor(() => expect(api.appels().filter((a) => a.chemin.endsWith("/produits") && a.methode === "GET").length).toBeGreaterThan(lecturesAvant));
+  });
+
   it("modifie le prix et le coût de revient", async () => {
     preparer();
     api.repondre("PUT", `/boutiques/${BOUTIQUE_1}/prix/p-riz`, 200, { success: true });

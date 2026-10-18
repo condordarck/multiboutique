@@ -1,6 +1,6 @@
 import type { CommandeListee, StatutCommande, TermePaiement } from "@multiboutique/shared";
 import { Badge, Bouton, Carte, Champ, ChoixSegmente, Dialogue, Panneau, Selecteur, type TonBadge } from "@multiboutique/ui";
-import { LignesArticles, type LigneSaisie } from "../../commun/LignesArticles";
+import { LignesArticles, lignesInvalides, type LigneSaisie } from "../../commun/LignesArticles";
 import { useState } from "react";
 import { useParams } from "react-router";
 import { useProduits } from "../../api/catalogue";
@@ -119,6 +119,7 @@ export function Commandes() {
                           variante="discret"
                           aria-label={`Confirmer ${c.reference_commande}`}
                           disabled={confirmation.desactivee}
+                          chargement={confirmation.enCours}
                           onClick={() => void confirmation.envoyer({ id: c.id })}
                         >
                           Confirmer
@@ -177,6 +178,8 @@ function NouvelleCommande({ boutiqueId, onFermer }: { boutiqueId: string; onFerm
   async function envoyer() {
     if (!clientId) return setErreur("Choisissez un client");
     if (!lignes.length || lignes.some((l) => !l.produit_id)) return setErreur("Ajoutez au moins une ligne avec un produit");
+    const invalide = lignesInvalides(lignes);
+    if (invalide) return setErreur(invalide);
     setErreur(null);
     const resultat = await creation.envoyer({
       boutiqueId,

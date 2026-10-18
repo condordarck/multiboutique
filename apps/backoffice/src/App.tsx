@@ -3,9 +3,9 @@ import { QueryClient } from "@tanstack/react-query";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { createBrowserRouter, RouterProvider } from "react-router";
 import { persistance } from "./hors-ligne/instance";
-import { DUREE_CACHE_MS } from "./hors-ligne/persistance";
+import { DUREE_CACHE_MS, verifierProprietaire } from "./hors-ligne/persistance";
 import { routes } from "./routes";
-import { surDeconnexion } from "./session/Session";
+import { surConnexion, surDeconnexion } from "./session/Session";
 
 export { routes };
 
@@ -24,8 +24,10 @@ export function creerClientRequetes() {
 
 const client = creerClientRequetes();
 const routeur = createBrowserRouter(routes);
-// Déconnexion : le cache de l'appareil part avec la session.
+// Déconnexion : le cache de l'appareil part avec la session. Connexion d'un
+// autre utilisateur : son prédécesseur ne doit rien laisser à l'écran.
 surDeconnexion(persistance.purger);
+surConnexion((id) => verifierProprietaire(client, id, persistance.purger));
 
 export function App() {
   return (

@@ -103,6 +103,8 @@ describe("connexion", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Se déconnecter" }));
     await screen.findByRole("heading", { name: "Connexion" });
     expect(api.ecritures().map((a) => a.chemin)).toEqual(["/auth/deconnexion"]);
+    // Pas de « retour » : le suivant sur la tablette part de son propre accueil.
+    expect(app.adresse()).toBe("/connexion");
     expect(app.client.getQueryData(["quelque-chose"])).toBeUndefined();
   });
 });

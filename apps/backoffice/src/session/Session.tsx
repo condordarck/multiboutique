@@ -1,6 +1,6 @@
 import { aPermission, type Permission, type SessionUtilisateur } from "@multiboutique/shared";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { createContext, useCallback, useContext, useEffect, useMemo, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { appeler, ErreurApi, EVENEMENT_SESSION_EXPIREE } from "../api/client";
 
 export const CLE_SESSION = ["session"] as const;
@@ -8,6 +8,8 @@ export const CLE_SESSION = ["session"] as const;
 interface ContexteSession {
   utilisateur: SessionUtilisateur | null;
   chargement: boolean;
+  /** La session vient d'être fermée par l'utilisateur (pas expirée). */
+  deconnecte: boolean;
   /** Confort d'affichage seulement : l'API vérifie chaque requête. */
   peut: (permission: Permission) => boolean;
   connecter: (email: string, motDePasse: string) => Promise<SessionUtilisateur>;
@@ -15,6 +17,16 @@ interface ContexteSession {
 }
 
 const Contexte = createContext<ContexteSession | null>(null);
+
+/**
+ * Actions à mener avant d'afficher la session d'un utilisateur qui vient de se
+ * connecter (vider le cache d'un autre utilisateur de l'appareil).
+ */
+const avantConnexion = new Set<(utilisateurId: string) => Promise<void> | void>();
+export function surConnexion(action: (utilisateurId: string) => Promise<void> | void) {
+  avantConnexion.add(action);
+  return () => avantConnexion.delete(action);
+}
 
 /** Actions à mener à la déconnexion en plus du vidage du cache (purge IndexedDB). */
 const nettoyages = new Set<() => Promise<void> | void>();
@@ -39,6 +51,7 @@ export function FournisseurSession({ children }: { children: ReactNode }) {
   // qu'un affichage provisoire, l'API reste juge (hors ligne, elle reste affichée).
   const { data, isPending } = useQuery({ queryKey: CLE_SESSION, queryFn: lireSession, staleTime: 60_000, refetchOnMount: "always" });
   const utilisateur = data ?? null;
+  const [deconnecte, setDeconnecte] = useState(false);
 
   // L'API ne reconnaît plus la session : on l'oublie, la garde renvoie à la connexion.
   useEffect(() => {
@@ -53,6 +66,8 @@ export function FournisseurSession({ children }: { children: ReactNode }) {
         email,
         mot_de_passe: motDePasse,
       });
+      for (const action of avantConnexion) await action(utilisateur.id);
+      setDeconnecte(false);
       client.setQueryData(CLE_SESSION, utilisateur);
       return utilisateur;
     },
@@ -66,6 +81,7 @@ export function FournisseurSession({ children }: { children: ReactNode }) {
       // Hors ligne ou API à terre : on efface quand même tout côté appareil.
     }
     // La session d'abord : vider son entrée relancerait sa lecture.
+    setDeconnecte(true);
     client.setQueryData(CLE_SESSION, null);
     // Tablettes partagées : rien des données du précédent utilisateur ne reste.
     client.removeQueries({ predicate: (requete) => requete.queryKey[0] !== CLE_SESSION[0] });
@@ -77,11 +93,12 @@ export function FournisseurSession({ children }: { children: ReactNode }) {
     () => ({
       utilisateur,
       chargement: isPending,
+      deconnecte,
       peut: (permission) => aPermission(utilisateur, permission),
       connecter,
       deconnecter,
     }),
-    [utilisateur, isPending, connecter, deconnecter]
+    [utilisateur, isPending, deconnecte, connecter, deconnecter]
   );
 
   return <Contexte.Provider value={valeur}>{children}</Contexte.Provider>;

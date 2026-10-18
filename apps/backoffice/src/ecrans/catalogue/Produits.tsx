@@ -1,6 +1,7 @@
 import type { ProduitBoutique } from "@multiboutique/shared";
 import { Badge, Bouton, Carte, Champ, Panneau, Selecteur } from "@multiboutique/ui";
 import { clsx } from "clsx";
+import { useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { useParams } from "react-router";
 import { creerProduit, disponible, entrerStock, modifierPrix, useCategories, useProduits } from "../../api/catalogue";
@@ -12,7 +13,7 @@ import { formatMontant, formatNombre } from "../../commun/formats";
 import { Formulaire } from "../../commun/Formulaire";
 import { ListeChargee } from "../../commun/ListeChargee";
 import { correspond } from "../../commun/recherche";
-import { lireNombre } from "../../commun/saisie";
+import { lireEntier, lireNombre } from "../../commun/saisie";
 import { useEcriture } from "../../commun/useEcriture";
 import { useSession } from "../../session/Session";
 
@@ -134,10 +135,12 @@ function NouveauProduit({ boutiqueId, onFermer }: { boutiqueId: string; onFermer
   const [envoiPhoto, setEnvoiPhoto] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
   const photo = useRef<HTMLInputElement>(null);
+  const client = useQueryClient();
   const creation = useEcriture({
     appel: async () => {
       const prix = lireNombre(champs.prix);
       const cout = lireNombre(champs.cout);
+      const quantite = champs.quantite.trim() ? lireEntier(champs.quantite, 0) : 0;
       const { produitId } = await creerProduit({
         boutiqueId,
         produit: {
@@ -151,9 +154,17 @@ function NouveauProduit({ boutiqueId, onFermer }: { boutiqueId: string; onFermer
         prix_vente: prix,
         ...(Number.isNaN(cout) ? {} : { cout_revient: cout }),
       });
-      // Entrée de stock initiale facultative, comme le monolithe.
-      const quantite = lireNombre(champs.quantite);
-      if (quantite > 0) await entrerStock({ boutiqueId, produitId, quantite, motif: "Stock initial" });
+      // Entrée de stock initiale facultative, comme le monolithe. Le produit existe
+      // déjà : en cas d'échec, la liste le montre, et le message le dit.
+      if (quantite > 0) {
+        try {
+          await entrerStock({ boutiqueId, produitId, quantite, motif: "Stock initial" });
+        } catch (e) {
+          await client.invalidateQueries({ queryKey: ["boutiques", boutiqueId] });
+          const raison = e instanceof ErreurApi ? e.message : "erreur inattendue";
+          throw new ErreurApi(e instanceof ErreurApi ? e.statut : 0, `Produit créé, mais l'entrée de stock initiale a échoué : ${raison}. Faites-la depuis Stock.`);
+        }
+      }
       return produitId;
     },
     invalide: [["boutiques", boutiqueId]],
@@ -181,7 +192,11 @@ function NouveauProduit({ boutiqueId, onFermer }: { boutiqueId: string; onFermer
 
   async function envoyer() {
     const prix = lireNombre(champs.prix);
-    if (!prix || prix <= 0) return setErreur("Le prix de vente doit être un nombre positif");
+    if (!(prix > 0)) return setErreur("Le prix de vente doit être un nombre positif");
+    if (champs.cout.trim() && !(lireNombre(champs.cout) >= 0)) return setErreur("Le coût de revient doit être un nombre positif ou nul");
+    if (champs.quantite.trim() && Number.isNaN(lireEntier(champs.quantite, 0))) {
+      return setErreur("La quantité initiale doit être un nombre entier");
+    }
     setErreur(null);
     if (await creation.envoyer(undefined)) onFermer();
   }
@@ -257,9 +272,11 @@ function PrixProduit({ boutiqueId, produit, onFermer }: { boutiqueId: string; pr
 
   async function envoyer() {
     const p = lireNombre(prix);
-    if (!p || p <= 0) return setErreur("Le prix de vente doit être positif");
-    setErreur(null);
+    if (!(p > 0)) return setErreur("Le prix de vente doit être positif");
     const c = lireNombre(cout);
+    // Un coût mal saisi ne doit pas effacer le coût enregistré.
+    if (cout.trim() && !(c >= 0)) return setErreur("Le coût de revient doit être un nombre positif ou nul");
+    setErreur(null);
     const ok = await modification.envoyer({
       boutiqueId,
       produitId: produit.produit_id,

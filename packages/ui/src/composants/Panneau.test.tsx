@@ -59,6 +59,11 @@ describe("Panneau", () => {
     await userEvent.click(screen.getByRole("button", { name: "Nouveau client" }));
     await userEvent.click(screen.getByLabelText("Nom"));
     expect(onFermer).not.toHaveBeenCalled();
+    // Sélection commencée dans un champ et relâchée sur le voile : pas de fermeture.
+    fireEvent.pointerDown(screen.getByLabelText("Nom"));
+    fireEvent.click(screen.getByRole("dialog"));
+    expect(onFermer).not.toHaveBeenCalled();
+    fireEvent.pointerDown(screen.getByRole("dialog"));
     fireEvent.click(screen.getByRole("dialog"));
     expect(onFermer).toHaveBeenCalledOnce();
   });

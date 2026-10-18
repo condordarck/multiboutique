@@ -31,15 +31,17 @@ export function FormulaireClient({ initial, libelleEnvoyer, enCours, desactivee,
 
   function envoyer() {
     if (!f.nom.trim()) return setErreurSaisie("Le nom est requis");
+    // Vide : au comptant (0). Mal saisi : refusé, plutôt que de remettre le plafond à 0.
+    const plafond = f.plafond.trim() ? lireNombre(f.plafond) : 0;
+    if (!(plafond >= 0)) return setErreurSaisie("Le plafond de crédit doit être un nombre positif ou nul");
     setErreurSaisie(null);
-    const plafond = lireNombre(f.plafond);
     onEnvoyer({
       nom: f.nom,
       ...(f.telephone ? { telephone: f.telephone } : {}),
       ...(f.email ? { email: f.email } : {}),
       ...(f.adresse ? { adresse: f.adresse } : {}),
       type_client: f.type_client,
-      plafond_credit: Number.isNaN(plafond) ? 0 : plafond,
+      plafond_credit: plafond,
       est_vip: f.est_vip,
     });
   }

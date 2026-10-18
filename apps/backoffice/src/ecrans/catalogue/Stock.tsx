@@ -10,7 +10,7 @@ import { formatMontant, formatNombre } from "../../commun/formats";
 import { Formulaire } from "../../commun/Formulaire";
 import { ListeChargee } from "../../commun/ListeChargee";
 import { correspond } from "../../commun/recherche";
-import { lireNombre } from "../../commun/saisie";
+import { lireEntier } from "../../commun/saisie";
 import { useEcriture } from "../../commun/useEcriture";
 import { useSession } from "../../session/Session";
 
@@ -219,8 +219,9 @@ function FicheStock({ boutiqueId, ligne, onFermer }: { boutiqueId: string; ligne
   const ecriture = { entree, ajustement, transfert }[operation];
 
   async function envoyer() {
-    const q = lireNombre(quantite);
-    if (operation === "ajustement" ? Number.isNaN(q) || q < 0 : !q || q <= 0) return setErreur("Quantité invalide");
+    // Entier : 0 accepté pour un ajustement (stock vidé), au moins 1 sinon.
+    const q = lireEntier(quantite, operation === "ajustement" ? 0 : 1);
+    if (Number.isNaN(q)) return setErreur("Quantité invalide (nombre entier)");
     if (operation === "transfert" && !destination) return setErreur("Choisissez la boutique de destination");
     setErreur(null);
     const commun = { boutiqueId, produitId: ligne.produit_id, quantite: q, motif };

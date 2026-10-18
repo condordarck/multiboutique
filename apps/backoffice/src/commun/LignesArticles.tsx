@@ -1,9 +1,16 @@
 import { Bouton, Champ, Selecteur } from "@multiboutique/ui";
+import { lireEntier, lireNombre } from "./saisie";
 
 export interface LigneSaisie {
   produit_id: string;
   quantite: string;
   prix: string;
+}
+
+/** Message pour la première ligne dont la quantité ou le prix est invalide ; null sinon. */
+export function lignesInvalides(lignes: LigneSaisie[]): string | null {
+  const i = lignes.findIndex((l) => Number.isNaN(lireEntier(l.quantite, 1)) || !(lireNombre(l.prix) >= 0));
+  return i < 0 ? null : `Article ${i + 1} : quantité entière d'au moins 1 et prix positif ou nul requis`;
 }
 
 interface Props {

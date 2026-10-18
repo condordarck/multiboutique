@@ -19,9 +19,9 @@ import { useBoutique } from "../../api/tableaux";
 import { EnTeteEcran } from "../../commun/EnTeteEcran";
 import { formatMontant, formatNombre } from "../../commun/formats";
 import { Formulaire } from "../../commun/Formulaire";
-import { LignesArticles, type LigneSaisie } from "../../commun/LignesArticles";
+import { LignesArticles, lignesInvalides, type LigneSaisie } from "../../commun/LignesArticles";
 import { ListeChargee } from "../../commun/ListeChargee";
-import { lireNombre } from "../../commun/saisie";
+import { lireEntier, lireNombre } from "../../commun/saisie";
 import { useEcriture } from "../../commun/useEcriture";
 import { useSession } from "../../session/Session";
 
@@ -164,6 +164,8 @@ export function Achats() {
                       variante="discret"
                       aria-label={`${f.actif ? "Désactiver" : "Réactiver"} ${f.nom}`}
                       disabled={activation.desactivee}
+                      // Le service inverse l'état : un double appui l'annulerait.
+                      chargement={activation.enCours}
                       onClick={() => void activation.envoyer({ boutiqueId, fournisseurId: f.id })}
                     >
                       {f.actif ? "Désactiver" : "Réactiver"}
@@ -208,8 +210,15 @@ function Reception({ commande, boutiqueId, onFermer }: { commande: CommandeFourn
   const [erreur, setErreur] = useState<string | null>(null);
 
   async function envoyer() {
-    const receptions = Object.entries(saisies)
-      .map(([ligne_id, q]) => ({ ligne_id, quantite_recue: lireNombre(q) }))
+    const remplies = Object.entries(saisies).filter(([, q]) => q.trim());
+    for (const [ligne_id, q] of remplies) {
+      const ligne = commande.lignes.find((l) => l.ligne_id === ligne_id)!;
+      const restant = Number(ligne.quantite_commandee) - Number(ligne.quantite_recue);
+      const n = lireEntier(q, 0);
+      if (Number.isNaN(n) || n > restant) return setErreur(`${ligne.produit_nom} : entre 0 et ${restant} unités`);
+    }
+    const receptions = remplies
+      .map(([ligne_id, q]) => ({ ligne_id, quantite_recue: lireEntier(q, 0) }))
       .filter((r) => r.quantite_recue > 0);
     if (!receptions.length) return setErreur("Entrez au moins une quantité reçue");
     setErreur(null);
@@ -317,6 +326,8 @@ function NouvelleCommandeFournisseur({ boutiqueId, fournisseurs, onFermer }: { b
   async function envoyer() {
     if (!fournisseurId) return setErreur("Choisissez un fournisseur");
     if (!lignes.length || lignes.some((l) => !l.produit_id)) return setErreur("Ajoutez au moins une ligne avec un produit");
+    const invalide = lignesInvalides(lignes);
+    if (invalide) return setErreur(invalide);
     setErreur(null);
     const resultat = await creation.envoyer({
       boutiqueId,

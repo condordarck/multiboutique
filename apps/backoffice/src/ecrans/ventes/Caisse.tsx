@@ -12,6 +12,7 @@ import { formatMontant, formatNombre } from "../../commun/formats";
 import { Lecture } from "../../commun/Lecture";
 import { LienBouton } from "../../commun/LienBouton";
 import { correspond } from "../../commun/recherche";
+import { lireNombre } from "../../commun/saisie";
 import { useEcriture } from "../../commun/useEcriture";
 import { useSession, useUtilisateur } from "../../session/Session";
 import { Ticket, type TicketProps } from "./Ticket";
@@ -27,8 +28,11 @@ interface Ligne {
   quantite: number;
 }
 
-/** Montant saisi (virgule ou point décimal) ; 0 si vide ou invalide. */
-const lireMontant = (texte: string) => Number(texte.replace(",", ".")) || 0;
+/** Montant saisi (« 10 000,5 » accepté) ; 0 si vide ou invalide. */
+const lireMontant = (texte: string) => {
+  const n = lireNombre(texte);
+  return Number.isNaN(n) ? 0 : n;
+};
 
 /**
  * Caisse : la maquette « Nouvelle vente » avec toutes les fonctions de

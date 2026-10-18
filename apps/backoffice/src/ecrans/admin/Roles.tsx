@@ -84,6 +84,8 @@ export function Roles() {
     try {
       await togglePermissionRole({ role, permission, active });
       await client.invalidateQueries({ queryKey: ["admin", "roles"] });
+      // La valeur relue fait foi ; la surcharge ne masquera pas un changement ultérieur.
+      setSurcharges(({ [cle]: _confirmee, ...reste }) => reste);
     } catch (e) {
       setSurcharges((s) => ({ ...s, [cle]: !active }));
       setErreur(e instanceof ErreurApi ? e.message : "Erreur lors de l'enregistrement");

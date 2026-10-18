@@ -221,6 +221,16 @@ describe("administration", () => {
     expect(caseVente.checked).toBe(true);
   });
 
+  it("paramètres : un seuil non entier est refusé avant l'API", async () => {
+    rendreApp("/admin/parametres");
+    const seuil = await screen.findByLabelText("Seuil d'alerte stock par défaut");
+    await userEvent.clear(seuil);
+    await userEvent.type(seuil, "1,5");
+    await userEvent.click(screen.getByRole("button", { name: "Enregistrer" }));
+    expect((await screen.findByRole("alert")).textContent).toBe("Le seuil d'alerte doit être un entier positif ou nul");
+    expect(api.ecritures()).toEqual([]);
+  });
+
   it("paramètres : les quatre valeurs partent ensemble", async () => {
     api.repondre("PUT", "/admin/parametres", 200, { success: true });
     rendreApp("/admin/parametres");

@@ -70,6 +70,19 @@ describe("promotions", () => {
     );
   });
 
+  it("refuse une limite d'utilisations qui n'est pas un entier positif", async () => {
+    preparer();
+    rendreApp(PAGE);
+    await userEvent.click(await screen.findByRole("button", { name: "Nouveau code promo" }));
+    const panneau = screen.getByRole("dialog", { name: "Nouveau code promo" });
+    await userEvent.type(within(panneau).getByLabelText("Code promo"), "X");
+    await userEvent.type(within(panneau).getByLabelText("Pourcentage de réduction"), "10");
+    await userEvent.type(within(panneau).getByLabelText("Limite d'utilisations (vide = illimité)"), "abc");
+    await userEvent.click(within(panneau).getByRole("button", { name: "Créer le code" }));
+    expect(within(panneau).getByRole("alert").textContent).toBe("La limite d'utilisations doit être un entier positif");
+    expect(api.ecritures()).toEqual([]);
+  });
+
   it("arrête, lance et supprime après confirmation", async () => {
     preparer();
     api.repondre("POST", "/codes-promo/cp1/activation", 200, { success: true });

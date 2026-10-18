@@ -9,7 +9,7 @@ import { EnTeteEcran } from "../../commun/EnTeteEcran";
 import { formatMontant, formatNombre } from "../../commun/formats";
 import { Formulaire } from "../../commun/Formulaire";
 import { ListeChargee } from "../../commun/ListeChargee";
-import { lireNombre } from "../../commun/saisie";
+import { lireEntier, lireNombre } from "../../commun/saisie";
 import { useEcriture } from "../../commun/useEcriture";
 import { useSession } from "../../session/Session";
 
@@ -110,6 +110,8 @@ export function Promotions() {
                       variante="discret"
                       aria-label={`${c.actif ? "Arrêter" : "Lancer"} ${c.code}`}
                       disabled={activation.desactivee}
+                      // Le service inverse l'état : un double appui l'annulerait.
+                      chargement={activation.enCours}
                       onClick={() => void activation.envoyer({ id: c.id })}
                     >
                       {c.actif ? "Arrêter" : "Lancer"}
@@ -168,13 +170,15 @@ function EditionCode({ boutiqueId, code, onFermer }: { boutiqueId: string; code:
       return setErreur(f.type === "pourcentage" ? "Le pourcentage doit être entre 1 et 100" : "Le montant doit être positif");
     }
     if (f.debut && f.fin && f.debut > f.fin) return setErreur("La date de fin est antérieure à la date de début");
+    const max = f.max.trim() ? lireEntier(f.max, 1) : null;
+    if (Number.isNaN(max)) return setErreur("La limite d'utilisations doit être un entier positif");
     setErreur(null);
     const donnees: CodePromoFormData = {
       code: f.code,
       ...(f.description ? { description: f.description } : {}),
       type_reduction: f.type,
       valeur_reduction: v,
-      max_utilisations: f.max ? Number(f.max) : null,
+      max_utilisations: max,
       date_debut: f.debut || null,
       date_fin: f.fin || null,
     };
