@@ -1,7 +1,7 @@
 // Formes des réponses de l'API, telles que les fronts les reçoivent. Types
 // seuls : l'API renvoie les lignes PostgreSQL, montants et comptages en nombres.
 // Les champs listés sont ceux que les écrans lisent ; une ligne peut en porter d'autres.
-import type { Client, Commande, CommandeFournisseur, Groupe, PrixReference, Region, Reservation, ResumeJour, RoleUtilisateur, StockDisponible, Vente } from "./types";
+import type { Client, Commande, CommandeFournisseur, Groupe, PrixReference, Region, Reservation, ResumeJour, RoleUtilisateur, StatutReservation, StockDisponible, Vente } from "./types";
 
 /** GET /auth/session, POST /auth/connexion → { utilisateur } */
 export interface SessionUtilisateur {
@@ -274,4 +274,57 @@ export interface CompteCree {
   label: string;
   email: string;
   password: string;
+}
+
+/** Vitrine : colonnes publiques d'une boutique (jamais SELECT *). */
+export interface BoutiquePublique {
+  id: string;
+  nom: string;
+  adresse: string | null;
+  telephone: string | null;
+  email: string | null;
+}
+
+/** GET /public/boutiques/:id/catalogue */
+export interface CataloguePublic {
+  boutique: BoutiquePublique;
+  produits: {
+    id: string;
+    produit_id: string;
+    produit_nom: string;
+    produit_reference: string;
+    produit_code: string | null;
+    produit_image: string | null;
+    disponible: number;
+    prix_vente: number;
+    categorie_id: string | null;
+    categorie_nom: string | null;
+  }[];
+  categories: { id: string; nom: string; nb_produits: number }[];
+}
+
+/** GET /public/reservations/:id : ni téléphone ni e-mail du client. */
+export interface ReservationPublique {
+  id: string;
+  reference_reservation: string;
+  client_nom: string;
+  boutique_id: string;
+  statut: StatutReservation;
+  montant_total: number;
+  date_retrait_prevue: string | null;
+  created_at: string;
+  boutique: BoutiquePublique | null;
+  lignes: { id: string; produit_nom: string; produit_reference: string; quantite: number; prix_unitaire: number }[];
+}
+
+/** GET /me/reservations */
+export interface ReservationClient {
+  id: string;
+  reference_reservation: string;
+  boutique_nom: string;
+  statut: StatutReservation;
+  montant_total: number;
+  nombre_articles: number;
+  created_at: string;
+  date_retrait_prevue: string | null;
 }
