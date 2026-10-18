@@ -5,13 +5,19 @@ import { CoqueBackoffice } from "./coque/CoqueBackoffice";
 import { Accueil } from "./ecrans/Accueil";
 import { Connexion } from "./ecrans/Connexion";
 import { Introuvable } from "./ecrans/Introuvable";
+import { Consolidation } from "./ecrans/tableaux/Consolidation";
+import { TableauDeBord } from "./ecrans/tableaux/TableauDeBord";
+import { VueBoutique } from "./ecrans/tableaux/VueBoutique";
 import { GardeSession } from "./session/GardeSession";
 import { FournisseurSession } from "./session/Session";
 
 const sectionIntrouvable = <EtatVide message="Page introuvable" description="Cette section n'existe pas." />;
 
 /** Écrans d'une boutique, sous /b/:boutiqueId. */
-export const routesBoutique: RouteObject[] = [{ path: "*", element: sectionIntrouvable }];
+export const routesBoutique: RouteObject[] = [
+  { index: true, element: <VueBoutique /> },
+  { path: "*", element: sectionIntrouvable },
+];
 
 /** Écrans de l'administration, sous /admin. */
 export const routesAdmin: RouteObject[] = [{ path: "*", element: sectionIntrouvable }];
@@ -31,7 +37,11 @@ export const routes: RouteObject[] = [
           { index: true, element: <Accueil /> },
           {
             element: <CoqueBackoffice />,
-            children: [{ path: "b/:boutiqueId", children: routesBoutique }],
+            children: [
+              { path: "tableau-de-bord", element: <TableauDeBord /> },
+              { path: "consolidation", element: <Consolidation /> },
+              { path: "b/:boutiqueId", children: routesBoutique },
+            ],
           },
           { path: "admin", element: <CoqueAdmin />, children: routesAdmin },
         ],

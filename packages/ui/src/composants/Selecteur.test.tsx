@@ -25,6 +25,12 @@ describe("Selecteur", () => {
     expect(screen.getByRole("option", { name: "Aucun client" })).toBeTruthy();
   });
 
+  it("garde un nom accessible quand le libellé est masqué", () => {
+    render(<Selecteur libelle="Boutique" libelleMasque options={OPTIONS} />);
+    expect(screen.getByRole("combobox", { name: "Boutique" })).toBeTruthy();
+    expect(screen.getByText("Boutique").className).toContain("sr-only");
+  });
+
   it("sans violation d'accessibilité", async () => {
     const { container } = render(<Selecteur libelle="Boutique" options={OPTIONS} aide="Boutique de destination" />);
     await sansViolation(container);

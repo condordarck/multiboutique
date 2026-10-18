@@ -13,9 +13,11 @@ export interface SelecteurProps extends SelectHTMLAttributes<HTMLSelectElement> 
   optionVide?: string;
   aide?: string;
   erreur?: string;
+  /** Libellé lu par les lecteurs d'écran seulement (en-tête compact). */
+  libelleMasque?: boolean;
 }
 
-export function Selecteur({ libelle, options, optionVide, aide, erreur, id, className, ...reste }: SelecteurProps) {
+export function Selecteur({ libelle, options, optionVide, aide, erreur, libelleMasque = false, id, className, ...reste }: SelecteurProps) {
   const idAuto = useId();
   const idChamp = id ?? idAuto;
   const idAide = `${idChamp}-aide`;
@@ -24,7 +26,7 @@ export function Selecteur({ libelle, options, optionVide, aide, erreur, id, clas
 
   return (
     <div className="flex flex-col gap-1.5">
-      <label htmlFor={idChamp} className="text-libelle font-semibold text-texte">
+      <label htmlFor={idChamp} className={libelleMasque ? "sr-only" : "text-libelle font-semibold text-texte"}>
         {libelle}
       </label>
       <select

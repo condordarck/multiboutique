@@ -43,7 +43,8 @@ export function TuileChiffre({
       <span className={clsx("text-libelle", miseEnAvant ? "font-semibold" : "text-texte-discret")}>
         {libelle}
       </span>
-      <span className="text-chiffre font-bold tabular-nums">{valeur}</span>
+      {/* Plus petit sur téléphone, où les tuiles vont par deux. */}
+      <span className="text-[1.5rem] leading-tight font-bold tabular-nums [overflow-wrap:anywhere] tablette:text-chiffre">{valeur}</span>
       {/* La variation s'écrit en toutes lettres : une flèche ou une couleur
           seules ne disent rien à un lecteur d'écran ni à un daltonien. */}
       {variation && (

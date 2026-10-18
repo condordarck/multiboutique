@@ -61,7 +61,26 @@ const PAGES: Record<string, string> = {
 };
 
 // Pages pas encore reprises : chaque tâche d'écran en retire ; la tâche 14 vide la liste.
-const PAGES_MANQUANTES = new Set<string>(Object.keys(PAGES).filter((p) => p !== "(auth)/login/page.tsx"));
+const PAGES_MANQUANTES = new Set<string>([
+  "(dashboard)/dashboard/[boutiqueId]/ventes/page.tsx",
+  "(dashboard)/dashboard/[boutiqueId]/ventes/[venteId]/page.tsx",
+  "(dashboard)/dashboard/[boutiqueId]/produits/page.tsx",
+  "(dashboard)/dashboard/[boutiqueId]/stock/page.tsx",
+  "(dashboard)/dashboard/[boutiqueId]/clients/page.tsx",
+  "(dashboard)/dashboard/[boutiqueId]/promotions/page.tsx",
+  "(dashboard)/dashboard/[boutiqueId]/commandes/page.tsx",
+  "(dashboard)/dashboard/[boutiqueId]/reservations/page.tsx",
+  "(dashboard)/dashboard/[boutiqueId]/achats/page.tsx",
+  "(dashboard)/dashboard/[boutiqueId]/prix-conseilles/page.tsx",
+  "(dashboard)/dashboard/[boutiqueId]/rapports/page.tsx",
+  "(admin)/admin/page.tsx",
+  "(admin)/admin/utilisateurs/page.tsx",
+  "(admin)/admin/boutiques/page.tsx",
+  "(admin)/admin/organisation/page.tsx",
+  "(admin)/admin/categories/page.tsx",
+  "(admin)/admin/roles/page.tsx",
+  "(admin)/admin/parametres/page.tsx",
+]);
 
 const APP = fileURLToPath(new URL("../../../app/", import.meta.url));
 

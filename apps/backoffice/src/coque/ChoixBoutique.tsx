@@ -21,9 +21,10 @@ export function ChoixBoutique({ boutiques, courante }: { boutiques: BoutiqueResu
   }
 
   return (
-    <div className="w-56">
+    <div className="w-48 tablette:w-56">
       <Selecteur
         libelle="Boutique"
+        libelleMasque
         className="min-h-11"
         options={boutiques.map((b) => ({ valeur: b.id, libelle: b.nom }))}
         optionVide={actuelle ? undefined : "Choisir une boutique"}
