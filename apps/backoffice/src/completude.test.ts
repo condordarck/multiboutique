@@ -13,7 +13,7 @@ const OUTILS = new Set(["ErreurMetier", "exigerAccesBoutique", "exigerAdministra
 
 // Services qui ne relèvent pas du backoffice.
 const EXCLUS = new Set([
-  "creerReservation", // réservation de la vitrine : phase 4
+  "creerReservation", // couvert par la vitrine (apps/www)
   // « Payée » et stock déduit sans vente : aucun écran dans le monolithe, recoupe
   // encaisserReservation. Non exposé tant que le besoin n'est pas décidé.
   "validerReservation",
