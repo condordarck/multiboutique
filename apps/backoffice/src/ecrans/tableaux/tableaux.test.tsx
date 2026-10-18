@@ -1,8 +1,8 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { sansViolation } from "../../../test/axe";
+import { sansViolation } from "@multiboutique/front/test/axe";
+import { fauxApi, type FauxApi } from "@multiboutique/front/test/faux-api";
 import { BOUTIQUE_DETAIL, CONSOLIDATION, RESUME_BOUTIQUE, resumeJour } from "../../../test/donnees";
-import { fauxApi, type FauxApi } from "../../../test/faux-api";
 import { BOUTIQUE_1, BOUTIQUE_2, connecte, rendreApp, utilisateur } from "../../../test/rendu";
 
 let api: FauxApi;

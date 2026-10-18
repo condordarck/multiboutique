@@ -1,25 +1,14 @@
-import type { BoutiqueResumee, Parametres } from "@multiboutique/shared";
+import type { BoutiqueResumee } from "@multiboutique/shared";
 import { useQuery } from "@tanstack/react-query";
-import { appeler } from "./client";
+import { appeler, CLE_PARAMETRES } from "@multiboutique/front";
+
+// Paramètres (monnaie…) : lecture commune aux deux fronts, dans @multiboutique/front.
+export { useMonnaie, useParametres } from "@multiboutique/front";
 
 export const cles = {
-  parametres: ["parametres"] as const,
+  parametres: CLE_PARAMETRES,
   mesBoutiques: ["me", "boutiques"] as const,
 };
-
-export function useParametres(options: { refetchOnMount?: "always" } = {}) {
-  return useQuery({
-    queryKey: cles.parametres,
-    queryFn: () => appeler<Parametres>("GET", "/parametres"),
-    staleTime: 5 * 60_000,
-    ...options,
-  });
-}
-
-/** Le symbole monétaire ; « $ » tant que les paramètres ne sont pas lus (défaut du monolithe). */
-export function useMonnaie(): string {
-  return useParametres().data?.monnaie ?? "$";
-}
 
 export function useMesBoutiques() {
   return useQuery({

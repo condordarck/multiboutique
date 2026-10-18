@@ -4,11 +4,7 @@ import { useParams } from "react-router";
 import { useMonnaie } from "../../api/generales";
 import { useBoutique } from "../../api/tableaux";
 import { annulerVente, LIBELLES_PAIEMENT, useVente } from "../../api/ventes";
-import { EnTeteEcran } from "../../commun/EnTeteEcran";
-import { Lecture } from "../../commun/Lecture";
-import { LienBouton } from "../../commun/LienBouton";
-import { useEcriture } from "../../commun/useEcriture";
-import { useSession } from "../../session/Session";
+import { EnTeteEcran, Lecture, LienBouton, useEcriture, useSession } from "@multiboutique/front";
 import { Ticket } from "./Ticket";
 
 /**

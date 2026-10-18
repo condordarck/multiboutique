@@ -1,5 +1,5 @@
 import { Bouton, Champ, Selecteur } from "@multiboutique/ui";
-import { lireEntier, lireNombre } from "./saisie";
+import { lireEntier, lireNombre } from "@multiboutique/front";
 
 export interface LigneSaisie {
   produit_id: string;

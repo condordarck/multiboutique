@@ -8,7 +8,7 @@ import type {
   StatistiquesAdmin,
 } from "@multiboutique/shared";
 import { useQuery } from "@tanstack/react-query";
-import { appeler } from "./client";
+import { appeler } from "@multiboutique/front";
 
 const cle = (...suite: string[]) => ["admin", ...suite] as const;
 

@@ -4,13 +4,7 @@ import { useParams } from "react-router";
 import { appliquerPrixConseilles, publierPrixReference, usePrixConseilles } from "../../api/achats";
 import { useMonnaie } from "../../api/generales";
 import { useBoutique } from "../../api/tableaux";
-import { EnTeteEcran } from "../../commun/EnTeteEcran";
-import { formatMontant } from "../../commun/formats";
-import { Formulaire } from "../../commun/Formulaire";
-import { ListeChargee } from "../../commun/ListeChargee";
-import { lireNombre } from "../../commun/saisie";
-import { useEcriture } from "../../commun/useEcriture";
-import { useSession } from "../../session/Session";
+import { EnTeteEcran, formatMontant, Formulaire, lireNombre, ListeChargee, useEcriture, useSession } from "@multiboutique/front";
 
 /** Grille de prix du siège (app/(dashboard)/dashboard/[boutiqueId]/prix-conseilles/page.tsx). */
 export function PrixConseilles() {

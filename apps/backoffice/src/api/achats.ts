@@ -1,6 +1,6 @@
 import type { CommandeFournisseurListee, Fournisseur, GrillePrixConseilles } from "@multiboutique/shared";
 import { useQuery } from "@tanstack/react-query";
-import { appeler } from "./client";
+import { appeler } from "@multiboutique/front";
 import { cle } from "./tableaux";
 
 export const useFournisseurs = (boutiqueId: string) =>

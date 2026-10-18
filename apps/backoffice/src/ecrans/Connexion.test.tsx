@@ -1,8 +1,8 @@
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { EVENEMENT_SESSION_EXPIREE } from "../api/client";
-import { fauxApi, type FauxApi } from "../../test/faux-api";
+import { EVENEMENT_SESSION_EXPIREE } from "@multiboutique/front";
+import { fauxApi, type FauxApi } from "@multiboutique/front/test/faux-api";
 import { BOUTIQUE_1, connecte, rendreApp, utilisateur } from "../../test/rendu";
 
 let api: FauxApi;

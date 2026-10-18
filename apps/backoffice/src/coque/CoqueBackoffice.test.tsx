@@ -1,9 +1,9 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
-import { fauxApi, type FauxApi } from "../../test/faux-api";
+import { fauxApi, type FauxApi } from "@multiboutique/front/test/faux-api";
+import { sansViolation } from "@multiboutique/front/test/axe";
 import { BOUTIQUE_1, BOUTIQUE_2, connecte, rendreApp, utilisateur } from "../../test/rendu";
-import { sansViolation } from "../../test/axe";
 
 let api: FauxApi;
 afterEach(() => {

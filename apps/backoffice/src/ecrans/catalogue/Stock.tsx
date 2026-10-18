@@ -5,14 +5,7 @@ import { useParams, useSearchParams } from "react-router";
 import { ajusterStock, entrerStock, transfertStock, useMouvements, useStock } from "../../api/catalogue";
 import { useMesBoutiques, useMonnaie } from "../../api/generales";
 import { useBoutique } from "../../api/tableaux";
-import { EnTeteEcran } from "../../commun/EnTeteEcran";
-import { formatMontant, formatNombre } from "../../commun/formats";
-import { Formulaire } from "../../commun/Formulaire";
-import { ListeChargee } from "../../commun/ListeChargee";
-import { correspond } from "../../commun/recherche";
-import { lireEntier } from "../../commun/saisie";
-import { useEcriture } from "../../commun/useEcriture";
-import { useSession } from "../../session/Session";
+import { correspond, EnTeteEcran, formatMontant, formatNombre, Formulaire, lireEntier, ListeChargee, useEcriture, useSession } from "@multiboutique/front";
 
 type Filtre = "tous" | "alerte" | "rupture";
 

@@ -7,14 +7,7 @@ import { useClientsActifs } from "../../api/clients";
 import { useMonnaie } from "../../api/generales";
 import { useBoutique } from "../../api/tableaux";
 import { creerVente, LIBELLES_PAIEMENT } from "../../api/ventes";
-import { EnTeteEcran } from "../../commun/EnTeteEcran";
-import { formatMontant, formatNombre } from "../../commun/formats";
-import { Lecture } from "../../commun/Lecture";
-import { LienBouton } from "../../commun/LienBouton";
-import { correspond } from "../../commun/recherche";
-import { lireNombre } from "../../commun/saisie";
-import { useEcriture } from "../../commun/useEcriture";
-import { useSession, useUtilisateur } from "../../session/Session";
+import { correspond, EnTeteEcran, formatMontant, formatNombre, Lecture, LienBouton, lireNombre, useEcriture, useSession, useUtilisateur } from "@multiboutique/front";
 import { Ticket, type TicketProps } from "./Ticket";
 
 const MODES: { valeur: ModePaiement; libelle: string }[] = [

@@ -16,14 +16,8 @@ import {
 import { useProduits } from "../../api/catalogue";
 import { useMonnaie } from "../../api/generales";
 import { useBoutique } from "../../api/tableaux";
-import { EnTeteEcran } from "../../commun/EnTeteEcran";
-import { formatMontant, formatNombre } from "../../commun/formats";
-import { Formulaire } from "../../commun/Formulaire";
+import { EnTeteEcran, formatMontant, formatNombre, Formulaire, lireEntier, lireNombre, ListeChargee, useEcriture, useSession } from "@multiboutique/front";
 import { LignesArticles, lignesInvalides, type LigneSaisie } from "../../commun/LignesArticles";
-import { ListeChargee } from "../../commun/ListeChargee";
-import { lireEntier, lireNombre } from "../../commun/saisie";
-import { useEcriture } from "../../commun/useEcriture";
-import { useSession } from "../../session/Session";
 
 const STATUTS: Record<StatutCmdFournisseur, { libelle: string; ton: TonBadge }> = {
   en_attente: { libelle: "En attente", ton: "alerte" },

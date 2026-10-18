@@ -2,8 +2,7 @@ import type { Client, TypeClient } from "@multiboutique/shared";
 import { CaseACocher, Champ, Selecteur } from "@multiboutique/ui";
 import { useState, type ReactNode } from "react";
 import type { ClientSaisi } from "../../api/clients";
-import { Formulaire } from "../../commun/Formulaire";
-import { lireNombre } from "../../commun/saisie";
+import { Formulaire, lireNombre } from "@multiboutique/front";
 
 interface Props {
   initial?: Client;

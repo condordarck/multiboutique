@@ -1,7 +1,7 @@
 import { Coque } from "@multiboutique/ui";
 import icone from "@multiboutique/ui/assets/icone.svg";
 import { Navigate, Outlet, useLocation } from "react-router";
-import { useUtilisateur } from "../session/Session";
+import { useUtilisateur } from "@multiboutique/front";
 import { EnTete } from "./EnTete";
 import { ICONES } from "./icones-sections";
 import { LienRouteur } from "./LienRouteur";

@@ -4,12 +4,8 @@ import { clsx } from "clsx";
 import { Link, useParams } from "react-router";
 import { useMonnaie } from "../../api/generales";
 import { useBoutique, useResumeBoutique } from "../../api/tableaux";
-import { EnTeteEcran } from "../../commun/EnTeteEcran";
-import { formatMontant, formatNombre } from "../../commun/formats";
-import { Lecture } from "../../commun/Lecture";
-import { LienBouton } from "../../commun/LienBouton";
+import { EnTeteEcran, formatMontant, formatNombre, Lecture, LienBouton, useSession } from "@multiboutique/front";
 import { IconeReservations, IconeStock, IconeVentes } from "../../icones";
-import { useSession } from "../../session/Session";
 
 function Raccourci({ to, icone, titre, texte }: { to: string; icone: ReactNode; titre: string; texte: string }) {
   return (

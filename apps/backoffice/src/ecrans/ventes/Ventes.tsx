@@ -3,11 +3,7 @@ import { useParams } from "react-router";
 import { useMonnaie } from "../../api/generales";
 import { useBoutique } from "../../api/tableaux";
 import { LIBELLES_PAIEMENT, useStatistiquesVentes, useVentes } from "../../api/ventes";
-import { EnTeteEcran } from "../../commun/EnTeteEcran";
-import { formatMontant, formatNombre } from "../../commun/formats";
-import { ListeChargee } from "../../commun/ListeChargee";
-import { LienBouton } from "../../commun/LienBouton";
-import { useSession } from "../../session/Session";
+import { EnTeteEcran, formatMontant, formatNombre, LienBouton, ListeChargee, useSession } from "@multiboutique/front";
 
 export const BADGES_VENTE = {
   validee: <Badge ton="succes">Validée</Badge>,

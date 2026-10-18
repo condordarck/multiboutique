@@ -1,9 +1,7 @@
 import { TuileChiffre } from "@multiboutique/ui";
 import { Link } from "react-router";
 import { useStatistiquesAdmin } from "../../api/administration";
-import { EnTeteEcran } from "../../commun/EnTeteEcran";
-import { formatNombre } from "../../commun/formats";
-import { Lecture } from "../../commun/Lecture";
+import { EnTeteEcran, formatNombre, Lecture } from "@multiboutique/front";
 
 const RACCOURCIS = [
   { to: "/admin/utilisateurs", titre: "Utilisateurs", texte: "Créer des comptes pour chaque profil (gérant, vendeur, comptable…) et leur attribuer des boutiques." },

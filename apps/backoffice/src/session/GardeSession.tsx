@@ -1,6 +1,5 @@
 import { Navigate, Outlet, useLocation } from "react-router";
-import { Chargement } from "../commun/Chargement";
-import { useSession } from "./Session";
+import { Chargement, useSession } from "@multiboutique/front";
 
 /** Sans session, renvoie à la connexion en retenant l'écran demandé. */
 export function GardeSession() {

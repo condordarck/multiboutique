@@ -6,9 +6,7 @@ import { useMonnaie } from "../../api/generales";
 import { useRapport } from "../../api/rapports";
 import { useBoutique } from "../../api/tableaux";
 import { LIBELLES_PAIEMENT } from "../../api/ventes";
-import { EnTeteEcran } from "../../commun/EnTeteEcran";
-import { formatMontant, formatNombre } from "../../commun/formats";
-import { Lecture } from "../../commun/Lecture";
+import { EnTeteEcran, formatMontant, formatNombre, Lecture } from "@multiboutique/front";
 
 const PERIODES = [
   { valeur: "jour", libelle: "Journalier" },

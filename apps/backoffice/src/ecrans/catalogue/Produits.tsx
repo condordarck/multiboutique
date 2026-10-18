@@ -5,17 +5,9 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { useParams } from "react-router";
 import { creerProduit, disponible, entrerStock, modifierPrix, useCategories, useProduits } from "../../api/catalogue";
-import { ErreurApi, televerser, urlImage } from "../../api/client";
+import { correspond, EnTeteEcran, ErreurApi, formatMontant, formatNombre, Formulaire, lireEntier, lireNombre, ListeChargee, televerser, urlImage, useEcriture, useSession } from "@multiboutique/front";
 import { useMonnaie } from "../../api/generales";
 import { useBoutique } from "../../api/tableaux";
-import { EnTeteEcran } from "../../commun/EnTeteEcran";
-import { formatMontant, formatNombre } from "../../commun/formats";
-import { Formulaire } from "../../commun/Formulaire";
-import { ListeChargee } from "../../commun/ListeChargee";
-import { correspond } from "../../commun/recherche";
-import { lireEntier, lireNombre } from "../../commun/saisie";
-import { useEcriture } from "../../commun/useEcriture";
-import { useSession } from "../../session/Session";
 
 /** Catalogue et prix de la boutique (app/(dashboard)/dashboard/[boutiqueId]/produits/page.tsx). */
 export function Produits() {

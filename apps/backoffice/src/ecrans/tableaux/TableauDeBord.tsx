@@ -3,11 +3,7 @@ import { Badge, Carte, EtatVide, ListeAdaptative, TuileChiffre } from "@multibou
 import { Navigate } from "react-router";
 import { useMonnaie } from "../../api/generales";
 import { useResumeGlobal } from "../../api/tableaux";
-import { EnTeteEcran } from "../../commun/EnTeteEcran";
-import { formatMontant, formatNombre } from "../../commun/formats";
-import { Lecture } from "../../commun/Lecture";
-import { LienBouton } from "../../commun/LienBouton";
-import { useUtilisateur } from "../../session/Session";
+import { EnTeteEcran, formatMontant, formatNombre, Lecture, LienBouton, useUtilisateur } from "@multiboutique/front";
 
 const somme = (lignes: ResumeJour[], champ: keyof ResumeJour) => lignes.reduce((a, r) => a + (Number(r[champ]) || 0), 0);
 

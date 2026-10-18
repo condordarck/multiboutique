@@ -2,11 +2,7 @@ import { Badge, Carte, EtatVide, ListeAdaptative, TuileChiffre } from "@multibou
 import { Navigate } from "react-router";
 import { useMonnaie } from "../../api/generales";
 import { useConsolidation } from "../../api/tableaux";
-import { EnTeteEcran } from "../../commun/EnTeteEcran";
-import { formatMontant, formatNombre } from "../../commun/formats";
-import { Lecture } from "../../commun/Lecture";
-import { LienBouton } from "../../commun/LienBouton";
-import { useSession } from "../../session/Session";
+import { EnTeteEcran, formatMontant, formatNombre, Lecture, LienBouton, useSession } from "@multiboutique/front";
 
 /** Pilotage du siège (app/(dashboard)/dashboard/consolidation/page.tsx). */
 export function Consolidation() {

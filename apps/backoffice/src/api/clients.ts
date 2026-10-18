@@ -1,6 +1,6 @@
 import type { ClientActif, CodePromo, CodePromoFormData, DossiersClients, LigneRegistre, TypeClient } from "@multiboutique/shared";
 import { useQuery } from "@tanstack/react-query";
-import { appeler } from "./client";
+import { appeler } from "@multiboutique/front";
 import { cle } from "./tableaux";
 
 /** Liste réduite des clients actifs (caisse, commandes). */

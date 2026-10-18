@@ -1,9 +1,7 @@
 import { Bouton, Champ, Logotype } from "@multiboutique/ui";
 import { useState, type FormEvent } from "react";
 import { Navigate, useSearchParams } from "react-router";
-import { ErreurApi } from "../api/client";
-import { retourSain } from "../session/redirection";
-import { useSession } from "../session/Session";
+import { ErreurApi, retourSain, useSession } from "@multiboutique/front";
 
 export function Connexion() {
   const { utilisateur, connecter } = useSession();

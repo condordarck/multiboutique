@@ -10,10 +10,7 @@ import {
   useComptesBoutique,
   type BoutiqueSaisie,
 } from "../../api/administration";
-import { EnTeteEcran } from "../../commun/EnTeteEcran";
-import { Formulaire } from "../../commun/Formulaire";
-import { ListeChargee } from "../../commun/ListeChargee";
-import { useEcriture } from "../../commun/useEcriture";
+import { EnTeteEcran, Formulaire, ListeChargee, useEcriture } from "@multiboutique/front";
 import { ComptesCrees } from "./ComptesCrees";
 
 type LigneBoutique = Donnees["boutiques"][number];

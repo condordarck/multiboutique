@@ -6,11 +6,7 @@ import { annulerReservation, confirmerReservation, encaisserReservation, useRese
 import { useMonnaie } from "../../api/generales";
 import { useBoutique } from "../../api/tableaux";
 import { LIBELLES_PAIEMENT } from "../../api/ventes";
-import { EnTeteEcran } from "../../commun/EnTeteEcran";
-import { formatMontant, formatNombre } from "../../commun/formats";
-import { ListeChargee } from "../../commun/ListeChargee";
-import { useEcriture } from "../../commun/useEcriture";
-import { useSession, useUtilisateur } from "../../session/Session";
+import { EnTeteEcran, formatMontant, formatNombre, ListeChargee, useEcriture, useSession, useUtilisateur } from "@multiboutique/front";
 import { Ticket, type TicketProps } from "../ventes/Ticket";
 
 const STATUTS: Record<StatutReservation, { libelle: string; ton: TonBadge }> = {

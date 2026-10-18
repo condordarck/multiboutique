@@ -8,12 +8,8 @@ import {
   toggleActifUtilisateur,
   useComptesAdmin,
 } from "../../api/administration";
-import { EnTeteEcran } from "../../commun/EnTeteEcran";
-import { Formulaire } from "../../commun/Formulaire";
-import { ListeChargee } from "../../commun/ListeChargee";
-import { useEcriture } from "../../commun/useEcriture";
+import { EnTeteEcran, Formulaire, ListeChargee, useEcriture, useUtilisateur } from "@multiboutique/front";
 import { LIBELLES_ROLE } from "../../coque/navigation";
-import { useUtilisateur } from "../../session/Session";
 
 const ROLES: { valeur: RoleUtilisateur; libelle: string }[] = [
   { valeur: "administrateur", libelle: "Administrateur — Configuration générale du système" },

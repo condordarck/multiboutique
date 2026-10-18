@@ -1,6 +1,6 @@
 import type { BoutiqueResumee, Consolidation, ResumeBoutique, ResumeJour } from "@multiboutique/shared";
 import { useQuery } from "@tanstack/react-query";
-import { appeler } from "./client";
+import { appeler } from "@multiboutique/front";
 
 /**
  * Clés des lectures. Toutes celles d'une boutique commencent par

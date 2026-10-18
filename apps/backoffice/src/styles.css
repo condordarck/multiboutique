@@ -4,6 +4,7 @@
 /* Les composants vivent dans packages/ui, hors du dossier de l'app :
    Tailwind ne les analyse que si on le lui dit. */
 @source "../../../packages/ui/src";
+@source "../../../packages/front/src";
 
 @layer base {
   body {

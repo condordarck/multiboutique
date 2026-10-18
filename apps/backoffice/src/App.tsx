@@ -3,9 +3,8 @@ import { QueryClient } from "@tanstack/react-query";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { createBrowserRouter, RouterProvider } from "react-router";
 import { persistance } from "./hors-ligne/instance";
-import { DUREE_CACHE_MS, verifierProprietaire } from "./hors-ligne/persistance";
+import { DUREE_CACHE_MS, surConnexion, surDeconnexion, verifierProprietaire } from "@multiboutique/front";
 import { routes } from "./routes";
-import { surConnexion, surDeconnexion } from "./session/Session";
 
 export { routes };
 

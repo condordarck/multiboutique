@@ -14,13 +14,7 @@ import {
 } from "../../api/clients";
 import { useMonnaie } from "../../api/generales";
 import { useBoutique } from "../../api/tableaux";
-import { EnTeteEcran } from "../../commun/EnTeteEcran";
-import { formatMontant, formatNombre } from "../../commun/formats";
-import { Formulaire } from "../../commun/Formulaire";
-import { ListeChargee } from "../../commun/ListeChargee";
-import { lireNombre } from "../../commun/saisie";
-import { useEcriture } from "../../commun/useEcriture";
-import { useSession } from "../../session/Session";
+import { EnTeteEcran, formatMontant, formatNombre, Formulaire, lireNombre, ListeChargee, useEcriture, useSession } from "@multiboutique/front";
 import { FormulaireClient } from "./FormulaireClient";
 
 const somme = (clients: Client[], champ: "encours" | "plafond_credit") => clients.reduce((s, c) => s + (Number(c[champ]) || 0), 0);

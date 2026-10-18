@@ -3,11 +3,7 @@ import { Carte, Champ } from "@multiboutique/ui";
 import { useState } from "react";
 import { INVALIDE_ADMIN, mettreAJourParametres } from "../../api/administration";
 import { cles, useParametres } from "../../api/generales";
-import { EnTeteEcran } from "../../commun/EnTeteEcran";
-import { Formulaire } from "../../commun/Formulaire";
-import { Lecture } from "../../commun/Lecture";
-import { lireEntier } from "../../commun/saisie";
-import { useEcriture } from "../../commun/useEcriture";
+import { EnTeteEcran, Formulaire, Lecture, lireEntier, useEcriture } from "@multiboutique/front";
 
 /** app/(admin)/admin/parametres/page.tsx */
 export function ParametresAdmin() {

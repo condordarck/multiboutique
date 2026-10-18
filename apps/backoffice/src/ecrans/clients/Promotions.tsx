@@ -5,13 +5,7 @@ import { useParams } from "react-router";
 import { creerCodePromo, modifierCodePromo, supprimerCodePromo, toggleActifCodePromo, useCodesPromo } from "../../api/clients";
 import { useMonnaie } from "../../api/generales";
 import { useBoutique } from "../../api/tableaux";
-import { EnTeteEcran } from "../../commun/EnTeteEcran";
-import { formatMontant, formatNombre } from "../../commun/formats";
-import { Formulaire } from "../../commun/Formulaire";
-import { ListeChargee } from "../../commun/ListeChargee";
-import { lireEntier, lireNombre } from "../../commun/saisie";
-import { useEcriture } from "../../commun/useEcriture";
-import { useSession } from "../../session/Session";
+import { EnTeteEcran, formatMontant, formatNombre, Formulaire, lireEntier, lireNombre, ListeChargee, useEcriture, useSession } from "@multiboutique/front";
 
 const enDate = (d: string | null) => (d ? new Date(d).toISOString().slice(0, 10) : "");
 const affichageDate = (d: string | null) => (d ? new Date(d).toLocaleDateString("fr-FR") : null);

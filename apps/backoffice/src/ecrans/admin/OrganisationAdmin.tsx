@@ -2,11 +2,7 @@ import type { Organisation } from "@multiboutique/shared";
 import { Badge, Bouton, Carte, Champ, Panneau, Selecteur, TuileChiffre } from "@multiboutique/ui";
 import { useId, useState } from "react";
 import { creerGroupe, creerRegion, INVALIDE_ADMIN, modifierGroupe, modifierRegion, useOrganisation, type GroupeSaisi } from "../../api/administration";
-import { EnTeteEcran } from "../../commun/EnTeteEcran";
-import { formatNombre } from "../../commun/formats";
-import { Formulaire } from "../../commun/Formulaire";
-import { Lecture } from "../../commun/Lecture";
-import { useEcriture } from "../../commun/useEcriture";
+import { EnTeteEcran, formatNombre, Formulaire, Lecture, useEcriture } from "@multiboutique/front";
 
 type Groupe = Organisation["groupes"][number];
 type Region = Organisation["regions"][number];

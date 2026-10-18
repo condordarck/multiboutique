@@ -1,7 +1,6 @@
 import { Bouton, EtatVide } from "@multiboutique/ui";
 import { Navigate } from "react-router";
-import { accueilDu } from "../session/redirection";
-import { useSession, useUtilisateur } from "../session/Session";
+import { accueilDu, useSession, useUtilisateur } from "@multiboutique/front";
 
 /** La racine envoie chacun vers son écran ; sans boutique, explique pourquoi. */
 export function Accueil() {

@@ -2,11 +2,7 @@ import type { CategorieAdmin } from "@multiboutique/shared";
 import { Bouton, Carte, Champ, Dialogue, Panneau } from "@multiboutique/ui";
 import { useState } from "react";
 import { creerCategorie, INVALIDE_ADMIN, modifierCategorie, supprimerCategorie, useCategoriesAdmin } from "../../api/administration";
-import { EnTeteEcran } from "../../commun/EnTeteEcran";
-import { formatNombre } from "../../commun/formats";
-import { Formulaire } from "../../commun/Formulaire";
-import { ListeChargee } from "../../commun/ListeChargee";
-import { useEcriture } from "../../commun/useEcriture";
+import { EnTeteEcran, formatNombre, Formulaire, ListeChargee, useEcriture } from "@multiboutique/front";
 
 /** app/(admin)/admin/categories/page.tsx */
 export function CategoriesAdmin() {

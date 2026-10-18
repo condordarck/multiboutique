@@ -8,13 +8,7 @@ import { useClientsActifs } from "../../api/clients";
 import { annulerCommande, confirmerCommande, creerCommande, livrerCommande, useCommandes } from "../../api/commandes";
 import { useMonnaie } from "../../api/generales";
 import { useBoutique } from "../../api/tableaux";
-import { EnTeteEcran } from "../../commun/EnTeteEcran";
-import { formatDate, formatMontant } from "../../commun/formats";
-import { Formulaire } from "../../commun/Formulaire";
-import { ListeChargee } from "../../commun/ListeChargee";
-import { lireNombre } from "../../commun/saisie";
-import { useEcriture } from "../../commun/useEcriture";
-import { useSession } from "../../session/Session";
+import { EnTeteEcran, formatDate, formatMontant, Formulaire, lireNombre, ListeChargee, useEcriture, useSession } from "@multiboutique/front";
 
 const STATUTS: Record<StatutCommande, { libelle: string; ton: TonBadge }> = {
   en_attente: { libelle: "En attente", ton: "alerte" },

@@ -1,6 +1,6 @@
 import { clsx } from "clsx";
 import { useEffect, useId, useRef, useState } from "react";
-import { useSession, useUtilisateur } from "../session/Session";
+import { useSession, useUtilisateur } from "@multiboutique/front";
 import { LIBELLES_ROLE } from "./navigation";
 
 const FOCUS = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus";

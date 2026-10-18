@@ -1,11 +1,8 @@
 import { Carte } from "@multiboutique/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { ErreurApi } from "../../api/client";
+import { EnTeteEcran, ErreurApi, Lecture, useEnLigne } from "@multiboutique/front";
 import { togglePermissionRole, useRolesPermissions } from "../../api/administration";
-import { EnTeteEcran } from "../../commun/EnTeteEcran";
-import { Lecture } from "../../commun/Lecture";
-import { useEnLigne } from "../../commun/useEnLigne";
 
 // Mêmes groupes, libellés et colonnes que components/admin/RolesPerms.tsx.
 const GROUPES = [

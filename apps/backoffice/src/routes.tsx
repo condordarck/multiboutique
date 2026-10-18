@@ -20,9 +20,8 @@ import { ParametresAdmin } from "./ecrans/admin/ParametresAdmin";
 import { Roles } from "./ecrans/admin/Roles";
 import { Utilisateurs } from "./ecrans/admin/Utilisateurs";
 import { Introuvable } from "./ecrans/Introuvable";
-import { BandeauHorsLigne } from "./hors-ligne/BandeauHorsLigne";
-import { GardeProprietaire } from "./hors-ligne/GardeProprietaire";
-import { MiseAJour } from "./hors-ligne/MiseAJour";
+import { BandeauHorsLigne, FournisseurSession, GardeProprietaire, MiseAJour } from "@multiboutique/front";
+import { persistance } from "./hors-ligne/instance";
 import { Rapports } from "./ecrans/rapports/Rapports";
 import { Consolidation } from "./ecrans/tableaux/Consolidation";
 import { TableauDeBord } from "./ecrans/tableaux/TableauDeBord";
@@ -31,7 +30,6 @@ import { Caisse } from "./ecrans/ventes/Caisse";
 import { DetailVente } from "./ecrans/ventes/DetailVente";
 import { Ventes } from "./ecrans/ventes/Ventes";
 import { GardeSession } from "./session/GardeSession";
-import { FournisseurSession } from "./session/Session";
 
 const sectionIntrouvable = <EtatVide message="Page introuvable" description="Cette section n'existe pas." />;
 
@@ -69,7 +67,7 @@ export const routes: RouteObject[] = [
   {
     element: (
       <FournisseurSession>
-        <GardeProprietaire />
+        <GardeProprietaire purger={persistance.purger} />
         <MiseAJour />
         <BandeauHorsLigne />
         <Outlet />

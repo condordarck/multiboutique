@@ -17,7 +17,7 @@ export default defineConfig({
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
-    command: "npx tsx e2e/serveurs.ts",
+    command: "npx tsx e2e/lancer.ts",
     url: `http://localhost:${PORT_FRONT}`,
     timeout: 120_000,
     reuseExistingServer: false,

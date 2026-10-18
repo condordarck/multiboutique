@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { routes } from "../src/routes";
-import type { FauxApi } from "./faux-api";
+import type { FauxApi } from "@multiboutique/front/test/faux-api";
 
 /** Rend l'application entière à l'adresse donnée, sur le faux serveur. */
 export function rendreApp(chemin: string) {

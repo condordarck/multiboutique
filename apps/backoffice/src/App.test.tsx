@@ -1,6 +1,6 @@
 import { screen } from "@testing-library/react";
 import { afterEach, expect, it } from "vitest";
-import { fauxApi, type FauxApi } from "../test/faux-api";
+import { fauxApi, type FauxApi } from "@multiboutique/front/test/faux-api";
 import { rendreApp } from "../test/rendu";
 
 let api: FauxApi;

@@ -1,6 +1,6 @@
 import type { CategorieResumee, LigneStock, Mouvement, ProduitBoutique } from "@multiboutique/shared";
 import { useQuery } from "@tanstack/react-query";
-import { appeler } from "./client";
+import { appeler } from "@multiboutique/front";
 import { cle } from "./tableaux";
 
 export const cleProduits = (boutiqueId: string) => [...cle.boutique(boutiqueId), "produits"] as const;

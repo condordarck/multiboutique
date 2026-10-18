@@ -1,4 +1,4 @@
-import { formatMontant, formatNombre } from "../../commun/formats";
+import { formatMontant, formatNombre } from "@multiboutique/front";
 
 export interface LigneTicket {
   nom: string;
