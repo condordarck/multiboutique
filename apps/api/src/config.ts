@@ -23,7 +23,11 @@ function origine(env: Env, nom: string): string {
     throw new Error(`${nom} n'est pas une URL : « ${valeur} ».`);
   }
   // Comparée telle quelle à l'en-tête Origin : schéma https et hôte, rien d'autre.
-  if (url.protocol !== "https:" || url.origin !== valeur) {
+  // Seule exception : http://localhost, pour le développement et les tests de
+  // bout en bout (Chromium y accepte les cookies Secure). Un serveur n'a aucune
+  // raison d'avoir localhost dans son .env.
+  const local = url.protocol === "http:" && url.hostname === "localhost";
+  if ((url.protocol !== "https:" && !local) || url.origin !== valeur) {
     throw new Error(`${nom} doit être une origine https sans chemin (ex. https://www.exemple.org) : « ${valeur} ».`);
   }
   return valeur;

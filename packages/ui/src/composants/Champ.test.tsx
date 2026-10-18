@@ -32,6 +32,17 @@ describe("Champ", () => {
     expect(screen.getByLabelText("Prix").getAttribute("inputmode")).toBe("numeric");
   });
 
+  it("masque un mot de passe et ouvre le clavier e-mail", () => {
+    render(
+      <>
+        <Champ libelle="E-mail" type="email" />
+        <Champ libelle="Mot de passe" type="motDePasse" />
+      </>
+    );
+    expect(screen.getByLabelText("E-mail").getAttribute("type")).toBe("email");
+    expect(screen.getByLabelText("Mot de passe").getAttribute("type")).toBe("password");
+  });
+
   it("en recherche, devient un champ de recherche", () => {
     render(<Champ libelle="Rechercher un produit" type="recherche" />);
     expect(screen.getByRole("searchbox", { name: "Rechercher un produit" })).toBeTruthy();

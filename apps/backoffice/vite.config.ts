@@ -10,6 +10,8 @@ export default defineConfig({
   css: { postcss: { plugins: [] } },
   test: {
     environment: "jsdom",
+    // Les parcours de e2e/ sont pour Playwright.
+    include: ["src/**/*.test.{ts,tsx}"],
     setupFiles: ["./src/test-preparation.ts"],
     env: { VITE_API_URL: "https://api.test" },
   },

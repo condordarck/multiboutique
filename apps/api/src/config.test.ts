@@ -45,6 +45,16 @@ describe("lireConfig", () => {
     );
   });
 
+  it("accepte http://localhost:<port> pour le développement et les tests de bout en bout, et aucun autre http", () => {
+    expect(lireConfig({ ...VALIDE, ORIGINE_BACKOFFICE: "http://localhost:5174" }).origines.backoffice).toBe(
+      "http://localhost:5174"
+    );
+    expect(() => lireConfig({ ...VALIDE, ORIGINE_WWW: "http://exemple.org" })).toThrow("ORIGINE_WWW");
+    expect(() => lireConfig({ ...VALIDE, ORIGINE_WWW: "http://localhost.exemple.org:5174" })).toThrow("ORIGINE_WWW");
+    expect(() => lireConfig({ ...VALIDE, ORIGINE_WWW: "http://127.0.0.1:5174" })).toThrow("ORIGINE_WWW");
+    expect(() => lireConfig({ ...VALIDE, ORIGINE_WWW: "http://localhost:5174/x" })).toThrow("ORIGINE_WWW");
+  });
+
   it("refuse un port invalide", () => {
     expect(() => lireConfig({ ...VALIDE, PORT: "quatre" })).toThrow("PORT");
   });

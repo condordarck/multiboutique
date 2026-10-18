@@ -1,11 +1,15 @@
-import { render, screen } from "@testing-library/react";
-import { createMemoryRouter, RouterProvider } from "react-router";
-import { expect, it } from "vitest";
-import { routes } from "./App";
+import { screen } from "@testing-library/react";
+import { afterEach, expect, it } from "vitest";
+import { fauxApi, type FauxApi } from "../test/faux-api";
+import { rendreApp } from "../test/rendu";
 
-it("une adresse inconnue affiche « Page introuvable » et ramène à l'accueil", () => {
-  const routeur = createMemoryRouter(routes, { initialEntries: ["/inconnu"] });
-  render(<RouterProvider router={routeur} />);
-  expect(screen.getByRole("heading", { level: 1, name: "Page introuvable" })).toBeTruthy();
+let api: FauxApi;
+afterEach(() => api.restaurer());
+
+it("une adresse inconnue affiche « Page introuvable » et ramène à l'accueil", async () => {
+  api = fauxApi();
+  api.repondre("GET", "/auth/session", 401, { erreur: "Non authentifié" });
+  rendreApp("/inconnu");
+  expect(await screen.findByRole("heading", { level: 1, name: "Page introuvable" })).toBeTruthy();
   expect(screen.getByRole("link", { name: "Retour à l'accueil" }).getAttribute("href")).toBe("/");
 });
