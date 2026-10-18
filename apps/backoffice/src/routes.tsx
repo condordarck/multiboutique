@@ -20,6 +20,9 @@ import { ParametresAdmin } from "./ecrans/admin/ParametresAdmin";
 import { Roles } from "./ecrans/admin/Roles";
 import { Utilisateurs } from "./ecrans/admin/Utilisateurs";
 import { Introuvable } from "./ecrans/Introuvable";
+import { BandeauHorsLigne } from "./hors-ligne/BandeauHorsLigne";
+import { GardeProprietaire } from "./hors-ligne/GardeProprietaire";
+import { MiseAJour } from "./hors-ligne/MiseAJour";
 import { Rapports } from "./ecrans/rapports/Rapports";
 import { Consolidation } from "./ecrans/tableaux/Consolidation";
 import { TableauDeBord } from "./ecrans/tableaux/TableauDeBord";
@@ -66,6 +69,9 @@ export const routes: RouteObject[] = [
   {
     element: (
       <FournisseurSession>
+        <GardeProprietaire />
+        <MiseAJour />
+        <BandeauHorsLigne />
         <Outlet />
       </FournisseurSession>
     ),

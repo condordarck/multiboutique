@@ -1,15 +1,22 @@
 import { FournisseurNotifications } from "@multiboutique/ui";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient } from "@tanstack/react-query";
+import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { createBrowserRouter, RouterProvider } from "react-router";
+import { persistance } from "./hors-ligne/instance";
+import { DUREE_CACHE_MS } from "./hors-ligne/persistance";
 import { routes } from "./routes";
+import { surDeconnexion } from "./session/Session";
 
 export { routes };
+
 export function creerClientRequetes() {
   return new QueryClient({
     defaultOptions: {
-      // Une erreur 4xx ne se corrige pas en réessayant ; le réseau, si.
       queries: {
+        // Une erreur 4xx ne se corrige pas en réessayant ; le réseau, si.
         retry: (echecs, erreur) => echecs < 2 && (erreur as { statut?: number }).statut === 0,
+        // Le cache persisté doit vivre aussi longtemps que sa conservation.
+        gcTime: DUREE_CACHE_MS,
       },
     },
   });
@@ -17,13 +24,26 @@ export function creerClientRequetes() {
 
 const client = creerClientRequetes();
 const routeur = createBrowserRouter(routes);
+// Déconnexion : le cache de l'appareil part avec la session.
+surDeconnexion(persistance.purger);
 
 export function App() {
   return (
-    <QueryClientProvider client={client}>
+    <PersistQueryClientProvider
+      client={client}
+      persistOptions={{
+        persister: persistance.persister,
+        maxAge: DUREE_CACHE_MS,
+        // Une nouvelle version jette le cache de l'ancienne (formes de réponse changées).
+        buster: __VERSION__,
+        // Une session vide n'est pas conservée : restaurée, elle renverrait à la
+        // connexion avant que l'API ait répondu.
+        dehydrateOptions: { shouldDehydrateQuery: (q) => q.state.status === "success" && q.state.data != null },
+      }}
+    >
       <FournisseurNotifications>
         <RouterProvider router={routeur} />
       </FournisseurNotifications>
-    </QueryClientProvider>
+    </PersistQueryClientProvider>
   );
 }

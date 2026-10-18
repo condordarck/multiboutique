@@ -1,9 +1,86 @@
+import { execSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
-import { defineConfig } from "vitest/config";
+import { VitePWA } from "vite-plugin-pwa";
+import { defineConfig, type Plugin } from "vitest/config";
+
+const ASSETS_UI = new URL("../../packages/ui/assets/", import.meta.url);
+const ICONES = [
+  "favicon.ico",
+  "pwa-64x64.png",
+  "pwa-192x192.png",
+  "pwa-512x512.png",
+  "maskable-icon-512x512.png",
+  "apple-touch-icon-180x180.png",
+];
+
+/** Les icônes vivent dans packages/ui : on les sert telles quelles à la racine du site. */
+function iconesPartagees(): Plugin {
+  return {
+    name: "mb-icones",
+    configureServer(serveur) {
+      serveur.middlewares.use((requete, reponse, suite) => {
+        const nom = requete.url?.slice(1);
+        if (!nom || !ICONES.includes(nom)) return suite();
+        reponse.end(readFileSync(new URL(nom, ASSETS_UI)));
+      });
+    },
+    generateBundle() {
+      for (const nom of ICONES) {
+        this.emitFile({ type: "asset", fileName: nom, source: readFileSync(new URL(nom, ASSETS_UI)) });
+      }
+    },
+  };
+}
+
+function version(): string {
+  let commit = "local";
+  try {
+    commit = execSync("git rev-parse --short HEAD", { stdio: ["ignore", "pipe", "ignore"] }).toString().trim();
+  } catch {
+    // Hors dépôt git (image, archive) : la date suffit à distinguer les builds.
+  }
+  return `${new Date().toISOString()}-${commit}`;
+}
 
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  define: { __VERSION__: JSON.stringify(version()) },
+  plugins: [
+    react(),
+    tailwindcss(),
+    iconesPartagees(),
+    VitePWA({
+      // La mise à jour est proposée (bandeau), jamais imposée au milieu d'une vente.
+      registerType: "prompt",
+      injectRegister: false,
+      manifest: {
+        name: "MultiBoutique Backoffice",
+        short_name: "Backoffice",
+        description: "Ventes, stock et gestion des boutiques MultiBoutique",
+        lang: "fr",
+        start_url: "/",
+        scope: "/",
+        display: "standalone",
+        background_color: "#F4F0E8",
+        theme_color: "#2B50D9",
+        icons: [
+          { src: "/pwa-64x64.png", sizes: "64x64", type: "image/png" },
+          { src: "/pwa-192x192.png", sizes: "192x192", type: "image/png" },
+          { src: "/pwa-512x512.png", sizes: "512x512", type: "image/png" },
+          { src: "/maskable-icon-512x512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+        ],
+      },
+      workbox: {
+        // Le shell seulement. Aucune réponse de l'API n'est mise en cache par le
+        // service worker : le cache de données est celui de TanStack Query.
+        globPatterns: ["**/*.{js,css,html,woff2,svg,png,ico}"],
+        navigateFallback: "/index.html",
+        runtimeCaching: [],
+        cleanupOutdatedCaches: true,
+      },
+    }),
+  ],
   // Configuration PostCSS vide : sans elle, Vite remonte jusqu'au
   // postcss.config.js du monolithe, à la racine, qui applique Tailwind 3 à ce
   // CSS Tailwind 4. Tailwind 4 passe ici par son plugin Vite.
@@ -12,6 +89,8 @@ export default defineConfig({
     environment: "jsdom",
     // Les parcours de e2e/ sont pour Playwright.
     include: ["src/**/*.test.{ts,tsx}"],
+    // Le module virtuel du service worker n'existe qu'au build.
+    alias: { "virtual:pwa-register/react": new URL("./test/pwa-register.ts", import.meta.url).pathname },
     setupFiles: ["./src/test-preparation.ts"],
     env: { VITE_API_URL: "https://api.test" },
   },

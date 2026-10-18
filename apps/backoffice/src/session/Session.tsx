@@ -35,7 +35,9 @@ async function lireSession(): Promise<SessionUtilisateur | null> {
 
 export function FournisseurSession({ children }: { children: ReactNode }) {
   const client = useQueryClient();
-  const { data, isPending } = useQuery({ queryKey: CLE_SESSION, queryFn: lireSession, staleTime: 60_000 });
+  // Relue à chaque ouverture : une session restaurée du cache hors ligne n'est
+  // qu'un affichage provisoire, l'API reste juge (hors ligne, elle reste affichée).
+  const { data, isPending } = useQuery({ queryKey: CLE_SESSION, queryFn: lireSession, staleTime: 60_000, refetchOnMount: "always" });
   const utilisateur = data ?? null;
 
   // L'API ne reconnaît plus la session : on l'oublie, la garde renvoie à la connexion.

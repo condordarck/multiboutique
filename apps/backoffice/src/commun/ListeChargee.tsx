@@ -27,7 +27,9 @@ export function ListeChargee<T>({ requete, vide, ...liste }: ListeChargeeProps<T
       </div>
     );
   }
-  if (requete.error || !requete.data) {
+  // Des données en cache valent mieux qu'une erreur de relecture (hors ligne) :
+  // le bandeau hors ligne dit déjà qu'elles datent.
+  if (!requete.data) {
     const message = requete.error instanceof ErreurApi ? requete.error.message : "Lecture impossible.";
     return (
       <div role="alert" className="flex flex-col items-start gap-3 rounded-carte bg-danger-fond px-4 py-3 text-danger">

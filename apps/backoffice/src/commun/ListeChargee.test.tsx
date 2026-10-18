@@ -23,5 +23,10 @@ describe("ListeChargee", () => {
 
     rerender(<ListeChargee {...base} requete={{ isPending: false, error: null, data: [{ nom: "Awa" }], refetch: relancer }} />);
     expect(screen.getAllByText("Awa").length).toBeGreaterThan(0);
+
+    // Relecture en échec (hors ligne) : les données en cache restent affichées.
+    rerender(<ListeChargee {...base} requete={{ isPending: false, error: new ErreurApi(0, "Connexion impossible"), data: [{ nom: "Awa" }], refetch: relancer }} />);
+    expect(screen.getAllByText("Awa").length).toBeGreaterThan(0);
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 });
