@@ -25,3 +25,13 @@ test("la consolidation agrège les trois boutiques", async ({ page }) => {
   await expect(page.getByRole("table", { name: "Détail par boutique" }).getByRole("row")).toHaveCount(4);
   await verifierFormats(page, "consolidation");
 });
+
+test("la gérante génère le rapport du mois", async ({ page }) => {
+  await seConnecter(page, "gerant");
+  await page.goto(`/b/${BOUTIQUE_1}/rapports`);
+  await expect(page.getByRole("heading", { level: 2, name: /^Rapport mensuel — / })).toBeVisible();
+  await page.getByLabel("Période").selectOption("annee");
+  await page.getByRole("button", { name: "Générer le rapport" }).click();
+  await expect(page.getByRole("heading", { level: 2, name: `Rapport annuel — ${new Date().getFullYear()}` })).toBeVisible();
+  await verifierFormats(page, "rapports");
+});

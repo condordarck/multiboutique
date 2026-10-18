@@ -202,3 +202,15 @@ export interface GrillePrixConseilles {
   prix: (PrixReference & { produit_nom: string; applique: boolean })[];
   produits: { produit_id: string; nom: string; prix_vente: number | null }[];
 }
+
+/** GET /boutiques/:id/rapports?periode=…&debut=…&fin=… (fin exclue). */
+export interface Rapport {
+  periode: "jour" | "semaine" | "mois" | "annee" | "personnalisee";
+  debut: string;
+  fin: string;
+  totaux: { nb_ventes: number; ca: number; remises: number; nb_promos: number; panier_moyen: number };
+  par_jour: { jour: string; nb: number; ca: number }[];
+  par_mode: { mode_paiement: string; nb: number; ca: number }[];
+  top_produits: { nom: string; qte: number; ca: number }[];
+  reservations: { nb: number; montant: number };
+}

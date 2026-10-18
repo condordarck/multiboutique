@@ -60,7 +60,6 @@ const PAGES: Record<string, string> = {
 
 // Pages pas encore reprises : chaque tâche d'écran en retire ; la tâche 14 vide la liste.
 const PAGES_MANQUANTES = new Set<string>([
-  "(dashboard)/dashboard/[boutiqueId]/rapports/page.tsx",
   "(admin)/admin/page.tsx",
   "(admin)/admin/utilisateurs/page.tsx",
   "(admin)/admin/boutiques/page.tsx",

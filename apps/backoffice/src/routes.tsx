@@ -13,6 +13,7 @@ import { Reservations } from "./ecrans/commandes/Reservations";
 import { Achats } from "./ecrans/achats/Achats";
 import { PrixConseilles } from "./ecrans/achats/PrixConseilles";
 import { Introuvable } from "./ecrans/Introuvable";
+import { Rapports } from "./ecrans/rapports/Rapports";
 import { Consolidation } from "./ecrans/tableaux/Consolidation";
 import { TableauDeBord } from "./ecrans/tableaux/TableauDeBord";
 import { VueBoutique } from "./ecrans/tableaux/VueBoutique";
@@ -38,6 +39,7 @@ export const routesBoutique: RouteObject[] = [
   { path: "reservations", element: <Reservations /> },
   { path: "achats", element: <Achats /> },
   { path: "prix-conseilles", element: <PrixConseilles /> },
+  { path: "rapports", element: <Rapports /> },
   { path: "*", element: sectionIntrouvable },
 ];
 
