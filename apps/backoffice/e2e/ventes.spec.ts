@@ -18,8 +18,9 @@ test("un vendeur encaisse, la gérante annule : le stock suit", async ({ browser
 
   await vendeur.getByRole("button", { name: /^Riz 25 kg/ }).click();
   await vendeur.getByRole("button", { name: /^Riz 25 kg/ }).click();
-  await vendeur.getByRole("button", { name: /^Sucre 1 kg/ }).click();
-  await expect(vendeur.getByTestId("total")).toHaveText(/45,5/);
+  // L'huile : aucun autre parcours ne change son prix (3,2).
+  await vendeur.getByRole("button", { name: /^Huile d'arachide 1 L/ }).click();
+  await expect(vendeur.getByTestId("total")).toHaveText(/47,2/);
   await vendeur.getByLabel("Montant reçu ($)").fill("50");
   await verifierFormats(vendeur, "caisse");
   await vendeur.setViewportSize({ width: 1180, height: 820 });

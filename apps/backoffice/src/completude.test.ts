@@ -19,16 +19,9 @@ const EXCLUS = new Set([
   "validerReservation",
 ]);
 
-// Écritures pas encore branchées : chaque tâche d'écran du plan en retire ;
-// la tâche 14 vide la liste.
-const MANQUES_ATTENDUS = new Set<string>([
-  "creerBoutique",
-  "creerCategorie", "creerGroupe", "creerRegion", "creerUtilisateur",
-  "creerUtilisateursDefaut", "listerComptesBoutique",
-  "mettreAJourParametres", "modifierBoutique", "modifierCategorie",
-  "modifierGroupe", 
-  "modifierRegion", "reinitialiserMotDePasse", "supprimerCategorie", "toggleActifUtilisateur", "togglePermissionRole",
-  ]);
+// Écritures pas encore branchées. Vide : tout est branché ; la liste reste pour
+// qu'un service ajouté plus tard sans écran se déclare ici, explicitement.
+const MANQUES_ATTENDUS = new Set<string>([]);
 
 const B = "11111111-1111-1111-1111-111111111111";
 
@@ -58,16 +51,8 @@ const PAGES: Record<string, string> = {
   "(admin)/admin/parametres/page.tsx": "/admin/parametres",
 };
 
-// Pages pas encore reprises : chaque tâche d'écran en retire ; la tâche 14 vide la liste.
-const PAGES_MANQUANTES = new Set<string>([
-  "(admin)/admin/page.tsx",
-  "(admin)/admin/utilisateurs/page.tsx",
-  "(admin)/admin/boutiques/page.tsx",
-  "(admin)/admin/organisation/page.tsx",
-  "(admin)/admin/categories/page.tsx",
-  "(admin)/admin/roles/page.tsx",
-  "(admin)/admin/parametres/page.tsx",
-]);
+// Pages pas encore reprises. Vide : toutes les pages du personnel ont leur écran.
+const PAGES_MANQUANTES = new Set<string>([]);
 
 const APP = fileURLToPath(new URL("../../../app/", import.meta.url));
 

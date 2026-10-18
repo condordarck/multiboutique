@@ -1,7 +1,7 @@
 // Formes des réponses de l'API, telles que les fronts les reçoivent. Types
 // seuls : l'API renvoie les lignes PostgreSQL, montants et comptages en nombres.
 // Les champs listés sont ceux que les écrans lisent ; une ligne peut en porter d'autres.
-import type { Client, Commande, CommandeFournisseur, PrixReference, Reservation, ResumeJour, RoleUtilisateur, StockDisponible, Vente } from "./types";
+import type { Client, Commande, CommandeFournisseur, Groupe, PrixReference, Region, Reservation, ResumeJour, RoleUtilisateur, StockDisponible, Vente } from "./types";
 
 /** GET /auth/session, POST /auth/connexion → { utilisateur } */
 export interface SessionUtilisateur {
@@ -213,4 +213,65 @@ export interface Rapport {
   par_mode: { mode_paiement: string; nb: number; ca: number }[];
   top_produits: { nom: string; qte: number; ca: number }[];
   reservations: { nb: number; montant: number };
+}
+
+/** GET /admin/statistiques */
+export interface StatistiquesAdmin {
+  utilisateurs: number;
+  boutiques: number;
+  boutiques_actives: number;
+  produits: number;
+}
+
+export interface UtilisateurAdmin {
+  id: string;
+  email: string;
+  nom_complet: string;
+  role: RoleUtilisateur;
+  boutique_ids: string[];
+  region_id: string | null;
+  groupe_id: string | null;
+  telephone: string | null;
+  actif: boolean;
+  created_at: string;
+  boutique_noms: string[];
+  region_nom: string | null;
+  groupe_nom: string | null;
+}
+
+/** GET /admin/utilisateurs */
+export interface ComptesAdmin {
+  utilisateurs: UtilisateurAdmin[];
+  boutiques: BoutiqueResumee[];
+  groupes: Groupe[];
+  regions: Region[];
+}
+
+/** GET /admin/boutiques */
+export interface BoutiquesAdmin {
+  boutiques: (BoutiqueResumee & { region_nom: string | null; groupe_nom: string | null })[];
+  regions: Region[];
+}
+
+/** GET /admin/organisation */
+export interface Organisation {
+  groupes: (Groupe & { adresse?: string | null; telephone?: string | null; email?: string | null })[];
+  regions: (Region & { groupe_nom: string | null; nb_boutiques: number; boutique_noms: string[] })[];
+  sans_region: { nom: string }[];
+}
+
+/** GET /admin/categories */
+export interface CategorieAdmin {
+  id: string;
+  nom: string;
+  description: string | null;
+  nb_produits: number;
+}
+
+/** Comptes par défaut créés avec une boutique : mot de passe en clair, montré une fois. */
+export interface CompteCree {
+  role: string;
+  label: string;
+  email: string;
+  password: string;
 }

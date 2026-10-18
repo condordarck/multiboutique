@@ -12,6 +12,13 @@ import { Commandes } from "./ecrans/commandes/Commandes";
 import { Reservations } from "./ecrans/commandes/Reservations";
 import { Achats } from "./ecrans/achats/Achats";
 import { PrixConseilles } from "./ecrans/achats/PrixConseilles";
+import { AccueilAdmin } from "./ecrans/admin/AccueilAdmin";
+import { BoutiquesAdmin } from "./ecrans/admin/BoutiquesAdmin";
+import { CategoriesAdmin } from "./ecrans/admin/CategoriesAdmin";
+import { OrganisationAdmin } from "./ecrans/admin/OrganisationAdmin";
+import { ParametresAdmin } from "./ecrans/admin/ParametresAdmin";
+import { Roles } from "./ecrans/admin/Roles";
+import { Utilisateurs } from "./ecrans/admin/Utilisateurs";
 import { Introuvable } from "./ecrans/Introuvable";
 import { Rapports } from "./ecrans/rapports/Rapports";
 import { Consolidation } from "./ecrans/tableaux/Consolidation";
@@ -44,7 +51,16 @@ export const routesBoutique: RouteObject[] = [
 ];
 
 /** Écrans de l'administration, sous /admin. */
-export const routesAdmin: RouteObject[] = [{ path: "*", element: sectionIntrouvable }];
+export const routesAdmin: RouteObject[] = [
+  { index: true, element: <AccueilAdmin /> },
+  { path: "utilisateurs", element: <Utilisateurs /> },
+  { path: "boutiques", element: <BoutiquesAdmin /> },
+  { path: "organisation", element: <OrganisationAdmin /> },
+  { path: "categories", element: <CategoriesAdmin /> },
+  { path: "roles", element: <Roles /> },
+  { path: "parametres", element: <ParametresAdmin /> },
+  { path: "*", element: sectionIntrouvable },
+];
 
 export const routes: RouteObject[] = [
   {
