@@ -64,6 +64,10 @@ jobs:
 
       - name: Build des workspaces
         run: npm run build:workspaces
+        env:
+          # Le backoffice refuse de se construire sans l'hôte de son API (CSP) :
+          # ici une valeur fictive, le build n'est pas déployé.
+          VITE_API_URL: https://api.exemple.invalid
 
       - name: Build Next.js (inclut le typecheck)
         run: npm run build
@@ -276,6 +280,10 @@ jobs:
 
       - name: Build
         run: npm run build -w @multiboutique/${{ matrix.front }}
+        env:
+          # Hôte de l'API de l'environnement : le backoffice l'écrit dans sa CSP
+          # (connect-src, img-src) ; sans lui, son build échoue.
+          VITE_API_URL: https://${{ vars.API_DOMAIN }}
 
       # Hors du _headers versionné, commun aux environnements : seule la
       # recette doit échapper aux moteurs de recherche. Cloudflare cumule les

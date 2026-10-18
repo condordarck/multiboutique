@@ -166,9 +166,31 @@ Cloudflare**. Sinon un attaquant contourne le proxy en visant directement l'IP.
 Vite, React 19, React Router, TanStack Query, Tailwind, `packages/ui`.
 `VITE_API_URL` injectée au build (une valeur par environnement).
 Routage SPA par `not_found_handling: "single-page-application"` (toute route inconnue
-renvoie `index.html`) ; `_headers`
-pour la CSP (`connect-src` limité à `api.<base>`) et les en-têtes de sécurité. Les déploiements de
-recette portent `X-Robots-Tag: noindex`.
+renvoie `index.html`). `_headers` (CSP et en-têtes de sécurité) est **écrit au build**
+à partir de `VITE_API_URL` : `connect-src` et `img-src` n'autorisent que `api.<base>`,
+en une seule politique ; le build échoue sans `VITE_API_URL` en https (http accepté
+pour `localhost` seulement). Les déploiements de recette portent `X-Robots-Tag: noindex`.
+
+Décisions de la phase 3 (backoffice) :
+
+- **Parité fonctionnelle, pas d'écran** : chaque page du monolithe a son écran, avec
+  ses données, ses actions et ses contrôles, mais la mise en page suit les maquettes
+  (listes adaptatives, formulaires en panneau). Les services sans écran dans le
+  monolithe (`annulerVente`, `transfertStock`, `annulerReservation`, `modifierGroupe`,
+  `modifierRegion`) en ont un ; `validerReservation` reste sans écran, à décider.
+- **Une seule couche d'accès** : `src/api/client.ts` et un module par domaine ;
+  aucun écran n'appelle `fetch`. Types des réponses dans `packages/shared/src/reponses.ts`.
+- **Garde de complétude** (`apps/backoffice/src/completude.test.ts`) : chaque service
+  de `packages/metier` destiné au personnel a exactement une fonction d'appel, et
+  chaque page du personnel dans le monolithe a son écran.
+- **Le menu suit les permissions** (`aPermission`, même matrice que le monolithe) ;
+  l'API reste l'autorité.
+- **Adresses** : `/b/:boutiqueId/<section>`, `/tableau-de-bord`, `/consolidation`,
+  `/admin/<section>`, `/connexion`.
+- **Développement et parcours de bout en bout** sur `http://localhost` : l'API
+  accepte `http://localhost:<port>` comme origine, et aucun autre http. Les parcours
+  Playwright tournent en CI contre la vraie API, une vraie base et la vraie CSP, et
+  conditionnent le déploiement.
 
 ### 6.2 PWA
 
@@ -180,7 +202,11 @@ contrôlable et effaçable.
 ### 6.3 Hors-ligne (backoffice)
 
 - Les requêtes `GET` réussies sont persistées dans IndexedDB
-  (`persistQueryClient`), avec une durée de vie bornée (24 h).
+  (`persistQueryClient`), avec une durée de vie bornée (24 h) ; une nouvelle version
+  de l'application jette le cache de l'ancienne. Une session vide n'est pas
+  persistée, et la session est relue à chaque ouverture (l'API reste juge).
+- Un autre utilisateur qui ouvre une session sur l'appareil vide le cache du
+  précédent avant de le voir.
 - Hors connexion : bandeau « hors ligne — données du <heure> », boutons d'écriture
   désactivés. Aucune file d'écritures différées.
 - **Déconnexion = purge** de IndexedDB : les tablettes de boutique sont partagées.
@@ -220,7 +246,7 @@ Chaque phase se déploie en recette et laisse l'application utilisable.
 | 0 | Monorepo, `packages/shared`, CI à trois cibles | build vert, rien ne change pour l'utilisateur |
 | 1 | Design system et maquettes | maquettes validées |
 | 2 | API : auth, lectures, écritures, tests d'intégration sur Postgres réel en CI | parité fonctionnelle avec les 50 actions et les 25 pages — **réalisée** (branche `phase-2-api`) ; mise en ligne après création du tunnel |
-| 3 | Backoffice PWA | parcours métier complets en recette |
+| 3 | Backoffice PWA | parcours métier complets en recette — **réalisée** (branche `phase-3-backoffice`), mise en recette après fusion |
 | 4 | www PWA | vitrine, réservation, espace client en recette |
 | 5 | Bascule : tunnel en production, retrait du monolithe Next | ancien domaine redirigé vers `www.<base>` |
 

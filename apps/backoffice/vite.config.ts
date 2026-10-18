@@ -4,6 +4,7 @@ import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 import { defineConfig, type Plugin } from "vitest/config";
+import { pluginEnTetes } from "./outils/en-tetes";
 
 const ASSETS_UI = new URL("../../packages/ui/assets/", import.meta.url);
 const ICONES = [
@@ -50,6 +51,7 @@ export default defineConfig({
     react(),
     tailwindcss(),
     iconesPartagees(),
+    pluginEnTetes(),
     VitePWA({
       // La mise à jour est proposée (bandeau), jamais imposée au milieu d'une vente.
       registerType: "prompt",
@@ -88,7 +90,7 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     // Les parcours de e2e/ sont pour Playwright.
-    include: ["src/**/*.test.{ts,tsx}"],
+    include: ["src/**/*.test.{ts,tsx}", "outils/**/*.test.ts"],
     // Le module virtuel du service worker n'existe qu'au build.
     alias: { "virtual:pwa-register/react": new URL("./test/pwa-register.ts", import.meta.url).pathname },
     setupFiles: ["./src/test-preparation.ts"],

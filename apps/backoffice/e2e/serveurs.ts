@@ -82,5 +82,15 @@ createServer((entree, sortie) => {
 const racineFront = fileURLToPath(new URL("..", import.meta.url));
 process.env.VITE_API_URL = `http://localhost:${PORT_API}`;
 await build({ root: racineFront, logLevel: "warn" });
-const serveur = await preview({ root: racineFront, preview: { port: PORT_FRONT, strictPort: true, host: "localhost" } });
+
+// Les en-têtes de dist/_headers (bloc « /* »), CSP comprise, comme les applique Cloudflare :
+// les parcours tournent sous la vraie politique de sécurité.
+const enTetes = Object.fromEntries(
+  readFileSync(join(racineFront, "dist/_headers"), "utf8")
+    .split("\n\n")[0]!
+    .split("\n")
+    .slice(1)
+    .map((ligne) => ligne.trim().split(/: (.*)/s).slice(0, 2) as [string, string])
+);
+const serveur = await preview({ root: racineFront, preview: { port: PORT_FRONT, strictPort: true, host: "localhost", headers: enTetes } });
 serveur.printUrls();
