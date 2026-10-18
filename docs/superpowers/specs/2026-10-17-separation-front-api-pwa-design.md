@@ -84,7 +84,8 @@ packages/shared   types métier, schémas zod (validation partagée front/API),
 packages/ui       design system : tokens, composants React + Tailwind
 ```
 
-Le monolithe actuel reste en place et déployé jusqu'à la bascule (§8).
+Le monolithe Next.js a été retiré du dépôt et de la recette en phase 5 (§8) ;
+l'historique Git et le tag `avant-bascule` le conservent.
 
 ### 3.2 Répartition des écrans
 
@@ -267,15 +268,32 @@ Chaque phase se déploie en recette et laisse l'application utilisable.
 | 2 | API : auth, lectures, écritures, tests d'intégration sur Postgres réel en CI | parité fonctionnelle avec les 50 actions et les 25 pages — **réalisée** (branche `phase-2-api`) ; mise en ligne après création du tunnel |
 | 3 | Backoffice PWA | parcours métier complets en recette — **réalisée** (branche `phase-3-backoffice`), mise en recette après fusion |
 | 4 | www PWA | vitrine, réservation, espace client en recette — **réalisée** (branche `phase-4-www`), mise en recette après fusion |
-| 5 | Bascule : tunnel en production, retrait du monolithe Next | ancien domaine redirigé vers `www.<base>` |
+| 5 | Bascule de la recette, retrait du monolithe Next ; production préparée | recette servie par l'API et les deux PWA, ancienne adresse supprimée — **réalisée** (branche `phase-5-bascule`) ; production activée quand son domaine sera acquis |
 
-Déploiement : l'image de l'API s'ajoute à celle du monolithe dans
-`deploy/docker-compose.prod.yml` (profil `api`, avec le service `cloudflared`), sans port
-publié ; elle la remplacera en phase 5. `server-deploy.sh` n'active ce profil que si
-`API_IMAGE`, `API_JWT_SECRET` et `TUNNEL_TOKEN` sont fournis : un `.env` incomplet ne
-bloque pas le monolithe. `db/` reste à la racine jusqu'à la bascule. Les
-fronts sont publiés par `wrangler deploy --env <environnement>` depuis le workflow, un
-Worker par front et par environnement, avec les environnements GitHub `recette` et `production` existants.
+Déploiement (depuis la phase 5) : `deploy/docker-compose.prod.yml` ne contient plus
+que la base, l'API et `cloudflared`, sans port publié ; les variables de l'API et du
+tunnel sont obligatoires. `db/` est sous `apps/api/db/`. Les fronts sont publiés par
+`wrangler deploy --env <environnement>` depuis le workflow, un Worker par front et
+par environnement, avec les environnements GitHub `recette` et `production`.
+
+Décisions de la phase 5 (plan `docs/superpowers/plans/2026-10-18-phase-5-bascule-recette.md`) :
+
+1. Rien ne disparaît sans que son remplaçant soit vérifié : `server-deploy.sh` n'arrête
+   le conteneur du monolithe qu'après une réponse de l'API sur `/health`.
+2. La bascule est réversible : tag `avant-bascule`, images conservées dans GHCR,
+   procédure écrite et répétée sur une pile locale (`docs/bascule-recette.md`).
+3. Ni le schéma ni les données ne changent ; une sauvegarde précède chaque déploiement.
+4. Les images des produits passent de `public/uploads` à `donnees/uploads`, déplacées
+   une fois par `server-deploy.sh`, qui refuse de choisir si les deux contiennent des
+   fichiers.
+5. `db/` passe sous `apps/api/db/`.
+6. Les gardes de complétude gardent la table des pages du monolithe, figée : chaque
+   route listée doit toujours exister.
+7. La production est préparée, pas activée : une garde refuse tout tag `v*` tant que
+   son domaine, ses Workers et son environnement GitHub ne sont pas configurés.
+8. Le développement local se passe du monolithe : `npm run db:dev`, `npm run dev`.
+9. Les gestes sur le VPS partagé, chez OVH et dans GitHub sont faits à la main, selon
+   `docs/bascule-recette.md`. L'ancienne adresse est supprimée, pas redirigée.
 
 ## 9. Prérequis et questions ouvertes
 
@@ -293,4 +311,5 @@ Question ouverte :
 
 3. **Domaine de production** : à acquérir, puis à ajouter comme zone Cloudflare.
    `dev4future.space` (DNS chez OVH, partagé avec d'autres services) n'est plus utilisé
-   par MultiBoutique après la bascule.
+   par MultiBoutique depuis la bascule. Activation : `docs/bascule-recette.md`, section
+   « Production ».
