@@ -42,11 +42,12 @@ export IMAGE
 # API et tunnel (phase 2) : déployés seulement si leur configuration est complète.
 # Sans elle, le monolithe se déploie seul, comme avant, et on le dit.
 API_ACTIVE=0
-if [ -n "${API_IMAGE:-}" ] && [ -n "${API_JWT_SECRET:-}" ] && [ -n "${TUNNEL_TOKEN:-}" ]; then
+if [ -n "${API_IMAGE:-}" ] && [ -n "${API_JWT_SECRET:-}" ] && [ -n "${TUNNEL_TOKEN:-}" ] \
+   && [ -n "${ORIGINE_WWW:-}" ] && [ -n "${ORIGINE_BACKOFFICE:-}" ]; then
   API_ACTIVE=1
   export API_IMAGE
 else
-  echo "[deploy] API non déployée : API_IMAGE, API_JWT_SECRET et TUNNEL_TOKEN sont requis (cf. deploy/.env.example)."
+  echo "[deploy] API non déployée : API_IMAGE, API_JWT_SECRET, TUNNEL_TOKEN, ORIGINE_WWW et ORIGINE_BACKOFFICE sont requis (cf. deploy/.env.example)."
 fi
 
 if [ "$SOUS_COMMANDE" = "pull" ]; then

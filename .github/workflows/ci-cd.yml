@@ -126,7 +126,11 @@ jobs:
             type=raw,value=main,enable={{is_default_branch}}
             type=sha,format=short
 
+      # Un échec ici ne doit pas empêcher le déploiement du monolithe : API_IMAGE
+      # n'est alors pas transmis et server-deploy.sh ne déploie pas l'API.
       - name: Build & push de l'image API
+        id: build-api
+        continue-on-error: true
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -150,7 +154,7 @@ jobs:
             # périmé : ancien compose, anciennes migrations, anciens scripts.
             git pull --ff-only origin main
             export IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}"
-            export API_IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-api:${{ steps.meta-api.outputs.version }}"
+            export API_IMAGE="${{ steps.build-api.outcome == 'success' && format('{0}/{1}-api:{2}', env.REGISTRY, env.IMAGE_NAME, steps.meta-api.outputs.version) || '' }}"
             bash deploy/server-deploy.sh up
 
       - name: Vérifier la santé de l'application
@@ -300,7 +304,11 @@ jobs:
             type=raw,value=main,enable={{is_default_branch}}
             type=sha,format=short
 
+      # Un échec ici ne doit pas empêcher le déploiement du monolithe : API_IMAGE
+      # n'est alors pas transmis et server-deploy.sh ne déploie pas l'API.
       - name: Build & push de l'image API
+        id: build-api
+        continue-on-error: true
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -330,7 +338,7 @@ jobs:
             git fetch origin --tags --force
             git checkout --detach "$TAG"
             export IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}"
-            export API_IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-api:${{ steps.meta-api.outputs.version }}"
+            export API_IMAGE="${{ steps.build-api.outcome == 'success' && format('{0}/{1}-api:{2}', env.REGISTRY, env.IMAGE_NAME, steps.meta-api.outputs.version) || '' }}"
             bash deploy/server-deploy.sh up
 
       - name: Vérifier la santé de l'application

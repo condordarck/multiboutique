@@ -65,6 +65,23 @@ describe("POST /uploads", () => {
     expect(r.json().url).toMatch(/\.jpg$/);
   });
 
+  it("refuse des champs texte glissés avant le fichier (mémoire)", async () => {
+    const frontiere = "----essai";
+    const corps = Buffer.concat([
+      Buffer.from(`--${frontiere}\r\nContent-Disposition: form-data; name="bourrage"\r\n\r\n${"x".repeat(1000)}\r\n`),
+      Buffer.from(`--${frontiere}\r\nContent-Disposition: form-data; name="file"; filename="i"\r\nContent-Type: image/png\r\n\r\n`),
+      PNG,
+      Buffer.from(`\r\n--${frontiere}--\r\n`),
+    ]);
+    const r = await app.inject({
+      method: "POST",
+      url: "/uploads",
+      headers: { "content-type": `multipart/form-data; boundary=${frontiere}`, origin: ORIGINES.backoffice, cookie: cookies.gerant },
+      payload: corps,
+    });
+    expect(r.statusCode).toBe(413);
+  });
+
   it("refuse une image de plus de 5 Mo", async () => {
     const lourd = Buffer.concat([PNG, Buffer.alloc(5 * 1024 * 1024 + 1)]);
     expect((await envoyer(lourd, "image/png", { origin: ORIGINES.backoffice, cookie: cookies.gerant })).statusCode).toBe(413);

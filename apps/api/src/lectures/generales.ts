@@ -13,11 +13,12 @@ const PARAMETRES_DEFAUT: Record<string, string> = {
 const COLONNES_PUBLIQUES_BOUTIQUE = "id, nom, adresse, telephone, email";
 
 export const lecturesGenerales: FastifyPluginAsync<{ db: Db }> = async (app, { db }) => {
-  // lib/monnaie.ts:18
+  // lib/monnaie.ts:18 — publique : la vitrine anonyme affiche la monnaie et le nom,
+  // comme le monolithe. Aucun paramètre n'est sensible.
   route(app, {
     methode: "GET",
     chemin: "/parametres",
-    garde: "connexion",
+    garde: "public",
     gerer: async () => {
       const { rows } = await db.query(`SELECT cle, valeur FROM parametres`);
       return { ...PARAMETRES_DEFAUT, ...Object.fromEntries(rows.map((r) => [r.cle, r.valeur])) };

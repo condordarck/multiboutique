@@ -62,7 +62,7 @@ describe("utilisateur rechargé à chaque requête", () => {
   it("le cookie de la vitrine ne vaut rien sur une requête du backoffice", async () => {
     const client = await creerCompte(base.pool, "client");
     const cookie = await seConnecter(app, client, "www");
-    const r = await app.inject({ url: "/essai/connecte", headers: { origin: ORIGINES.backoffice, cookie: cookie.replace("mb_session_www", "mb_session_bo") } });
+    const r = await app.inject({ url: "/essai/connecte", headers: { origin: ORIGINES.backoffice, cookie: cookie.replace("__Host-mb_session_www", "__Host-mb_session_bo") } });
     expect(r.statusCode).toBe(401);
   });
 

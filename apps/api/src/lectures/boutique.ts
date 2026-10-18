@@ -10,6 +10,12 @@ import { bornesPeriode, boutiqueActive, estPeriode, exigerLecture } from "./comm
 
 const requete = <T extends Record<string, string | undefined>>(r: FastifyRequest) => r.query as T;
 
+/** Le coût de revient n'est visible qu'avec prix:gerer, quelle que soit la lecture. */
+function masquerCout<T extends Record<string, unknown>>(u: Utilisateur, lignes: T[]) {
+  if (aPermission(u, "prix:gerer")) return lignes;
+  return lignes.map(({ cout_revient: _masque, ...reste }) => reste);
+}
+
 export const lecturesBoutique: FastifyPluginAsync<{ db: Db }> = async (app, { db }) => {
   const b = (r: FastifyRequest) => parametre(r, "boutiqueId");
   // Toutes les lectures d'une boutique commencent par vérifier qu'elle est active.
@@ -33,7 +39,7 @@ export const lecturesBoutique: FastifyPluginAsync<{ db: Db }> = async (app, { db
   });
 
   // [boutiqueId]/page.tsx:31-58
-  lecture("/resume", async (r) => {
+  lecture("/resume", async (r, u) => {
     const id = b(r);
     const [resume, ventes, reservations, alertes] = await Promise.all([
       db.query(`SELECT * FROM resume_jour WHERE boutique_id = $1`, [id]),
@@ -64,7 +70,7 @@ export const lecturesBoutique: FastifyPluginAsync<{ db: Db }> = async (app, { db
       resume: resume.rows[0] ?? null,
       dernieres_ventes: ventes.rows,
       reservations_en_attente: reservations.rows,
-      alertes_stock: alertes.rows,
+      alertes_stock: masquerCout(u, alertes.rows),
     };
   });
 
@@ -149,9 +155,9 @@ export const lecturesBoutique: FastifyPluginAsync<{ db: Db }> = async (app, { db
   });
 
   // stock/page.tsx:57
-  lecture("/stock", async (r) => {
+  lecture("/stock", async (r, u) => {
     const { rows } = await db.query(`SELECT * FROM stock_disponible WHERE boutique_id = $1 ORDER BY produit_nom`, [b(r)]);
-    return rows;
+    return masquerCout(u, rows);
   });
 
   // stock/page.tsx:64-108 ; une période inconnue n'impose pas de borne, comme la page.
@@ -203,8 +209,7 @@ export const lecturesBoutique: FastifyPluginAsync<{ db: Db }> = async (app, { db
        ORDER BY c.nom, p.nom`,
       [b(r)]
     );
-    if (aPermission(u, "prix:gerer")) return rows;
-    return rows.map(({ cout_revient: _masque, ...reste }) => reste);
+    return masquerCout(u, rows);
   });
 
   // clients/page.tsx:30,53 ; ?actifs=1 : liste réduite de ventes:77 et commandes:57.

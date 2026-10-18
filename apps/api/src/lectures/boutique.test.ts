@@ -103,6 +103,13 @@ describe("lectures par boutique : contenu", () => {
     expect(masque.prix_vente).toBe(10);
   });
 
+  it("stock et alertes : coût de revient masqué sans prix:gerer, comme /produits", async () => {
+    const stockVendeur = (await lire("vendeur", b1("/stock"))).json();
+    expect(stockVendeur[0]).not.toHaveProperty("cout_revient");
+    expect((await lire("vendeur", b1("/resume"))).json().alertes_stock[0]).not.toHaveProperty("cout_revient");
+    expect((await lire("gerant", b1("/stock"))).json()[0].cout_revient).toBe(6);
+  });
+
   it("mouvements de stock : filtres par type, produit et période", async () => {
     const tous = (await lire("gerant", b1("/mouvements-stock"))).json();
     expect(tous.length).toBeGreaterThan(0);

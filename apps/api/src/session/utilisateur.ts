@@ -12,9 +12,11 @@ declare module "fastify" {
   }
 }
 
+// __Host- : le navigateur n'accepte ce cookie que Secure, Path=/ et sans Domain,
+// et refuse qu'une page d'un sous-domaine voisin en impose un du même nom.
 export const NOMS_COOKIE: Record<Audience, string> = {
-  www: "mb_session_www",
-  backoffice: "mb_session_bo",
+  www: "__Host-mb_session_www",
+  backoffice: "__Host-mb_session_bo",
 };
 
 /** Seul un client se connecte à la vitrine ; tout autre rôle, au backoffice. */

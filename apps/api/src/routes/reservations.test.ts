@@ -72,6 +72,15 @@ describe("POST /reservations", () => {
     expect((await reserver("www", undefined, { ...corps(), client_nom: "" })).statusCode).toBe(400);
   });
 
+  it("limite les réservations anonymes à 20 par heure et par adresse", async () => {
+    const depuis = { ...ecriture("www"), "cf-connecting-ip": "203.0.113.99" };
+    for (let i = 0; i < 20; i++) {
+      const r = await app.inject({ method: "POST", url: "/reservations", headers: depuis, payload: corps(1) });
+      expect(r.statusCode, `réservation ${i + 1}`).toBe(201);
+    }
+    expect((await app.inject({ method: "POST", url: "/reservations", headers: depuis, payload: corps(1) })).statusCode).toBe(429);
+  });
+
   it("refuse une quantité supérieure au stock disponible", async () => {
     expect((await reserver("www", undefined, corps(1000))).statusCode).toBe(409);
   });

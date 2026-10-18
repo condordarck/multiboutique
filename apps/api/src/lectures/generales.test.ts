@@ -39,10 +39,10 @@ const lire = (qui: string | null, url: string, audience: "www" | "backoffice" = 
   app.inject({ url, headers: { origin: ORIGINES[audience], ...(qui ? { cookie: cookies[qui] } : {}) } });
 
 describe("lectures générales", () => {
-  it("paramètres : valeurs par défaut fusionnées", async () => {
+  it("paramètres : valeurs par défaut fusionnées, lisibles par la vitrine anonyme", async () => {
     const r = (await lire("vendeur", "/parametres")).json();
     expect(r).toMatchObject({ monnaie: "$", nom_application: "MultiBoutique", seuil_alerte_defaut: "10" });
-    expect((await lire(null, "/parametres")).statusCode).toBe(401);
+    expect((await app.inject({ url: "/parametres" })).json().monnaie).toBe("$");
   });
 
   it("mes boutiques : tout pour le propriétaire, son périmètre pour les autres, refus à l'admin", async () => {

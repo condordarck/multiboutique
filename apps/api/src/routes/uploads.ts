@@ -32,7 +32,9 @@ const NOM_FICHIER = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{1
 
 export const routesUploads: FastifyPluginAsync<{ uploadsDir: string }> = async (app, { uploadsDir }) => {
   const dossier = join(uploadsDir, "produits");
-  await app.register(multipart, { limits: { fileSize: TAILLE_MAX, files: 1 } });
+  // Une seule partie, le fichier : sans ces limites, des champs texte placés avant
+  // lui (1 000 × 1 Mo par défaut) seraient gardés en mémoire.
+  await app.register(multipart, { limits: { fileSize: TAILLE_MAX, files: 1, fields: 0, parts: 1 } });
 
   route(app, {
     methode: "POST",

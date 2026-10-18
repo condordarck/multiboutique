@@ -37,7 +37,8 @@ describe("POST /auth/connexion", () => {
     expect(r.statusCode).toBe(200);
     expect(r.json().utilisateur).toMatchObject({ id: gerant.id, role: "gerant", boutique_ids: [BOUTIQUES.b1] });
     const cookie = r.cookies[0]!;
-    expect(cookie.name).toBe("mb_session_bo");
+    // __Host- : le navigateur refuse qu'un sous-domaine voisin impose ce cookie.
+    expect(cookie.name).toBe("__Host-mb_session_bo");
     expect(cookie).toMatchObject({ httpOnly: true, secure: true, sameSite: "Lax", path: "/" });
     expect(cookie.domain).toBeUndefined();
     expect(cookie.maxAge).toBe(7 * 24 * 3600);
@@ -46,7 +47,7 @@ describe("POST /auth/connexion", () => {
   it("connecte un client à la vitrine, avec le cookie de la vitrine", async () => {
     const r = await connexion("www", client.email, client.motDePasse);
     expect(r.statusCode).toBe(200);
-    expect(r.cookies[0]!.name).toBe("mb_session_www");
+    expect(r.cookies[0]!.name).toBe("__Host-mb_session_www");
   });
 
   it("refuse un client sur le backoffice et le personnel sur la vitrine", async () => {
@@ -144,6 +145,6 @@ describe("session et déconnexion", () => {
     const cookie = await seConnecter(app, gerant, "backoffice");
     const r = await app.inject({ method: "POST", url: "/auth/deconnexion", headers: { origin: ORIGINES.backoffice, cookie } });
     expect(r.statusCode).toBe(200);
-    expect(r.cookies[0]).toMatchObject({ name: "mb_session_bo", value: "", maxAge: 0 });
+    expect(r.cookies[0]).toMatchObject({ name: "__Host-mb_session_bo", value: "", maxAge: 0 });
   });
 });

@@ -1,6 +1,7 @@
 import * as metier from "@multiboutique/metier";
 import { schemaEncaissement, schemaMotif, schemaReservation, schemaVente } from "@multiboutique/shared";
 import type { FastifyPluginAsync } from "fastify";
+import { cleClient } from "./auth";
 import { parametre, route } from "./registre";
 
 export const routesVentes: FastifyPluginAsync<{ db: metier.Db }> = async (app, { db }) => {
@@ -31,6 +32,17 @@ export const routesReservations: FastifyPluginAsync<{ db: metier.Db }> = async (
     garde: "public",
     service: "creerReservation",
     statut: 201,
+    // Ouverte à tous et bloquant du stock : une limite par adresse évite qu'un
+    // script réserve tout le stock de toutes les boutiques.
+    config: {
+      rateLimit: {
+        max: 20,
+        timeWindow: 60 * 60 * 1000,
+        keyGenerator: cleClient,
+        errorResponseBuilder: () =>
+          Object.assign(new Error("Trop de réservations depuis cette adresse. Réessayez plus tard."), { statusCode: 429 }),
+      },
+    },
     gerer: (r, u) => metier.creerReservation(db, u, schemaReservation.parse(r.body)),
   });
 
