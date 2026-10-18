@@ -127,6 +127,13 @@ Extraits de la grille par défaut :
 
 ## 4. Architecture technique
 
+> **Depuis la phase 5 (octobre 2026), cette section décrit l'architecture
+> d'origine**, celle du monolithe Next.js retiré du dépôt. L'architecture en
+> service (API Fastify, deux PWA servies par Cloudflare, tunnel) est décrite dans
+> `README.md` et dans `docs/superpowers/specs/2026-10-17-separation-front-api-pwa-design.md`.
+> Les règles métier et de sécurité ci-dessous restent valables ; elles sont portées
+> par `apps/api` et `packages/metier`.
+
 ### 4.1 Pile technologique
 
 | Couche | Technologie |
@@ -504,14 +511,14 @@ Synthèse des mesures en place (voir aussi `RAPPORT_SAST_DAST.md`) :
 
 | Mesure | Détail |
 |---|---|
-| Secrets | `JWT_SECRET` **obligatoire**, ≥ 32 caractères, échec explicite (fail-closed) s'il est absent/faible/défaut connu. `.env` hors dépôt et hors image. |
+| Secrets | `API_JWT_SECRET` **obligatoire**, ≥ 32 caractères, échec explicite (fail-closed) s'il est absent/faible/défaut connu. `.env` hors dépôt et hors image. |
 | Sessions | JWT HS256 (WebCrypto), signature vérifiée en **temps constant**, cookie `httpOnly`/`sameSite=lax`/`secure` en prod. |
 | Mots de passe | bcrypt (pgcrypto) coût 10, vérification **en base**. |
 | Injection SQL | ~100 % des requêtes paramétrées (`$1`, `$2`…). |
 | Contrôle d'accès | Double contrôle *permission* **et** *accès boutique* sur chaque action ; anti-IDOR. |
 | Rate limiting | Login 5/15 min ; inscription 3/h ; `429` + `Retry-After`. |
 | Upload | Types MIME restreints, taille ≤ 5 Mo, noms UUID, service par route dédiée (pas d'accès direct au `public`). |
-| Traversée de chemin | Bloquée sur la route `/uploads/[...path]`. |
+| Traversée de chemin | Bloquée sur la route `/uploads/produits/:fichier` (nom UUID strict). |
 | Séparation | Administrateur sans accès aux données commerciales ; personnel sans accès `/admin`. |
 | Audits | ZAP baseline + tests actifs : 0 injection SQL, 0 XSS exploitable, 0 path traversal, 0 CSRF sur Server Actions. |
 
@@ -526,38 +533,43 @@ et durée (M1), code bcrypt (M5).
 ### 10.1 Environnements
 
 Deux environnements partagent le même `deploy/docker-compose.prod.yml`, paramétré
-par un `deploy/.env` propre à chaque serveur : **recette** (`carrefoot-dev`) et
-**production** (cible dédiée).
+par un `deploy/.env` propre à chaque serveur : **recette** (`morpion.cloud`) et
+**production** (domaine à acquérir, cf. `docs/bascule-recette.md`).
 
-| Service | Image / build | Port hôte | Rôle |
+| Service | Image | Port hôte | Rôle |
 |---|---|---|---|
 | `db` | `postgres:16-alpine` | aucun | Base de données (volume `pgdata`), joignable par le réseau Docker seulement |
-| `app` | image GHCR (conteneur `multiboutique-prod`) | `127.0.0.1:${APP_PORT}` → 3000 | Application |
-| `dev` | `Dockerfile.dev` | 3002 → 3000 | Développement local (hot reload) |
+| `api` | image GHCR `multiboutique-api` (conteneur `multiboutique-api`) | aucun | API Fastify |
+| `cloudflared` | `cloudflare/cloudflared` (conteneur `multiboutique-tunnel`) | aucun | Tunnel sortant : publie `api.<base>` → `http://api:4000` |
 
-Le **reverse proxy n'est pas conteneurisé** : il est fourni par l'hôte (Apache et
-certbot en recette, cf. `deploy/setup-vhost.sh`). Limites mémoire : 640 Mo pour
-`app`, 512 Mo pour `db`.
+Aucun port n'est publié et aucun reverse proxy n'est nécessaire sur l'hôte : l'API
+n'est joignable que par le tunnel. Les deux PWA sont servies par Cloudflare Workers.
+Limites mémoire : 384 Mo pour `api`, 512 Mo pour `db`, 128 Mo pour `cloudflared`.
+Le développement local utilise `docker-compose.yml` (PostgreSQL seul) et
+`npm run dev` (README).
 
 ### 10.2 Variables d'environnement
 
-- `IMAGE` — image GHCR à déployer (obligatoire, sans défaut).
-- `APP_PORT` — port local écouté par l'application (3002 en recette).
-- `DOMAIN` — nom d'hôte du vhost et cible du smoke test.
-- `DATABASE_URL` — chaîne de connexion PostgreSQL (obligatoire, sans repli).
-- `JWT_SECRET` — secret de signature (≥ 32 car., obligatoire).
-- `POSTGRES_PASSWORD`, `POSTGRES_USER`, `POSTGRES_DB` (service `db`).
+- `POSTGRES_PASSWORD` — mot de passe de la base (lu au premier démarrage du volume).
+- `API_IMAGE` — image de l'API (fournie par le CI).
+- `API_JWT_SECRET` — secret de signature des sessions (≥ 32 car., obligatoire).
+- `TUNNEL_TOKEN` — jeton du tunnel Cloudflare.
+- `ORIGINE_WWW`, `ORIGINE_BACKOFFICE` — origines des deux PWA.
 - `RESTIC_REPOSITORY`, `RESTIC_PASSWORD`, `AWS_ACCESS_KEY_ID`,
   `AWS_SECRET_ACCESS_KEY` — sauvegardes chiffrées (cf. 10.6).
-- `BACKUP_PING_URL` — optionnel, alerte en cas d'échec de sauvegarde.
-- `NODE_ENV=production`, `NODE_OPTIONS=--max-old-space-size=4096` (build).
+- `BACKUP_PING_URL`, `HEALTH_PING_URL` — optionnels, alertes.
+
+`server-deploy.sh` refuse de démarrer, avant tout effet, si l'une des six
+premières manque.
 
 ### 10.3 Build & image
 
-- `Dockerfile` multi-étapes (`deps` → `builder` → `runner`), sortie Next.js
-  **`standalone`**, exécution sous utilisateur non privilégié **uid 1001**.
-- Le dossier `public/uploads` est monté en **volume** ; il doit appartenir à l'**uid
-  1001** (sinon erreur d'écriture `EACCES`).
+- `apps/api/Dockerfile` multi-étapes, bundle esbuild, exécution sous utilisateur
+  non privilégié **uid 1001**.
+- Le dossier `donnees/uploads` (images des produits) est monté en **volume** ; il
+  doit appartenir à l'**uid 1001** (sinon erreur d'écriture `EACCES`).
+- Les PWA sont construites par Vite dans le CI (`VITE_API_URL`), puis publiées par
+  `wrangler deploy --env <environnement>`.
 
 ### 10.4 Migrations
 
@@ -568,26 +580,24 @@ certbot en recette, cf. `deploy/setup-vhost.sh`). Limites mémoire : 640 Mo pour
 
 ### 10.5 CI/CD (GitHub Actions)
 
-1. `push`/`PR` sur `main` → **job `build`** (`npm ci` + `npm run build`, inclut le
-   typecheck).
-2. `push` sur `main` → **job `deploy-recette`** (environnement GitHub `recette`).
-3. `push` d'un tag `v*` → **job `deploy-production`** (environnement `production`).
+1. `push`/`PR` sur `main` → **jobs `build`** (tests, typecheck, builds des
+   workspaces) et **`e2e`** (parcours des deux PWA).
+2. `push` sur `main` → **`deploy-recette`** (image de l'API, SSH,
+   `bash deploy/server-deploy.sh up`) et **`deploy-fronts-recette`**, puis
+   **`sante-recette`** : `https://api.<base>/health`, `https://www.<base>/` et
+   `https://backoffice.<base>/` doivent répondre 200.
+3. `push` d'un tag `v*` → **`garde-production`**, qui refuse tant que la production
+   n'est pas configurée, puis le même chemin vers l'environnement `production`.
 
-Les deux jobs de déploiement poussent l'image sur **GHCR** (`main`, `sha-`,
-`semver`), ouvrent une session **SSH** sur leur serveur, lancent
-`bash deploy/server-deploy.sh up` (sauvegarde BDD + migrations + redémarrage),
-puis **interrogent `https://${DOMAIN}/api/health` et échouent si la réponse n'est
-pas 200**.
-
-Les secrets `SERVER_HOST`, `SERVER_PORT`, `SERVER_USER`, `SERVER_SSH_KEY` et les
-variables `APP_DIR`, `DOMAIN` sont portés **par environnement GitHub**, jamais au
-niveau du dépôt : c'est ce cloisonnement qui empêche un push sur `main`
-d'atteindre la production.
+Les secrets `SERVER_HOST`, `SERVER_PORT`, `SERVER_USER`, `SERVER_SSH_KEY`,
+`CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` et les variables `APP_DIR`,
+`API_DOMAIN` sont portés **par environnement GitHub**, jamais au niveau du dépôt :
+c'est ce cloisonnement qui empêche un push sur `main` d'atteindre la production.
 
 ### 10.6 Sauvegarde / restauration
 
 `deploy/backup.sh` (quotidien, 02h30, crontab utilisateur) : `pg_dump -Fc` de la
-base **et** copie de `public/uploads` — les photos produits n'ont aucune autre
+base **et** copie de `donnees/uploads` — les photos produits n'ont aucune autre
 copie — chiffrés par **restic** (conteneur `restic/restic`) avant envoi sur
 **Cloudflare R2**. Rétention : 7 quotidiennes, 4 hebdomadaires, 6 mensuelles. Le
 script refuse d'envoyer un dump vide et journalise dans `backups/backup.log`.
@@ -612,8 +622,8 @@ bash deploy/server-deploy.sh up
 
 # Vérifier l'état
 docker compose -f deploy/docker-compose.prod.yml ps
-docker inspect -f '{{.State.Health.Status}}' multiboutique-prod
-docker logs multiboutique-prod --tail 50
+docker logs multiboutique-api --tail 50
+docker logs multiboutique-tunnel --tail 50
 
 # Appliquer les migrations
 bash apps/api/db/migrate.sh
@@ -626,6 +636,8 @@ bash deploy/restore-test.sh
 ### 10.8 Documentation de référence
 
 - `README.md` — démarrage, exploitation, CI/CD.
+- `docs/bascule-recette.md` — retrait du monolithe, retour arrière, activation
+  de la production.
 - `docs/superpowers/specs/2026-10-09-deploiement-vps-design.md` — design du
   durcissement du déploiement.
 - `RAPPORT_SAST_DAST.md` — audit de sécurité.

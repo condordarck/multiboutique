@@ -1,17 +1,15 @@
 node_modules
-.next/*
-!.next/standalone
-!.next/static
 .git
 .gitignore
 # Les motifs .dockerignore sont sensibles à la profondeur : `.env` seul ne
-# couvre pas deploy/.env, qui contient JWT_SECRET, le mot de passe de la base
+# couvre pas deploy/.env, qui contient API_JWT_SECRET, le mot de passe de la base
 # et les clés R2. Un build local sur le serveur les ferait entrer dans une
 # couche du builder.
 **/.env
 **/.env.local
 **/.env*.local
 backups
+donnees
 *.md
 docker-compose.yml
 Dockerfile
