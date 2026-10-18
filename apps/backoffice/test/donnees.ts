@@ -281,3 +281,28 @@ export function reservation(
     ...surcharge,
   };
 }
+
+export const FOURNISSEURS: import("@multiboutique/shared").Fournisseur[] = [
+  { id: "f1", nom: "Minoterie du Fleuve", telephone: "+243 811 000 000", email: null, adresse: "Matadi", boutique_id: BOUTIQUE_1, actif: true, created_at: "", updated_at: "" },
+  { id: "f2", nom: "Ancien grossiste", telephone: null, email: null, adresse: null, boutique_id: BOUTIQUE_1, actif: false, created_at: "", updated_at: "" },
+];
+
+export function commandeFournisseur(
+  surcharge: Partial<import("@multiboutique/shared").CommandeFournisseurListee> = {}
+): import("@multiboutique/shared").CommandeFournisseurListee {
+  return {
+    id: "cf1",
+    reference_cmd: "CF-0001",
+    boutique_id: BOUTIQUE_1,
+    fournisseur_id: "f1",
+    fournisseur_nom: "Minoterie du Fleuve",
+    statut: "partielle",
+    total_attendu: 720,
+    note: null,
+    nb_lignes: 1,
+    lignes: [{ commande_id: "cf1", ligne_id: "l1", produit_nom: "Riz 25 kg", quantite_commandee: 40, quantite_recue: 10 }],
+    created_at: "2026-10-10T00:00:00Z",
+    updated_at: "2026-10-10T00:00:00Z",
+    ...surcharge,
+  };
+}

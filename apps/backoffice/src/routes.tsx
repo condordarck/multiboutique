@@ -10,6 +10,8 @@ import { Clients } from "./ecrans/clients/Clients";
 import { Promotions } from "./ecrans/clients/Promotions";
 import { Commandes } from "./ecrans/commandes/Commandes";
 import { Reservations } from "./ecrans/commandes/Reservations";
+import { Achats } from "./ecrans/achats/Achats";
+import { PrixConseilles } from "./ecrans/achats/PrixConseilles";
 import { Introuvable } from "./ecrans/Introuvable";
 import { Consolidation } from "./ecrans/tableaux/Consolidation";
 import { TableauDeBord } from "./ecrans/tableaux/TableauDeBord";
@@ -34,6 +36,8 @@ export const routesBoutique: RouteObject[] = [
   { path: "promotions", element: <Promotions /> },
   { path: "commandes", element: <Commandes /> },
   { path: "reservations", element: <Reservations /> },
+  { path: "achats", element: <Achats /> },
+  { path: "prix-conseilles", element: <PrixConseilles /> },
   { path: "*", element: sectionIntrouvable },
 ];
 

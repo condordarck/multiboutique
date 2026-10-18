@@ -1,5 +1,6 @@
 import type { CommandeListee, StatutCommande, TermePaiement } from "@multiboutique/shared";
 import { Badge, Bouton, Carte, Champ, ChoixSegmente, Dialogue, Panneau, Selecteur, type TonBadge } from "@multiboutique/ui";
+import { LignesArticles, type LigneSaisie } from "../../commun/LignesArticles";
 import { useState } from "react";
 import { useParams } from "react-router";
 import { useProduits } from "../../api/catalogue";
@@ -157,12 +158,6 @@ export function Commandes() {
   );
 }
 
-interface LigneSaisie {
-  produit_id: string;
-  quantite: string;
-  prix: string;
-}
-
 /** components/dashboard/CommandeForm.tsx, dans un panneau. */
 function NouvelleCommande({ boutiqueId, onFermer }: { boutiqueId: string; onFermer: () => void }) {
   const monnaie = useMonnaie();
@@ -177,7 +172,6 @@ function NouvelleCommande({ boutiqueId, onFermer }: { boutiqueId: string; onFerm
   const [erreur, setErreur] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
-  const majLigne = (i: number, patch: Partial<LigneSaisie>) => setLignes((ls) => ls.map((l, j) => (j === i ? { ...l, ...patch } : l)));
   const totalBrut = lignes.reduce((s, l) => s + (lireNombre(l.quantite) || 0) * (lireNombre(l.prix) || 0), 0);
 
   async function envoyer() {
@@ -235,35 +229,14 @@ function NouvelleCommande({ boutiqueId, onFermer }: { boutiqueId: string; onFerm
           value={codePromo}
           onChange={(e) => setCodePromo(e.target.value.toUpperCase())}
         />
-        <fieldset className="m-0 flex flex-col gap-3 border-0 p-0">
-          <legend className="mb-1 text-libelle font-semibold">Articles</legend>
-          {lignes.length === 0 && <p className="m-0 text-texte-discret">Aucun article</p>}
-          {lignes.map((l, i) => (
-            <div key={i} className="flex flex-col gap-2 rounded-bouton bg-surface-relevee p-3">
-              <Selecteur
-                libelle={`Produit de l'article ${i + 1}`}
-                optionVide="— Produit —"
-                options={(produits.data ?? []).map((p) => ({ valeur: p.produit_id, libelle: p.produit_nom }))}
-                value={l.produit_id}
-                onChange={(e) => {
-                  const p = produits.data?.find((x) => x.produit_id === e.target.value);
-                  // Prix officiel proposé, modifiable.
-                  majLigne(i, { produit_id: e.target.value, prix: p ? String(p.prix_vente) : "" });
-                }}
-              />
-              <div className="grid grid-cols-2 gap-2">
-                <Champ libelle={`Quantité de l'article ${i + 1}`} type="nombre" value={l.quantite} onChange={(e) => majLigne(i, { quantite: e.target.value })} />
-                <Champ libelle={`Prix unitaire de l'article ${i + 1}`} type="montant" value={l.prix} onChange={(e) => majLigne(i, { prix: e.target.value })} />
-              </div>
-              <Bouton variante="discret" className="self-end" onClick={() => setLignes((ls) => ls.filter((_, j) => j !== i))}>
-                Retirer l'article
-              </Bouton>
-            </div>
-          ))}
-          <Bouton variante="secondaire" className="self-start" onClick={() => setLignes((ls) => [...ls, { produit_id: "", quantite: "1", prix: "" }])}>
-            Ajouter un article
-          </Bouton>
-        </fieldset>
+        <LignesArticles
+          lignes={lignes}
+          onChange={setLignes}
+          produits={(produits.data ?? []).map((p) => ({ produit_id: p.produit_id, nom: p.produit_nom }))}
+          // Prix officiel de la boutique, modifiable.
+          prixPropose={(id) => produits.data?.find((p) => p.produit_id === id)?.prix_vente}
+          libellePrix="Prix unitaire"
+        />
         <Champ libelle="Note (facultatif)" placeholder="Conditions de livraison, référence client…" value={note} onChange={(e) => setNote(e.target.value)} />
         <p className="m-0 text-courant">
           Total brut : <strong className="tabular-nums">{formatMontant(totalBrut, monnaie)}</strong>

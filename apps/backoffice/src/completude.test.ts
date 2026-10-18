@@ -22,13 +22,12 @@ const EXCLUS = new Set([
 // Écritures pas encore branchées : chaque tâche d'écran du plan en retire ;
 // la tâche 14 vide la liste.
 const MANQUES_ATTENDUS = new Set<string>([
-  "annulerCommandeFournisseur", "appliquerPrixConseilles", "creerBoutique",
-  "creerCategorie", "creerCommandeFournisseur",
-  "creerFournisseur", "creerGroupe", "creerRegion", "creerUtilisateur",
+  "creerBoutique",
+  "creerCategorie", "creerGroupe", "creerRegion", "creerUtilisateur",
   "creerUtilisateursDefaut", "listerComptesBoutique",
   "mettreAJourParametres", "modifierBoutique", "modifierCategorie",
-  "modifierFournisseur", "modifierGroupe", 
-  "modifierRegion", "publierPrixReference", "recevoirCommandeFournisseur", "reinitialiserMotDePasse", "supprimerCategorie", "toggleActifFournisseur", "toggleActifUtilisateur", "togglePermissionRole",
+  "modifierGroupe", 
+  "modifierRegion", "reinitialiserMotDePasse", "supprimerCategorie", "toggleActifUtilisateur", "togglePermissionRole",
   ]);
 
 const B = "11111111-1111-1111-1111-111111111111";
@@ -61,8 +60,6 @@ const PAGES: Record<string, string> = {
 
 // Pages pas encore reprises : chaque tâche d'écran en retire ; la tâche 14 vide la liste.
 const PAGES_MANQUANTES = new Set<string>([
-  "(dashboard)/dashboard/[boutiqueId]/achats/page.tsx",
-  "(dashboard)/dashboard/[boutiqueId]/prix-conseilles/page.tsx",
   "(dashboard)/dashboard/[boutiqueId]/rapports/page.tsx",
   "(admin)/admin/page.tsx",
   "(admin)/admin/utilisateurs/page.tsx",

@@ -1,3 +1,4 @@
+import { SERVICES_ACHATS } from "./achats";
 import { SERVICES_CATALOGUE } from "./catalogue";
 import { SERVICES_CLIENTS } from "./clients";
 import { SERVICES_COMMANDES } from "./commandes";
@@ -13,4 +14,5 @@ export const SERVICES: Record<string, (...args: never[]) => Promise<unknown>> = 
   ...SERVICES_CATALOGUE,
   ...SERVICES_CLIENTS,
   ...SERVICES_COMMANDES,
+  ...SERVICES_ACHATS,
 };
