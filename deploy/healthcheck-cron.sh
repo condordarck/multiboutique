@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Redémarre l'application lorsqu'elle est bloquée, arrêtée ou « unhealthy ».
+# Redémarre la base, l'API ou le tunnel lorsqu'ils sont bloqués, arrêtés ou
+# « unhealthy » (l'API porte une sonde /health dans son image).
 #
 #   bash deploy/healthcheck-cron.sh     (toutes les 2 minutes via cron)
 #
@@ -17,8 +18,9 @@ cd "$ROOT"
 
 [ -f deploy/.env ] && { set -a; . deploy/.env; set +a; }
 
-CONTENEUR_APP="multiboutique-prod"
 CONTENEUR_DB="multiboutique-db"
+CONTENEUR_API="multiboutique-api"
+CONTENEUR_TUNNEL="multiboutique-tunnel"
 MAX_REDEMARRAGES=3
 FENETRE_MIN=30
 
@@ -67,9 +69,10 @@ redemarrer() {
 }
 
 # La base d'abord : elle porte mem_limit 512m sur une machine partagée, donc un
-# OOM kill est un scénario réaliste. Si on ne regardait que l'app, on la
-# redémarrerait trois fois pendant que la vraie victime reste à terre.
-for conteneur in "$CONTENEUR_DB" "$CONTENEUR_APP"; do
+# OOM kill est un scénario réaliste. Si on ne regardait que l'API, on la
+# redémarrerait trois fois pendant que la vraie victime reste à terre. Le tunnel
+# en dernier : sans lui, l'API saine reste injoignable.
+for conteneur in "$CONTENEUR_DB" "$CONTENEUR_API" "$CONTENEUR_TUNNEL"; do
   if ! docker inspect "$conteneur" >/dev/null 2>&1; then
     journaliser "Conteneur ${conteneur} introuvable — rien à faire"
     continue

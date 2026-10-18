@@ -1,6 +1,6 @@
-# Application — profil PRODUCTION et RECETTE.
-# Le reverse proxy n'est PAS dans ce fichier : il est fourni par l'hôte
-# (Apache + certbot en recette, cf. deploy/setup-vhost.sh).
+# MultiBoutique sur le serveur — recette et production : PostgreSQL, l'API et
+# Cloudflare Tunnel. Aucun port publié : l'API n'est joignable que par le tunnel,
+# les PWA sont servies par Cloudflare. Le monolithe Next a été retiré (phase 5).
 # Secrets et valeurs par environnement : deploy/.env (jamais commité).
 
 # Sans ce nom, Docker déduit le projet du répertoire parent — « deploy » —, qui
@@ -31,47 +31,16 @@ services:
     networks:
       - multiboutique
 
-  app:
-    image: "${IMAGE:?IMAGE manquant (ex: ghcr.io/condordarck/multiboutique:main)}"
-    container_name: multiboutique-prod
-    restart: unless-stopped
-    ports:
-      # Jamais 0.0.0.0 : c'est le reverse proxy de l'hôte qui expose l'app.
-      - "127.0.0.1:${APP_PORT:?APP_PORT manquant (recette: 3002)}:3000"
-    environment:
-      DATABASE_URL: "postgresql://mb:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD manquant}@db:5432/multiboutique"
-      JWT_SECRET: "${JWT_SECRET:?JWT_SECRET manquant (ex: openssl rand -hex 32)}"
-    depends_on:
-      db:
-        condition: service_healthy
-    volumes:
-      - ../public/uploads:/app/public/uploads
-    healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 40s
-    mem_limit: 640m
-    networks:
-      - multiboutique
-
-  # --- API et Cloudflare Tunnel (phase 2) ---------------------------------
-  # Profil « api » : server-deploy.sh ne l'active que si API_IMAGE, API_JWT_SECRET
-  # et TUNNEL_TOKEN sont fournis, pour qu'un .env encore incomplet ne bloque pas
-  # le déploiement du monolithe. Valeurs vides tolérées ici : l'API valide sa
-  # propre configuration au démarrage et nomme la variable manquante.
   api:
-    image: "${API_IMAGE:-}"
+    image: "${API_IMAGE:?API_IMAGE manquant (ex: ghcr.io/condordarck/multiboutique-api:main)}"
     container_name: multiboutique-api
-    profiles: ["api"]
     restart: unless-stopped
     # Aucun port publié : seul cloudflared l'atteint, par le réseau Docker.
     environment:
-      DATABASE_URL: "postgresql://mb:${POSTGRES_PASSWORD:-}@db:5432/multiboutique"
-      API_JWT_SECRET: "${API_JWT_SECRET:-}"
-      ORIGINE_WWW: "${ORIGINE_WWW:-}"
-      ORIGINE_BACKOFFICE: "${ORIGINE_BACKOFFICE:-}"
+      DATABASE_URL: "postgresql://mb:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD manquant}@db:5432/multiboutique"
+      API_JWT_SECRET: "${API_JWT_SECRET:?API_JWT_SECRET manquant (ex: openssl rand -hex 32)}"
+      ORIGINE_WWW: "${ORIGINE_WWW:?ORIGINE_WWW manquant (ex: https://www.morpion.cloud)}"
+      ORIGINE_BACKOFFICE: "${ORIGINE_BACKOFFICE:?ORIGINE_BACKOFFICE manquant (ex: https://backoffice.morpion.cloud)}"
       UPLOADS_DIR: /donnees/uploads
       PORT: "4000"
     depends_on:
@@ -89,11 +58,10 @@ services:
   cloudflared:
     image: cloudflare/cloudflared:2026.10.0
     container_name: multiboutique-tunnel
-    profiles: ["api"]
     restart: unless-stopped
     command: tunnel --no-autoupdate run
     environment:
-      TUNNEL_TOKEN: "${TUNNEL_TOKEN:-}"
+      TUNNEL_TOKEN: "${TUNNEL_TOKEN:?TUNNEL_TOKEN manquant (jeton du tunnel Cloudflare)}"
     depends_on:
       - api
     mem_limit: 128m
