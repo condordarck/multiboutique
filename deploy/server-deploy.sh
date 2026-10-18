@@ -119,13 +119,26 @@ if docker inspect "$MONOLITHE" >/dev/null 2>&1; then
   docker stop "$MONOLITHE" >/dev/null
   docker rm -f "$MONOLITHE" >/dev/null
   echo "[deploy] Ancien conteneur ${MONOLITHE} (monolithe) arrêté et supprimé."
-  # Jusqu'ici, le monolithe tournait encore : redémarré dans l'intervalle, il a
-  # pu recréer public/uploads (source de son montage). Second passage : les
-  # restes vides disparaissent ; une image écrite là entre-temps fait refuser.
-  deplacer_uploads "$ROOT"
 fi
 
-# 9. Nettoyage des images orphelines.
+# 9. Restes de l'ancien emplacement des images. Le monolithe tournait encore
+# pendant le déplacement : redémarré dans l'intervalle, Docker a pu recréer la
+# source de son montage, public/uploads, au nom de root. Vides, ces dossiers
+# sont supprimés par un conteneur jetable (root) ; une image écrite là
+# entre-temps est une fusion à faire à la main.
+if [ -d public ]; then
+  if contient_des_fichiers public; then
+    echo "[deploy] ECHEC : public/ contient des fichiers écrits pendant la bascule ; les fusionner dans donnees/uploads à la main." >&2
+    find public -type f >&2
+    exit 1
+  fi
+  docker run --rm --user 0 --entrypoint find -v "$ROOT/public:/ancien" "$API_IMAGE" \
+    /ancien -mindepth 1 -depth -type d -empty -delete
+  rmdir public
+  echo "[deploy] Restes vides de public/ supprimés."
+fi
+
+# 10. Nettoyage des images orphelines.
 docker image prune -f >/dev/null 2>&1 || true
 
 echo "[deploy] OK — base, API et tunnel à jour."

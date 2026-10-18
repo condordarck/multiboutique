@@ -31,11 +31,21 @@ case "$*" in
   *"exec -T db pg_dump"*) echo "-- dump" ;;
   *"exec -T api node"*) [ "${FAUX_API_SAINE:-1}" = 1 ] || exit 1 ;;
   "inspect multiboutique-prod"*) [ "${FAUX_MONOLITHE:-1}" = 1 ] || exit 1 ;;
+  # Le monolithe, redémarré pendant la bascule, a recréé la source de son montage.
+  "stop multiboutique-prod"*)
+    if [ -n "${FAUX_RECREE:-}" ]; then
+      mkdir -p "$DEPOT/public/uploads/produits"
+      [ "$FAUX_RECREE" = fichier ] && printf 'tardive' > "$DEPOT/public/uploads/produits/b.png"
+    fi ;;
+  # Le conteneur jetable de nettoyage, joué sur l'hôte.
+  "run --rm --user 0 --entrypoint find -v "*)
+    for arg in "$@"; do case "$arg" in *:/ancien) hote="${arg%%:*}" ;; esac; done
+    find "$hote" -mindepth 1 -depth -type d -empty -delete ;;
 esac
 exit 0
 FAUX
   chmod +x "$DEPOT/bin/docker"
-  export JOURNAL
+  export JOURNAL DEPOT
 }
 
 # Environnement complet d'une recette (valeurs factices).
@@ -86,6 +96,22 @@ echo "5. IMAGE (monolithe) encore dans l'environnement : signalée, ignorée"
 preparer
 deployer "${ENV_COMPLET[@]}" IMAGE=ghcr.io/x/multiboutique:main > "$DEPOT/sortie.log" 2>&1 || true
 verifier "$(grep -c 'IMAGE (monolithe) est ignorée' "$DEPOT/sortie.log")" "1" "avertissement"
+
+echo "6. public/uploads vide recréé pendant la bascule : supprimé"
+preparer
+mkdir -p "$DEPOT/public/uploads/produits" && printf 'img' > "$DEPOT/public/uploads/produits/a.png"
+if deployer "${ENV_COMPLET[@]}" FAUX_RECREE=vide > "$DEPOT/sortie.log" 2>&1; then CODE=0; else CODE=$?; fi
+verifier "$CODE" "0" "succès"
+verifier "$([ -e "$DEPOT/public" ] && echo reste || echo supprime)" "supprime" "public/ supprimé"
+verifier "$(rang 'run --rm --user 0')" "$(( $(rang 'rm -f multiboutique-prod') + 1 ))" "nettoyage juste après le retrait du monolithe"
+
+echo "7. image écrite dans public/ pendant la bascule : refus explicite, rien d'effacé"
+preparer
+mkdir -p "$DEPOT/public/uploads/produits" && printf 'img' > "$DEPOT/public/uploads/produits/a.png"
+if deployer "${ENV_COMPLET[@]}" FAUX_RECREE=fichier > "$DEPOT/sortie.log" 2>&1; then CODE=0; else CODE=$?; fi
+verifier "$([ "$CODE" -ne 0 ] && echo echec || echo succes)" "echec" "code de sortie non nul"
+verifier "$(cat "$DEPOT/public/uploads/produits/b.png")" "tardive" "image tardive conservée"
+verifier "$(grep -c 'fusionner dans donnees/uploads' "$DEPOT/sortie.log")" "1" "message explicite"
 
 if [ "$ECHECS" -ne 0 ]; then
   echo "$ECHECS échec(s)."
