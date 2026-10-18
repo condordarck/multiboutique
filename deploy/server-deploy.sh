@@ -134,7 +134,11 @@ if [ -d public ]; then
   fi
   docker run --rm --user 0 --entrypoint find -v "$ROOT/public:/ancien" "$API_IMAGE" \
     /ancien -mindepth 1 -depth -type d -empty -delete
-  rmdir public
+  if ! rmdir public 2>/dev/null; then
+    echo "[deploy] ECHEC : public/ n'a pas pu être supprimé (contenu inattendu) ; l'API est en service, à examiner à la main." >&2
+    ls -la public >&2
+    exit 1
+  fi
   echo "[deploy] Restes vides de public/ supprimés."
 fi
 

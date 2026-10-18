@@ -166,6 +166,13 @@ NB_FICHIERS_AVANT="$(find "$DEPOT/public/uploads" -type f | wc -l)"
 comptages > "$TRAVAIL/comptages-avant.txt"
 echo "image ${IMAGE_PRODUIT} servie ; ${NB_FICHIERS_AVANT} fichiers ; $(wc -l < "$TRAVAIL/comptages-avant.txt") tables comptées"
 
+# Section 1.2 de la procédure : empreinte du monolithe en service (l'API,
+# construite ici, n'en a pas : elle garde son étiquette locale).
+EMPREINTE_MONOLITHE="$(docker image inspect "$(docker inspect multiboutique-prod --format '{{.Image}}')" \
+  --format '{{index .RepoDigests 0}}' 2>/dev/null || true)"
+EMPREINTE_MONOLITHE="${EMPREINTE_MONOLITHE:-$IMAGE_MONOLITHE}"
+echo "monolithe en service : ${EMPREINTE_MONOLITHE}"
+
 # Section 1.3 de la procédure.
 cp -p "$DEPOT/deploy/.env" "$DEPOT/deploy/.env.avant-bascule"
 
@@ -231,10 +238,14 @@ etape "3. Retour arrière vers ${AVANT:0:7}"
   cp -a donnees/uploads/. public/uploads/
   [ "$(find public/uploads -type f | wc -l)" -ge "$(find donnees/uploads -type f | wc -l)" ]
   rm -rf donnees/uploads
-  IMAGE="$IMAGE_MONOLITHE" API_IMAGE="$API_IMAGE_LOCALE" bash deploy/server-deploy.sh up
+  # IMAGE se corrige dans le .env : l'ancien script le relit par-dessus l'environnement.
+  sed -i "s|^IMAGE=.*|IMAGE=${EMPREINTE_MONOLITHE}|" deploy/.env
+  API_IMAGE="$API_IMAGE_LOCALE" bash deploy/server-deploy.sh up
 ) > "$TRAVAIL/retour.log" 2>&1 || { cat "$TRAVAIL/retour.log"; echec "retour arrière"; }
 attendre "le monolithe ne répond pas après le retour arrière" monolithe_sain
-echo "ok   monolithe de nouveau en service (http://127.0.0.1:${APP_PORT_REPETITION}/api/health)"
+[ "$(docker inspect multiboutique-prod --format '{{.Config.Image}}')" = "$EMPREINTE_MONOLITHE" ] \
+  || echec "le monolithe relancé n'est pas l'image relevée (${EMPREINTE_MONOLITHE})"
+echo "ok   monolithe de nouveau en service, image relevée (http://127.0.0.1:${APP_PORT_REPETITION}/api/health)"
 attendre "l'API ne répond pas après le retour arrière" bash -c "[ \"\$(docker exec multiboutique-api node -e \"fetch('http://127.0.0.1:4000/health').then(r=>console.log(r.status)).catch(()=>console.log(0))\")\" = 200 ]"
 [ "$(http_api "/uploads/produits/$IMAGE_PRODUIT")" = 200 ] || echec "l'image n'est plus servie après le retour arrière"
 code_monolithe="$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:${APP_PORT_REPETITION}/uploads/produits/$IMAGE_PRODUIT")"

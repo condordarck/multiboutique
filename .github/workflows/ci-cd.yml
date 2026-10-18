@@ -22,7 +22,7 @@ env:
 
 jobs:
   # ------------------------------------------------------------------
-  # CI : compilation (typecheck + build Next.js) sur chaque push / PR
+  # CI : tests, typecheck et builds des workspaces sur chaque push / PR
   # ------------------------------------------------------------------
   build:
     name: Build & vérifications
@@ -179,14 +179,22 @@ jobs:
 
       - name: Déployer sur le serveur (SSH)
         uses: appleboy/ssh-action@v1.2.0
+        env:
+          API_DOMAIN: ${{ vars.API_DOMAIN }}
         with:
           host: ${{ secrets.SERVER_HOST }}
           port: ${{ secrets.SERVER_PORT }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           script_stop: true
+          envs: API_DOMAIN
           script: |
             cd "${{ vars.APP_DIR || '/var/www/multiboutique' }}"
+            # Le serveur atteint doit être celui de cet environnement : des
+            # secrets SERVER_* mal portés enverraient sinon la production sur la
+            # recette (ou l'inverse).
+            ( set -a; . deploy/.env; [ "${ORIGINE_WWW:-}" = "https://www.${API_DOMAIN#api.}" ] ) \
+              || { echo "Ce serveur n'est pas celui de ${API_DOMAIN} (ORIGINE_WWW de deploy/.env) : rien n'est fait." >&2; exit 1; }
             # Sans échec ici, une image neuve se déploierait sur un checkout
             # périmé : ancien compose, anciennes migrations, anciens scripts.
             git pull --ff-only origin main
@@ -357,15 +365,21 @@ jobs:
           # métacaractères shell, et une interpolation textuelle offrirait
           # l'exécution de commandes arbitraires sur le serveur de production.
           TAG: ${{ github.ref_name }}
+          API_DOMAIN: ${{ vars.API_DOMAIN }}
         with:
           host: ${{ secrets.SERVER_HOST }}
           port: ${{ secrets.SERVER_PORT }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           script_stop: true
-          envs: TAG
+          envs: TAG,API_DOMAIN
           script: |
             cd "${{ vars.APP_DIR || '/var/www/multiboutique' }}"
+            # Le serveur atteint doit être celui de cet environnement : des
+            # secrets SERVER_* mal portés enverraient sinon la production sur la
+            # recette (ou l'inverse).
+            ( set -a; . deploy/.env; [ "${ORIGINE_WWW:-}" = "https://www.${API_DOMAIN#api.}" ] ) \
+              || { echo "Ce serveur n'est pas celui de ${API_DOMAIN} (ORIGINE_WWW de deploy/.env) : rien n'est fait." >&2; exit 1; }
             git fetch origin --tags --force
             git checkout --detach "$TAG"
             export API_IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-api:${{ steps.meta-api.outputs.version }}"

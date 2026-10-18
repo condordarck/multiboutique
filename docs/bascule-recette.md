@@ -33,13 +33,17 @@ git push origin avant-bascule
 Sur le VPS :
 
 ```bash
-docker inspect multiboutique-prod --format '{{.Config.Image}}'
-docker inspect multiboutique-api  --format '{{.Config.Image}}'
+for c in multiboutique-prod multiboutique-api; do
+  docker image inspect "$(docker inspect "$c" --format '{{.Image}}')" \
+    --format "$c : {{join .RepoDigests \" \"}}"
+done
 ```
 
-Noter les deux valeurs (par exemple `ghcr.io/<compte>/multiboutique:sha-1a2b3c4` et
-`ghcr.io/<compte>/multiboutique-api:sha-1a2b3c4`) : ce sont `IMAGE` et `API_IMAGE`
-du retour arrière. Les deux restent dans GHCR sous ces étiquettes.
+Noter les deux empreintes (`ghcr.io/<compte>/multiboutique@sha256:…` et
+`ghcr.io/<compte>/multiboutique-api@sha256:…`) : ce sont `IMAGE` et `API_IMAGE` du
+retour arrière. **Pas l'étiquette** (`:main`) : celle de l'API est réécrite par le
+déploiement de la bascule, et l'image locale d'avant disparaît au nettoyage qui le
+suit. L'empreinte, elle, désigne toujours la même image dans GHCR.
 
 ### 1.3 Sauvegarder
 
@@ -65,6 +69,14 @@ done
 ```
 
 `API_IMAGE` est fourni par le CI.
+
+Le CI vérifie aussi, avant tout effet, qu'il est sur le bon serveur : `ORIGINE_WWW`
+doit valoir `https://www.` suivi du domaine de la variable GitHub `API_DOMAIN`
+sans son `api.` (ici `https://www.morpion.cloud`) :
+
+```bash
+( set -a; . deploy/.env; echo "$ORIGINE_WWW" )
+```
 
 ## 2. Fusion et vérification
 
@@ -189,11 +201,15 @@ trouverait des fichiers aux deux endroits et refuserait de choisir.
 
 ### 4.3 Redéployer le monolithe et l'API d'avant
 
-Avec les deux images relevées à l'étape 1.2 :
+L'ancien script relit `deploy/.env` **après** l'environnement : une `IMAGE` passée
+sur la ligne de commande serait ignorée. Elle se corrige donc dans le `.env` (remis
+à l'étape 4.1) ; `API_IMAGE`, elle, se passe sur la ligne de commande. Avec les deux
+empreintes relevées à l'étape 1.2 :
 
 ```bash
-IMAGE=ghcr.io/<compte>/multiboutique:sha-XXXXXXX \
-API_IMAGE=ghcr.io/<compte>/multiboutique-api:sha-XXXXXXX \
+sed -i 's|^IMAGE=.*|IMAGE=ghcr.io/<compte>/multiboutique@sha256:<empreinte>|' deploy/.env
+grep '^IMAGE=' deploy/.env
+API_IMAGE=ghcr.io/<compte>/multiboutique-api@sha256:<empreinte> \
   bash deploy/server-deploy.sh up
 docker ps --format '{{.Names}}\t{{.Status}}' | grep multiboutique
 curl -s -o /dev/null -w '%{http_code}\n' "http://127.0.0.1:$(grep '^APP_PORT=' deploy/.env | cut -d= -f2)/api/health"   # 200

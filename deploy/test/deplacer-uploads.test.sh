@@ -8,6 +8,16 @@ ICI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=deploy/lib/uploads.sh
 . "$ICI/../lib/uploads.sh"
 
+# Code de sortie de deplacer_uploads appelée comme par server-deploy.sh, sous
+# set -e : dans un `if`, bash suspendrait set -e et masquerait l'échec d'une commande.
+code_sous_set_e() {
+  if bash -euo pipefail -c '. "$1"; deplacer_uploads "$2"' _ "$ICI/../lib/uploads.sh" "$1" >/dev/null 2>&1; then
+    echo 0
+  else
+    echo $?
+  fi
+}
+
 ECHECS=0
 verifier() {
   if [ "$1" = "$2" ]; then echo "  ok   $3"; else echo "  ÉCHEC $3 — attendu « $2 », obtenu « $1 »"; ECHECS=$((ECHECS + 1)); fi
@@ -73,6 +83,25 @@ mkdir -p "$D/donnees/uploads/produits"
 printf 'serveur' > "$D/donnees/uploads/produits/suivie.png"
 deplacer_uploads "$D" >/dev/null
 verifier "$(cat "$D/donnees/uploads/produits/suivie.png")" "serveur" "copie sans écrasement"
+CODE="$(code_sous_set_e "$D")"
+verifier "$CODE" "0" "succès quand les images suivies sont déjà là (cp -n de coreutils 9.2-9.4)"
+
+echo "7. restes vides impossibles à supprimer (recréés par Docker, root) : sans erreur"
+D="$(nouveau_depot)"
+mkdir -p "$D/public/uploads/produits" "$D/donnees/uploads/produits"
+printf 'z' > "$D/donnees/uploads/produits/z.png"
+chmod 555 "$D/public" "$D/public/uploads"
+CODE="$(code_sous_set_e "$D")"
+chmod 755 "$D/public" "$D/public/uploads"
+verifier "$CODE" "0" "succès, le nettoyage est laissé à server-deploy.sh"
+verifier "$(cat "$D/donnees/uploads/produits/z.png")" "z" "images intactes"
+
+echo "8. un lien laissé dans public/ compte comme un contenu"
+D="$(nouveau_depot)"
+mkdir -p "$D/public/uploads/produits"
+ln -s /nulle-part "$D/public/uploads/produits/lien.png"
+deplacer_uploads "$D" >/dev/null
+verifier "$([ -L "$D/donnees/uploads/produits/lien.png" ] && echo deplace || echo perdu)" "deplace" "lien déplacé, pas effacé"
 
 if [ "$ECHECS" -ne 0 ]; then
   echo "$ECHECS échec(s)."

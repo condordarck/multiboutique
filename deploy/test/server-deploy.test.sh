@@ -59,7 +59,9 @@ ENV_COMPLET=(
 )
 
 deployer() { env PATH="$DEPOT/bin:$PATH" SANTE_TENTATIVES=2 SANTE_PAUSE=0 "$@" bash "$DEPOT/deploy/server-deploy.sh" up; }
-rang() { grep -n -m1 -- "$1" "$JOURNAL" | cut -d: -f1 || echo 0; }
+# Rang de la première occurrence ; 999999 si absente, pour qu'une opération
+# disparue ne passe jamais pour « placée avant ».
+rang() { local n; n="$(grep -n -m1 -- "$1" "$JOURNAL" | cut -d: -f1 || true)"; echo "${n:-999999}"; }
 
 echo "1. déploiement nominal : ordre des opérations, monolithe retiré en dernier"
 preparer
@@ -69,7 +71,7 @@ verifier "$CODE" "0" "succès"
 SAUVEGARDE="$(rang 'pg_dump')"; BASE="$(rang 'up -d db')"; API="$(rang 'up -d --force-recreate api cloudflared')"
 SANTE="$(rang 'exec -T api node')"; RETRAIT="$(rang 'rm -f multiboutique-prod')"
 verifier "$([ "$SAUVEGARDE" -lt "$BASE" ] && [ "$BASE" -lt "$API" ] && [ "$API" -lt "$SANTE" ] && [ "$SANTE" -lt "$RETRAIT" ] && echo ordre || echo désordre)" "ordre" "sauvegarde → base → API → santé → retrait du monolithe"
-verifier "$(cat "$DEPOT/donnees/uploads/produits/a.png")" "img" "images déplacées avant le démarrage de l'API"
+verifier "$(cat "$DEPOT/donnees/uploads/produits/a.png")" "img" "images déplacées dans donnees/uploads"
 verifier "$(grep -c 'pull app\|up -d --force-recreate app' "$JOURNAL" || true)" "0" "plus aucun appel au service app"
 
 echo "2. API malade : le monolithe n'est pas touché, échec"
