@@ -11,14 +11,19 @@ set -euo pipefail
 #   IMAGE, APP_PORT                        (image déployée et port local)
 #   POSTGRES_PASSWORD, JWT_SECRET          (bases/app)
 #   GHCR_USER, GHCR_TOKEN                  (seulement si le paquet GHCR est privé)
+#   API_IMAGE, API_JWT_SECRET, TUNNEL_TOKEN,
+#   ORIGINE_WWW, ORIGINE_BACKOFFICE        (API et tunnel ; facultatifs, cf. étape 6)
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 # Charge .env si présent (placé dans deploy/.env)
+# API_IMAGE fourni par le CI prime sur deploy/.env (où il est souvent vide).
+API_IMAGE_APPELANT="${API_IMAGE:-}"
 if [ -f deploy/.env ]; then
   set -a; . deploy/.env; set +a
 fi
+API_IMAGE="${API_IMAGE_APPELANT:-${API_IMAGE:-}}"
 
 # Aucun défaut : un déploiement sans IMAGE défini tirerait et exécuterait
 # l'image d'un compte tiers. Échouer est le seul comportement sûr.
@@ -34,9 +39,23 @@ fi
 
 export IMAGE
 
+# API et tunnel (phase 2) : déployés seulement si leur configuration est complète.
+# Sans elle, le monolithe se déploie seul, comme avant, et on le dit.
+API_ACTIVE=0
+if [ -n "${API_IMAGE:-}" ] && [ -n "${API_JWT_SECRET:-}" ] && [ -n "${TUNNEL_TOKEN:-}" ]; then
+  API_ACTIVE=1
+  export API_IMAGE
+else
+  echo "[deploy] API non déployée : API_IMAGE, API_JWT_SECRET et TUNNEL_TOKEN sont requis (cf. deploy/.env.example)."
+fi
+
 if [ "$SOUS_COMMANDE" = "pull" ]; then
   docker compose -f "$COMPOSE_FILE" pull app
   echo "[deploy] Image ${IMAGE} récupérée."
+  if [ "$API_ACTIVE" = 1 ]; then
+    docker compose -f "$COMPOSE_FILE" --profile api pull api cloudflared
+    echo "[deploy] Image ${API_IMAGE} récupérée."
+  fi
   exit 0
 fi
 
@@ -80,7 +99,15 @@ echo "[deploy] Base de données prête."
 # 5. Appliquer les migrations manquantes
 bash db/migrate.sh
 
-# 6. Nettoyage des images orphelines
+# 6. API et tunnel, une fois la base migrée : l'API ne démarre jamais sur un
+# schéma en retard.
+if [ "$API_ACTIVE" = 1 ]; then
+  docker compose -f "$COMPOSE_FILE" --profile api pull api cloudflared
+  docker compose -f "$COMPOSE_FILE" --profile api up -d --force-recreate api cloudflared
+  echo "[deploy] API ${API_IMAGE} et tunnel démarrés."
+fi
+
+# 7. Nettoyage des images orphelines
 docker image prune -f >/dev/null 2>&1 || true
 
 echo "[deploy] OK — application et migrations à jour."

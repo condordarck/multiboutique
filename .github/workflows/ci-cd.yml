@@ -116,6 +116,26 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Métadonnées (tags image API)
+        id: meta-api
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-api
+          tags: |
+            type=semver,pattern={{version}}
+            type=raw,value=main,enable={{is_default_branch}}
+            type=sha,format=short
+
+      - name: Build & push de l'image API
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          push: true
+          tags: ${{ steps.meta-api.outputs.tags }}
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,mode=max,scope=api
+
       - name: Déployer sur le serveur (SSH)
         uses: appleboy/ssh-action@v1.2.0
         with:
@@ -130,6 +150,7 @@ jobs:
             # périmé : ancien compose, anciennes migrations, anciens scripts.
             git pull --ff-only origin main
             export IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}"
+            export API_IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-api:${{ steps.meta-api.outputs.version }}"
             bash deploy/server-deploy.sh up
 
       - name: Vérifier la santé de l'application
@@ -145,6 +166,23 @@ jobs:
             sleep 10
           done
           echo "L'application ne répond pas 200 sur /api/health après déploiement." >&2
+          exit 1
+
+      # Tant que API_DOMAIN n'est pas défini (tunnel pas encore créé), l'API n'est
+      # pas déployée par server-deploy.sh : rien à vérifier.
+      - name: Vérifier la santé de l'API
+        if: vars.API_DOMAIN != ''
+        run: |
+          for tentative in 1 2 3 4 5 6; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "https://${{ vars.API_DOMAIN }}/health")
+            echo "Tentative ${tentative} : HTTP ${code}"
+            if [ "$code" = "200" ]; then
+              echo "API saine."
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "L'API ne répond pas 200 sur /health après déploiement." >&2
           exit 1
 
   # ------------------------------------------------------------------
@@ -252,6 +290,26 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Métadonnées (tags image API)
+        id: meta-api
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-api
+          tags: |
+            type=semver,pattern={{version}}
+            type=raw,value=main,enable={{is_default_branch}}
+            type=sha,format=short
+
+      - name: Build & push de l'image API
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          push: true
+          tags: ${{ steps.meta-api.outputs.tags }}
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,mode=max,scope=api
+
       - name: Déployer sur le serveur (SSH)
         uses: appleboy/ssh-action@v1.2.0
         env:
@@ -272,6 +330,7 @@ jobs:
             git fetch origin --tags --force
             git checkout --detach "$TAG"
             export IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.meta.outputs.version }}"
+            export API_IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-api:${{ steps.meta-api.outputs.version }}"
             bash deploy/server-deploy.sh up
 
       - name: Vérifier la santé de l'application
@@ -287,4 +346,21 @@ jobs:
             sleep 10
           done
           echo "L'application ne répond pas 200 sur /api/health après déploiement." >&2
+          exit 1
+
+      # Tant que API_DOMAIN n'est pas défini (tunnel pas encore créé), l'API n'est
+      # pas déployée par server-deploy.sh : rien à vérifier.
+      - name: Vérifier la santé de l'API
+        if: vars.API_DOMAIN != ''
+        run: |
+          for tentative in 1 2 3 4 5 6; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "https://${{ vars.API_DOMAIN }}/health")
+            echo "Tentative ${tentative} : HTTP ${code}"
+            if [ "$code" = "200" ]; then
+              echo "API saine."
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "L'API ne répond pas 200 sur /health après déploiement." >&2
           exit 1

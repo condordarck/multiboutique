@@ -105,12 +105,21 @@ Le monolithe actuel reste en place et déployé jusqu'à la bascule (§8).
 - Routes REST regroupées par domaine : `/auth`, `/boutiques/:id/ventes`, `/stock`,
   `/commandes`, `/fournisseurs`, `/clients`, `/promotions`, `/rapports`, `/admin/*`,
   `/public/*` (vitrine, sans session), `/uploads/*`, `/health`.
-- Le corps SQL des 50 actions est **déplacé, pas réécrit** : transactions, verrous et
-  contrôles de stock gardent leur comportement actuel. Seule l'enveloppe change
-  (arguments → corps JSON validé, `revalidatePath` → rien, le front invalide son cache).
-- Chaque route déclare la permission exigée ; un hook vérifie session, rôle et
-  périmètre de boutiques (`boutique_ids`, résolution région/groupe reprise de
-  `app/api/auth/login/route.ts`). C'est désormais **la seule** barrière d'accès.
+- Le corps SQL des 50 actions est **déplacé, pas réécrit**, dans `packages/metier`, que
+  le monolithe et l'API appellent tous deux (décision de la phase 2 : une seule copie
+  des règles de gestion tant que le monolithe tourne). `lib/actions/index.ts` n'est
+  plus qu'une couche mince : session, service, `revalidatePath`. Les services lèvent
+  `ErreurMetier(message, statut)` ; l'API la traduit en code HTTP.
+- Les lectures des pages sont recopiées dans l'API (`apps/api/src/lectures`), pas
+  partagées : les pages disparaissent en phase 5.
+- Montants (`numeric`) et comptages (`bigint`) sont renvoyés en nombres JSON.
+- Chaque route est inscrite dans un registre avec sa garde (`public`, `connexion`,
+  `boutique`, `administrateur`) ; l'utilisateur est rechargé à chaque requête (actif,
+  périmètre région/groupe, permissions de `roles_permissions`). Un test vérifie que
+  chacun des 50 services a exactement une route et qu'aucune écriture n'est publique,
+  hormis la réservation de la vitrine.
+- Le jeton de l'API est signé avec `API_JWT_SECRET`, distinct du `JWT_SECRET` du
+  monolithe.
 
 ### 4.2 Session et CSRF
 
@@ -210,14 +219,16 @@ Chaque phase se déploie en recette et laisse l'application utilisable.
 |---|---|---|
 | 0 | Monorepo, `packages/shared`, CI à trois cibles | build vert, rien ne change pour l'utilisateur |
 | 1 | Design system et maquettes | maquettes validées |
-| 2 | API : auth, lectures, écritures, tests d'intégration sur Postgres réel en CI | parité fonctionnelle avec les 50 actions et les 25 pages |
+| 2 | API : auth, lectures, écritures, tests d'intégration sur Postgres réel en CI | parité fonctionnelle avec les 50 actions et les 25 pages — **réalisée** (branche `phase-2-api`) ; mise en ligne après création du tunnel |
 | 3 | Backoffice PWA | parcours métier complets en recette |
 | 4 | www PWA | vitrine, réservation, espace client en recette |
 | 5 | Bascule : tunnel en production, retrait du monolithe Next | ancien domaine redirigé vers `www.<base>` |
 
-Déploiement : l'image de l'API remplace celle de l'application dans
-`deploy/docker-compose.prod.yml` (mêmes sauvegardes, migrations, supervision), qui gagne
-le service `cloudflared` ; les
+Déploiement : l'image de l'API s'ajoute à celle du monolithe dans
+`deploy/docker-compose.prod.yml` (profil `api`, avec le service `cloudflared`), sans port
+publié ; elle la remplacera en phase 5. `server-deploy.sh` n'active ce profil que si
+`API_IMAGE`, `API_JWT_SECRET` et `TUNNEL_TOKEN` sont fournis : un `.env` incomplet ne
+bloque pas le monolithe. `db/` reste à la racine jusqu'à la bascule. Les
 fronts sont publiés par `wrangler deploy --env <environnement>` depuis le workflow, un
 Worker par front et par environnement, avec les environnements GitHub `recette` et `production` existants.
 
