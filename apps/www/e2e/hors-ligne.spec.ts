@@ -52,5 +52,5 @@ test("la déconnexion vide le cache de l'appareil", async ({ page }) => {
   await page.getByRole("button", { name: "Se déconnecter" }).click();
   await expect(page).toHaveURL(/\/$/);
   expect(await lireIdb(page, "mb-cache-proprietaire")).toBeUndefined();
-  await expect.poll(async () => JSON.stringify((await lireIdb(page, "mb-cache-requetes")) ?? null)).not.toContain('"reservations"');
+  await expect.poll(async () => String((await lireIdb(page, "mb-cache-requetes")) ?? "")).not.toContain('"reservations"');
 });
