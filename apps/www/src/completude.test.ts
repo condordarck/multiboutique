@@ -1,8 +1,5 @@
 // @vitest-environment node
 import * as metier from "@multiboutique/metier";
-import { readdirSync, statSync } from "node:fs";
-import { join, relative } from "node:path";
-import { fileURLToPath } from "node:url";
 import { matchRoutes } from "react-router";
 import { describe, expect, it } from "vitest";
 import { SERVICES } from "./api/vitrine";
@@ -13,7 +10,9 @@ const OUTILS = new Set(["ErreurMetier", "exigerAccesBoutique", "exigerAdministra
 // Services de packages/metier qui reviennent à la vitrine.
 const SERVICES_VITRINE = ["creerReservation"];
 
-// Page publique ou client du monolithe (sous app/) → adresse de la vitrine.
+// Page publique ou client du monolithe retiré (voir l'historique Git avant la
+// phase 5) → adresse de la vitrine. Table figée : elle trace la parité et
+// vérifie que chaque route existe toujours.
 const PAGES: Record<string, string> = {
   "page.tsx": "/",
   "(public)/boutique/page.tsx": "/",
@@ -23,16 +22,6 @@ const PAGES: Record<string, string> = {
   "(auth)/register/page.tsx": "/inscription",
   "(client)/client/page.tsx": "/espace",
 };
-
-const APP = fileURLToPath(new URL("../../../app/", import.meta.url));
-
-function pages(dossier: string): string[] {
-  return readdirSync(dossier).flatMap((nom) => {
-    const chemin = join(dossier, nom);
-    if (statSync(chemin).isDirectory()) return pages(chemin);
-    return nom === "page.tsx" ? [relative(APP, chemin)] : [];
-  });
-}
 
 function aUnEcran(adresse: string): boolean {
   const derniere = (matchRoutes(routes, adresse) ?? []).at(-1)?.route;
@@ -46,10 +35,7 @@ describe("garde de complétude de la vitrine", () => {
     expect(Object.keys(SERVICES).sort()).toEqual([...SERVICES_VITRINE].sort());
   });
 
-  it("chaque page publique ou client du monolithe a sa route", () => {
-    const monolithe = ["page.tsx", "(auth)/login/page.tsx", "(auth)/register/page.tsx", ...pages(join(APP, "(public)")), ...pages(join(APP, "(client)"))];
-    // Une page ajoutée au monolithe doit être reportée dans la table.
-    expect(monolithe.filter((p) => !(p in PAGES))).toEqual([]);
-    expect(monolithe.filter((p) => !aUnEcran(PAGES[p]!))).toEqual([]);
+  it("chaque page publique ou client de l'ancien monolithe a toujours sa route", () => {
+    expect(Object.keys(PAGES).filter((p) => !aUnEcran(PAGES[p]!))).toEqual([]);
   });
 });

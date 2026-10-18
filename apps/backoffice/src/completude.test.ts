@@ -1,8 +1,5 @@
 // @vitest-environment node
 import * as metier from "@multiboutique/metier";
-import { readdirSync, statSync } from "node:fs";
-import { join, relative } from "node:path";
-import { fileURLToPath } from "node:url";
 import { matchRoutes } from "react-router";
 import { describe, expect, it } from "vitest";
 import { SERVICES } from "./api/services";
@@ -25,7 +22,9 @@ const MANQUES_ATTENDUS = new Set<string>([]);
 
 const B = "11111111-1111-1111-1111-111111111111";
 
-// Page du monolithe (sous app/) → adresse équivalente du backoffice.
+// Page du monolithe retiré (sous app/, voir l'historique Git avant la phase 5)
+// → adresse équivalente du backoffice. Table figée : elle trace la parité et
+// vérifie que chaque écran existe toujours.
 const PAGES: Record<string, string> = {
   "(auth)/login/page.tsx": "/connexion",
   "(dashboard)/dashboard/page.tsx": "/tableau-de-bord",
@@ -51,19 +50,6 @@ const PAGES: Record<string, string> = {
   "(admin)/admin/parametres/page.tsx": "/admin/parametres",
 };
 
-// Pages pas encore reprises. Vide : toutes les pages du personnel ont leur écran.
-const PAGES_MANQUANTES = new Set<string>([]);
-
-const APP = fileURLToPath(new URL("../../../app/", import.meta.url));
-
-function pagesDuMonolithe(dossier: string): string[] {
-  return readdirSync(dossier).flatMap((nom) => {
-    const chemin = join(dossier, nom);
-    if (statSync(chemin).isDirectory()) return pagesDuMonolithe(chemin);
-    return nom === "page.tsx" ? [relative(APP, chemin)] : [];
-  });
-}
-
 /**
  * Une adresse a un écran si la route la plus profonde qui la reçoit est une
  * feuille (pas une coque sans écran d'index) et pas un « * » de repli.
@@ -87,17 +73,7 @@ describe("garde de complétude du backoffice", () => {
     expect({ manquants, inconnus, perimes }).toEqual({ manquants: [], inconnus: [], perimes: [] });
   });
 
-  it("chaque page du personnel dans le monolithe a son écran", () => {
-    const pages = [
-      ...pagesDuMonolithe(join(APP, "(dashboard)")),
-      ...pagesDuMonolithe(join(APP, "(admin)")),
-      "(auth)/login/page.tsx",
-    ].sort();
-    // Une page ajoutée au monolithe doit être reportée dans la table.
-    expect(pages.filter((p) => !(p in PAGES))).toEqual([]);
-
-    const sansEcran = pages.filter((p) => !aUnEcran(PAGES[p]!) && !PAGES_MANQUANTES.has(p));
-    const perimees = pages.filter((p) => aUnEcran(PAGES[p]!) && PAGES_MANQUANTES.has(p));
-    expect({ sansEcran, perimees }).toEqual({ sansEcran: [], perimees: [] });
+  it("chaque page du personnel de l'ancien monolithe a toujours son écran", () => {
+    expect(Object.keys(PAGES).filter((p) => !aUnEcran(PAGES[p]!))).toEqual([]);
   });
 });
