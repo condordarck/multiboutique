@@ -1,7 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
-import { appliquerTheme, themeEnregistre } from "./theme";
+import { appliquerTheme, themeEnregistre } from "@multiboutique/ui";
 import "./styles.css";
 
 // Avant le premier rendu, pour ne pas montrer le mauvais thème un instant.

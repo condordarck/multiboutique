@@ -1,4 +1,4 @@
-import { ChoixSegmente } from "@multiboutique/ui";
+import { ChoixSegmente } from "../composants/ChoixSegmente";
 import { useState } from "react";
 import { appliquerTheme, themeEnregistre, type Theme } from "./theme";
 

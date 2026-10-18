@@ -1,8 +1,16 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { createBrowserRouter, RouterProvider, type RouteObject } from "react-router";
+import { Introuvable } from "./ecrans/Introuvable";
+
+export const routes: RouteObject[] = [{ path: "*", element: <Introuvable /> }];
+
+const client = new QueryClient();
+const routeur = createBrowserRouter(routes);
+
 export function App() {
   return (
-    <main>
-      <h1>MultiBoutique</h1>
-      <p>Backoffice — en construction</p>
-    </main>
+    <QueryClientProvider client={client}>
+      <RouterProvider router={routeur} />
+    </QueryClientProvider>
   );
 }

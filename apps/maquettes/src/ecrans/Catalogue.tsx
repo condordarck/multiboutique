@@ -3,7 +3,7 @@ import { useState } from "react";
 import { BOUTIQUES, CATEGORIES, etatStock, formatMontant, PRODUITS, type EtatStock } from "../donnees";
 import { IconeSac } from "../icones";
 import { correspond } from "../recherche";
-import { SelecteurTheme } from "../SelecteurTheme";
+import { SelecteurTheme } from "@multiboutique/ui";
 
 type Boutique = (typeof BOUTIQUES)[number];
 

@@ -1,0 +1,12 @@
+@import "tailwindcss";
+@import "@multiboutique/ui/theme.css";
+
+/* Les composants vivent dans packages/ui, hors du dossier de l'app :
+   Tailwind ne les analyse que si on le lui dit. */
+@source "../../../packages/ui/src";
+
+@layer base {
+  body {
+    @apply m-0 bg-fond font-texte text-texte antialiased;
+  }
+}

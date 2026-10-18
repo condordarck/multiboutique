@@ -10,7 +10,7 @@ import {
   IconeStock,
   IconeVentes,
 } from "./icones";
-import { SelecteurTheme } from "./SelecteurTheme";
+import { SelecteurTheme } from "@multiboutique/ui";
 
 type Section = "vente" | "stock";
 

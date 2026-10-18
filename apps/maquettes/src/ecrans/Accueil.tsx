@@ -1,5 +1,5 @@
 import { Logotype } from "@multiboutique/ui";
-import { SelecteurTheme } from "../SelecteurTheme";
+import { SelecteurTheme } from "@multiboutique/ui";
 
 const ECRANS = [
   {

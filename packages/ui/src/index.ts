@@ -21,3 +21,6 @@ export {
 } from "./composants/ListeAdaptative";
 
 export { Coque, type ComposantLien, type CoqueProps, type EntreeNavigation } from "./coque/Coque";
+
+export { appliquerTheme, themeEnregistre, type Theme } from "./theme/theme";
+export { SelecteurTheme } from "./theme/SelecteurTheme";
