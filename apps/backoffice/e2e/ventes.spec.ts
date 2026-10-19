@@ -72,3 +72,25 @@ test("un refus de l'API garde le panier", async ({ page }) => {
   await expect(page.getByRole("alert")).toBeVisible();
   await expect(page.getByRole("group", { name: "Quantité de Riz 25 kg" })).toContainText("1");
 });
+
+test("réglages d'impression du poste : modes directs proposés par Chrome, largeur 58 mm à l'impression", async ({ page }) => {
+  await seConnecter(page, "vendeur");
+  await page.goto("/impression");
+  await expect(page.getByRole("heading", { level: 1, name: "Impression des tickets" })).toBeVisible();
+  // Chromium connaît WebUSB, Web Bluetooth et Web Serial.
+  await expect(page.getByRole("option", { name: "USB direct", exact: true })).toBeAttached();
+  await expect(page.getByRole("option", { name: "Port série", exact: true })).toBeAttached();
+  await page.getByText("58 mm", { exact: true }).click();
+  await verifierFormats(page, "impression");
+
+  const apercu = page.getByRole("region", { name: "Reçu TEST-0001" });
+  await page.emulateMedia({ media: "print" });
+  // 48 mm imprimables sur un rouleau de 58 mm.
+  expect(Math.round(await apercu.evaluate((e) => e.getBoundingClientRect().width))).toBe(181);
+  await page.emulateMedia({ media: "screen" });
+
+  // Gardé sur le poste : relu après rechargement.
+  await page.reload();
+  await expect(page.getByRole("radio", { name: "58 mm" })).toBeChecked();
+});
+

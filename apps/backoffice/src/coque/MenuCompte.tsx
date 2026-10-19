@@ -1,5 +1,6 @@
 import { clsx } from "clsx";
 import { useEffect, useId, useRef, useState } from "react";
+import { Link } from "react-router";
 import { useSession, useUtilisateur } from "@multiboutique/front";
 import { LIBELLES_ROLE } from "./navigation";
 
@@ -8,7 +9,7 @@ const FOCUS = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visi
 /** Nom et rôle de l'utilisateur ; ouvre la déconnexion. */
 export function MenuCompte() {
   const utilisateur = useUtilisateur();
-  const { deconnecter } = useSession();
+  const { deconnecter, peut } = useSession();
   const [ouvert, setOuvert] = useState(false);
   const idPanneau = useId();
   const racine = useRef<HTMLDivElement>(null);
@@ -46,6 +47,15 @@ export function MenuCompte() {
         className="absolute right-0 z-30 mt-2 w-56 rounded-carte border border-bordure bg-surface p-2 shadow-carte"
       >
         <p className="m-0 truncate px-3 py-2 text-mention text-texte-discret">{utilisateur.email}</p>
+        {(peut("ventes:creer") || peut("reservations:gerer")) && (
+          <Link
+            to="/impression"
+            onClick={() => setOuvert(false)}
+            className={clsx("flex min-h-12 w-full items-center rounded-bouton px-3 font-semibold text-texte no-underline hover:bg-surface-relevee", FOCUS)}
+          >
+            Imprimante de ce poste
+          </Link>
+        )}
         <button
           type="button"
           onClick={() => void deconnecter()}

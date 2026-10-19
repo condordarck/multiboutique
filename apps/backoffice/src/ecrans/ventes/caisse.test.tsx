@@ -1,10 +1,12 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { sansViolation } from "@multiboutique/front/test/axe";
 import { fauxApi, type FauxApi } from "@multiboutique/front/test/faux-api";
 import { BOUTIQUE_DETAIL, CLIENTS_ACTIFS, PRODUITS } from "../../../test/donnees";
 import { BOUTIQUE_1, connecte, rendreApp, utilisateur } from "../../../test/rendu";
+import { fauxMateriel } from "../../impression/faux-materiel";
+import { enregistrerReglages, REGLAGES_DEFAUT } from "../../impression/reglages";
 
 let api: FauxApi;
 const CAISSE = `/b/${BOUTIQUE_1}/ventes/nouvelle`;
@@ -126,5 +128,63 @@ describe("caisse", () => {
     await ajouter(/^Riz 25 kg/);
     await waitFor(() => expect(screen.getByTestId("total")).toBeTruthy());
     await sansViolation(container);
+  });
+});
+
+describe("caisse : impression", () => {
+  const USB = { nom: "Winbond POS-80", vendorId: 0x0416, productId: 0x5011, serialNumber: "SN1" };
+  afterEach(() => vi.restoreAllMocks());
+
+  async function encaisser(reference: string) {
+    api.repondre("POST", `/boutiques/${BOUTIQUE_1}/ventes`, 201, { success: true, reference, montantTotal: 22, remise: 0, reste: 0 });
+    rendreApp(CAISSE);
+    await ajouter(/^Riz 25 kg/);
+    await userEvent.type(screen.getByLabelText("Montant reçu ($)"), "22");
+    await userEvent.click(screen.getByRole("button", { name: /^Encaisser/ }));
+    return screen.findByRole("region", { name: `Reçu ${reference}` });
+  }
+
+  it("sans impression automatique : rien ne part avant le clic", async () => {
+    const imprimer = vi.spyOn(window, "print").mockImplementation(() => {});
+    await encaisser("V-0050");
+    expect(imprimer).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole("button", { name: "Imprimer le reçu" }));
+    expect(imprimer).toHaveBeenCalledOnce();
+  });
+
+  it("impression automatique en USB : le ticket part une fois, dès l'encaissement", async () => {
+    const materiel = fauxMateriel(["usb"]);
+    materiel.autorises.usb = 1;
+    enregistrerReglages({ ...REGLAGES_DEFAUT, mode: "usb", automatique: true, imprimantes: { usb: USB } });
+    try {
+      await encaisser("V-0051");
+      await waitFor(() => expect(materiel.recus).toHaveLength(1));
+      const texte = Buffer.from(materiel.recus[0]!).toString("latin1");
+      // « N° » : le degré est l'octet 0xF8 de la table PC858.
+      expect(texte).toContain(`N${String.fromCharCode(0xf8)} V-0051`);
+      expect(texte).toContain("Riz 25 kg");
+      await new Promise((r) => setTimeout(r, 50));
+      expect(materiel.recus).toHaveLength(1);
+    } finally {
+      materiel.restaurer();
+    }
+  });
+
+  it("imprimante en panne : le message le dit, et le navigateur prend le relais", async () => {
+    const materiel = fauxMateriel(["usb"]);
+    const imprimer = vi.spyOn(window, "print").mockImplementation(() => {});
+    enregistrerReglages({ ...REGLAGES_DEFAUT, mode: "usb", imprimantes: { usb: USB } });
+    try {
+      await encaisser("V-0052");
+      await userEvent.click(screen.getByRole("button", { name: "Imprimer le reçu" }));
+      const alerte = await screen.findByRole("alert");
+      expect(alerte.textContent).toMatch(/Imprimante USB introuvable/);
+      expect(within(alerte).getByRole("link", { name: "Réglages d'impression" }).getAttribute("href")).toBe("/impression");
+      await userEvent.click(within(alerte).getByRole("button", { name: "Imprimer avec le navigateur" }));
+      expect(imprimer).toHaveBeenCalledOnce();
+      expect(materiel.recus).toEqual([]);
+    } finally {
+      materiel.restaurer();
+    }
   });
 });

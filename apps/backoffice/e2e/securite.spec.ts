@@ -18,7 +18,7 @@ test("la CSP est servie, et aucun écran ne la viole", async ({ page, request })
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     await page.waitForLoadState("networkidle");
   }
-  for (const ecran of ["/tableau-de-bord", "/consolidation"]) {
+  for (const ecran of ["/tableau-de-bord", "/consolidation", "/impression"]) {
     await page.goto(ecran);
     await page.waitForLoadState("networkidle");
   }

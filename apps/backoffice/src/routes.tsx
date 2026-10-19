@@ -20,6 +20,7 @@ import { ParametresAdmin } from "./ecrans/admin/ParametresAdmin";
 import { Roles } from "./ecrans/admin/Roles";
 import { Utilisateurs } from "./ecrans/admin/Utilisateurs";
 import { Introuvable } from "./ecrans/Introuvable";
+import { ReglagesImpression } from "./ecrans/impression/ReglagesImpression";
 import { BandeauHorsLigne, FournisseurSession, GardeProprietaire, MiseAJour } from "@multiboutique/front";
 import { persistance } from "./hors-ligne/instance";
 import { Rapports } from "./ecrans/rapports/Rapports";
@@ -84,6 +85,7 @@ export const routes: RouteObject[] = [
             children: [
               { path: "tableau-de-bord", element: <TableauDeBord /> },
               { path: "consolidation", element: <Consolidation /> },
+              { path: "impression", element: <ReglagesImpression /> },
               { path: "b/:boutiqueId", children: routesBoutique },
             ],
           },

@@ -4,8 +4,8 @@ import { useParams } from "react-router";
 import { useMonnaie } from "../../api/generales";
 import { useBoutique } from "../../api/tableaux";
 import { annulerVente, LIBELLES_PAIEMENT, useVente } from "../../api/ventes";
-import { EnTeteEcran, Lecture, LienBouton, useEcriture, useSession } from "@multiboutique/front";
-import { Ticket } from "./Ticket";
+import { Lecture, LienBouton, useEcriture, useSession } from "@multiboutique/front";
+import { ImpressionTicket } from "../../impression/ImpressionTicket";
 
 /**
  * Reçu d'une vente (app/(dashboard)/dashboard/[boutiqueId]/ventes/[venteId]/page.tsx),
@@ -38,12 +38,11 @@ export function DetailVente() {
         const total = Number(vente.montant_total) || 0;
         const paye = Number(vente.montant_paye) || 0;
         return (
-          <div className="flex flex-col gap-5 pb-6">
-            <EnTeteEcran
+          <>
+            <ImpressionTicket
               titre="Reçu de vente"
               actions={
                 <>
-                  <Bouton onClick={() => window.print()}>Imprimer le reçu</Bouton>
                   {vente.statut === "validee" && peut("ventes:annuler") && (
                     <Bouton variante="danger" onClick={() => setOuvert(true)}>
                       Annuler la vente
@@ -54,27 +53,25 @@ export function DetailVente() {
                   </LienBouton>
                 </>
               }
-            />
-            <Ticket
-              boutique={boutique.data ?? { nom: "" }}
-              reference={vente.reference_vente}
-              date={new Date(vente.created_at).toLocaleString("fr-FR")}
-              vendeur={vente.vendeur_nom}
-              paiement={LIBELLES_PAIEMENT[vente.mode_paiement] ?? vente.mode_paiement}
-              client={vente.client_nom}
-              lignes={lignes.map((l) => ({
-                nom: l.produit_nom,
-                code: l.produit_code || l.produit_reference,
-                quantite: Number(l.quantite),
-                prix: Number(l.prix_unitaire),
-              }))}
-              monnaie={monnaie}
-              total={total}
-              remise={Number(vente.remise) || 0}
-              {...(vente.client_id
-                ? { paye, reste: vente.statut !== "annulee" ? Math.max(0, total - paye) : 0 }
-                : {})}
-              annulee={vente.statut === "annulee" ? (vente.motif_annulation ?? "") : null}
+              ticket={{
+                boutique: boutique.data ?? { nom: "" },
+                reference: vente.reference_vente,
+                date: new Date(vente.created_at).toLocaleString("fr-FR"),
+                vendeur: vente.vendeur_nom,
+                paiement: LIBELLES_PAIEMENT[vente.mode_paiement] ?? vente.mode_paiement,
+                client: vente.client_nom,
+                lignes: lignes.map((l) => ({
+                  nom: l.produit_nom,
+                  code: l.produit_code || l.produit_reference,
+                  quantite: Number(l.quantite),
+                  prix: Number(l.prix_unitaire),
+                })),
+                monnaie,
+                total,
+                remise: Number(vente.remise) || 0,
+                ...(vente.client_id ? { paye, reste: vente.statut !== "annulee" ? Math.max(0, total - paye) : 0 } : {}),
+                annulee: vente.statut === "annulee" ? (vente.motif_annulation ?? "") : null,
+              }}
             />
             <Dialogue
               ouvert={ouvert}
@@ -105,7 +102,7 @@ export function DetailVente() {
                 </p>
               )}
             </Dialogue>
-          </div>
+          </>
         );
       }}
     </Lecture>

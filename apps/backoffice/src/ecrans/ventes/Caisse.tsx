@@ -8,7 +8,8 @@ import { useMonnaie } from "../../api/generales";
 import { useBoutique } from "../../api/tableaux";
 import { creerVente, LIBELLES_PAIEMENT } from "../../api/ventes";
 import { correspond, EnTeteEcran, formatMontant, formatNombre, Lecture, LienBouton, lireNombre, useEcriture, useSession, useUtilisateur } from "@multiboutique/front";
-import { Ticket, type TicketProps } from "./Ticket";
+import { ImpressionTicket } from "../../impression/ImpressionTicket";
+import type { TicketProps } from "./Ticket";
 
 const MODES: { valeur: ModePaiement; libelle: string }[] = [
   { valeur: "especes", libelle: "Espèces" },
@@ -159,20 +160,16 @@ function SaisieVente({ boutiqueId, produits }: { boutiqueId: string; produits: P
 
   if (recu) {
     return (
-      <div className="flex flex-col gap-5 pb-6">
-        <EnTeteEcran
-          titre="Vente enregistrée"
-          actions={
-            <>
-              <Bouton onClick={() => window.print()}>Imprimer le reçu</Bouton>
-              <Bouton variante="secondaire" onClick={toutEffacer}>
-                Nouvelle vente
-              </Bouton>
-            </>
-          }
-        />
-        <Ticket {...recu} />
-      </div>
+      <ImpressionTicket
+        titre="Vente enregistrée"
+        ticket={recu}
+        automatique
+        actions={
+          <Bouton variante="secondaire" onClick={toutEffacer}>
+            Nouvelle vente
+          </Bouton>
+        }
+      />
     );
   }
 

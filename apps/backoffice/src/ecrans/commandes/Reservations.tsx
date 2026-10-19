@@ -7,7 +7,8 @@ import { useMonnaie } from "../../api/generales";
 import { useBoutique } from "../../api/tableaux";
 import { LIBELLES_PAIEMENT } from "../../api/ventes";
 import { EnTeteEcran, formatMontant, formatNombre, ListeChargee, useEcriture, useSession, useUtilisateur } from "@multiboutique/front";
-import { Ticket, type TicketProps } from "../ventes/Ticket";
+import { ImpressionTicket } from "../../impression/ImpressionTicket";
+import type { TicketProps } from "../ventes/Ticket";
 
 const STATUTS: Record<StatutReservation, { libelle: string; ton: TonBadge }> = {
   en_attente: { libelle: "En attente", ton: "alerte" },
@@ -36,20 +37,16 @@ export function Reservations() {
 
   if (recu) {
     return (
-      <div className="flex flex-col gap-5 pb-6">
-        <EnTeteEcran
-          titre="Réservation encaissée"
-          actions={
-            <>
-              <Bouton onClick={() => window.print()}>Imprimer le reçu</Bouton>
-              <Bouton variante="secondaire" onClick={() => setRecu(null)}>
-                Terminé
-              </Bouton>
-            </>
-          }
-        />
-        <Ticket {...recu} />
-      </div>
+      <ImpressionTicket
+        titre="Réservation encaissée"
+        ticket={recu}
+        automatique
+        actions={
+          <Bouton variante="secondaire" onClick={() => setRecu(null)}>
+            Terminé
+          </Bouton>
+        }
+      />
     );
   }
 

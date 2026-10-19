@@ -64,6 +64,30 @@ affichées une seule fois.
 | `gerant`, `gerant_stock`, `comptable`, `vendeur` | backoffice : leur boutique, selon leurs permissions. |
 | `client` | vitrine : catalogue, réservation, « Mes réservations ». |
 
+## Impression des tickets
+
+Le reçu d'une vente est un ticket de caisse (rouleau de 58 ou 80 mm). Chaque
+poste règle son imprimante dans le backoffice, menu du compte → « Imprimante de
+ce poste » (`/impression`) ; les réglages restent dans ce navigateur.
+
+| Mode | Matériel | Navigateurs |
+|---|---|---|
+| Navigateur | toute imprimante installée, par la fenêtre d'impression | tous |
+| USB direct | imprimante ESC/POS en USB (WebUSB) | Chrome, Edge ; Chrome Android |
+| Bluetooth | imprimante ESC/POS Bluetooth basse consommation | Chrome, Edge ; Chrome Android |
+| Port série | Bluetooth classique appairé (port COM), USB-série (Web Serial) | Chrome, Edge sur ordinateur |
+
+- Sans fenêtre d'impression en mode Navigateur : lancer Chrome avec
+  `--kiosk-printing`, l'imprimante de tickets étant celle par défaut.
+- USB sous Windows : un pilote d'imprimante installé garde l'appareil ; le
+  remplacer par WinUSB (outil Zadig), ou passer par le mode Port série. Sous
+  Linux, le module `usblp` doit le libérer.
+- Options des modes directs : jeu de caractères, coupe du papier, tiroir-caisse,
+  exemplaires. Pour tous : impression automatique après l'encaissement, ticket
+  de test. Une imprimante en panne propose de repasser par le navigateur.
+- Une imprimante réseau (Wi-Fi, Ethernet) passe par le mode Navigateur : un
+  navigateur ne peut pas lui parler directement.
+
 ## Tests
 
 ```bash

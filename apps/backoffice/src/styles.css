@@ -36,6 +36,10 @@
     padding: 0;
     background: #fff;
   }
+  /* Rouleau de 58 mm (réglage du poste) : 48 mm imprimables. */
+  .zone-impression.ticket[data-papier="58"] {
+    width: 48mm;
+  }
   .zone-impression.ticket,
   .zone-impression.ticket * {
     color: #000;
