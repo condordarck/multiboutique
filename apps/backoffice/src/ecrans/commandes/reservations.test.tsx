@@ -56,7 +56,7 @@ describe("réservations", () => {
     await userEvent.click(within(carte("R-0008")).getByRole("button", { name: "Encaisser" }));
     const recu = await screen.findByRole("region", { name: "Reçu VTE-77" });
     expect(within(recu).getByText("Réservation : R-0008")).toBeTruthy();
-    expect(within(recu).getByText("Paiement : Mobile Money")).toBeTruthy();
+    expect(within(recu).getByText("Paiement").nextSibling?.textContent).toBe("Mobile Money");
     expect(api.ecritures().map((a) => [a.chemin, a.corps])).toEqual([
       ["/reservations/r1/confirmation", {}],
       ["/reservations/r2/encaissement", { mode_paiement: "mobile_money" }],

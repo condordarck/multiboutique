@@ -58,6 +58,8 @@ describe("reçu d'une vente", () => {
     const recu = await screen.findByRole("region", { name: "Reçu V-0001" });
     expect(within(recu).getByText("Riz 25 kg")).toBeTruthy();
     expect(within(recu).getByText("CER-0001")).toBeTruthy();
+    expect(espaces(within(recu).getByText(/^2 x /).textContent)).toBe("2 x 22 $");
+    expect(within(recu).getByText("2 articles")).toBeTruthy();
     expect(espaces(within(recu).getByText("TOTAL").nextSibling?.textContent)).toBe("44 $");
     await sansViolation(container);
 

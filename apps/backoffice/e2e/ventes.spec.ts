@@ -39,6 +39,10 @@ test("un vendeur encaisse, la gérante annule : le stock suit", async ({ browser
   const recu = vendeur.getByRole("region", { name: /^Reçu / });
   await expect(recu).toBeVisible();
   const reference = (await recu.getAttribute("aria-label"))!.replace("Reçu ", "");
+  // À l'impression, le reçu prend la largeur imprimable d'un rouleau de 80 mm (72 mm).
+  await vendeur.emulateMedia({ media: "print" });
+  expect(Math.round(await recu.evaluate((e) => e.getBoundingClientRect().width))).toBe(272);
+  await vendeur.emulateMedia({ media: "screen" });
   await attendreDisponibleRiz(vendeur, avant - 2);
 
   await vendeur.goto(`/b/${BOUTIQUE_1}/ventes`);

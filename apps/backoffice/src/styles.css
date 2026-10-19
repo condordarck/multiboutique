@@ -28,4 +28,26 @@
     width: 100%;
     box-shadow: none;
   }
+  /* Ticket de caisse : largeur imprimable d'un rouleau de 80 mm, noir sur blanc
+     (les imprimantes thermiques n'ont pas de gris). */
+  .zone-impression.ticket {
+    width: 72mm;
+    max-width: none;
+    padding: 0;
+    background: #fff;
+  }
+  .zone-impression.ticket,
+  .zone-impression.ticket * {
+    color: #000;
+    border-color: #000;
+  }
+  body:has(.ticket) {
+    page: ticket;
+  }
+}
+
+/* Page du ticket : marges minimales, la hauteur suit le rouleau. Les autres
+   impressions (rapports) gardent les marges du navigateur. */
+@page ticket {
+  margin: 2mm 4mm;
 }
