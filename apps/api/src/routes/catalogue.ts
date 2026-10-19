@@ -2,6 +2,7 @@ import * as metier from "@multiboutique/metier";
 import {
   schemaApplicationPrixConseilles,
   schemaCreationProduit,
+  schemaModificationProduit,
   schemaMouvementStock,
   schemaPrix,
   schemaPrixReference,
@@ -21,6 +22,15 @@ export const routesCatalogue: FastifyPluginAsync<{ db: metier.Db }> = async (app
       const { produit, prix_vente, cout_revient } = schemaCreationProduit.parse(r.body);
       return metier.creerProduit(db, u, parametre(r, "boutiqueId"), produit, prix_vente, cout_revient);
     },
+  });
+
+  route(app, {
+    methode: "PUT",
+    chemin: "/boutiques/:boutiqueId/produits/:produitId",
+    garde: "boutique",
+    service: "modifierProduit",
+    gerer: (r, u) =>
+      metier.modifierProduit(db, u, parametre(r, "boutiqueId"), parametre(r, "produitId"), schemaModificationProduit.parse(r.body)),
   });
 
   route(app, {

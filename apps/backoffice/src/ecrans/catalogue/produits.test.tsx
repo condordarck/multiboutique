@@ -42,7 +42,7 @@ describe("produits", () => {
     expect(entetes).not.toContain("Coût revient");
     expect(entetes).not.toContain("Marge");
     expect(screen.queryByRole("button", { name: "Nouveau produit" })).toBeNull();
-    expect(screen.queryByRole("button", { name: /Modifier le prix/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Modifier/ })).toBeNull();
   });
 
   it("crée un produit avec photo et stock initial", async () => {
@@ -136,5 +136,69 @@ describe("produits", () => {
     await userEvent.type(prix, "24");
     await userEvent.click(within(panneau).getByRole("button", { name: "Enregistrer" }));
     await waitFor(() => expect(api.ecritures()[0]).toMatchObject({ methode: "PUT", corps: { prix_vente: 24, cout_revient: 18 } }));
+  });
+
+  it("modifie les informations et remplace la photo", async () => {
+    preparer();
+    api.repondre("POST", "/uploads", 200, { url: "/uploads/produits/neuve.png" });
+    api.repondre("PUT", `/boutiques/${BOUTIQUE_1}/produits/p-riz`, 200, { success: true });
+    rendreApp(PAGE);
+    const table = await screen.findByRole("table", { name: "Produits de la boutique" });
+    await userEvent.click(within(table).getByRole("button", { name: "Modifier Riz 25 kg" }));
+    const panneau = screen.getByRole("dialog", { name: "Modifier Riz 25 kg" });
+    expect((within(panneau).getByLabelText("Nom du produit") as HTMLInputElement).value).toBe("Riz 25 kg");
+    expect((within(panneau).getByLabelText(/Code produit/) as HTMLInputElement).value).toBe("CER-0001");
+    expect((within(panneau).getByLabelText("Catégorie (rayon)") as HTMLSelectElement).value).toBe("cat-1");
+
+    const nom = within(panneau).getByLabelText("Nom du produit");
+    await userEvent.clear(nom);
+    await userEvent.type(nom, "Riz parfumé 25 kg");
+    await userEvent.upload(within(panneau).getByLabelText("Photo du produit"), new File(["x"], "riz.png", { type: "image/png" }));
+    expect((await within(panneau).findByRole("img", { name: "Aperçu du produit" })).getAttribute("src")).toBe(
+      "https://api.test/uploads/produits/neuve.png"
+    );
+    await userEvent.click(within(panneau).getByRole("button", { name: "Enregistrer" }));
+
+    await waitFor(() => expect(api.ecritures().map((a) => a.chemin)).toEqual(["/uploads", `/boutiques/${BOUTIQUE_1}/produits/p-riz`]));
+    expect(api.ecritures()[1]!.corps).toEqual({
+      nom: "Riz parfumé 25 kg",
+      description: "",
+      categorie_id: "cat-1",
+      image_url: "/uploads/produits/neuve.png",
+      code: "CER-0001",
+    });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
+  it("retire la photo d'un produit", async () => {
+    api = fauxApi();
+    connecte(api, utilisateur({ role: "gerant" }));
+    api.repondre("GET", `/boutiques/${BOUTIQUE_1}`, 200, BOUTIQUE_DETAIL);
+    api.repondre("GET", `/boutiques/${BOUTIQUE_1}/produits`, 200, [{ ...PRODUITS[0]!, produit_image: "/uploads/produits/ancienne.png" }]);
+    api.repondre("GET", "/categories", 200, [{ id: "cat-1", nom: "Céréales", code: "CER" }]);
+    api.repondre("PUT", `/boutiques/${BOUTIQUE_1}/produits/p-riz`, 200, { success: true });
+    rendreApp(PAGE);
+    const table = await screen.findByRole("table", { name: "Produits de la boutique" });
+    await userEvent.click(within(table).getByRole("button", { name: "Modifier Riz 25 kg" }));
+    const panneau = screen.getByRole("dialog", { name: "Modifier Riz 25 kg" });
+    expect(within(panneau).getByRole("img", { name: "Aperçu du produit" }).getAttribute("src")).toBe(
+      "https://api.test/uploads/produits/ancienne.png"
+    );
+    await userEvent.click(within(panneau).getByRole("button", { name: "Retirer la photo" }));
+    expect(within(panneau).queryByRole("img", { name: "Aperçu du produit" })).toBeNull();
+    await userEvent.click(within(panneau).getByRole("button", { name: "Enregistrer" }));
+    await waitFor(() => expect(api.ecritures()[0]!.corps).toMatchObject({ image_url: "" }));
+  });
+
+  it("refuse un nom vide sans appeler l'API", async () => {
+    preparer();
+    rendreApp(PAGE);
+    const table = await screen.findByRole("table", { name: "Produits de la boutique" });
+    await userEvent.click(within(table).getByRole("button", { name: "Modifier Riz 25 kg" }));
+    const panneau = screen.getByRole("dialog", { name: "Modifier Riz 25 kg" });
+    await userEvent.clear(within(panneau).getByLabelText("Nom du produit"));
+    await userEvent.click(within(panneau).getByRole("button", { name: "Enregistrer" }));
+    expect(within(panneau).getByText("Le nom du produit est requis")).toBeTruthy();
+    expect(api.ecritures()).toEqual([]);
   });
 });

@@ -4,7 +4,7 @@ import { clsx } from "clsx";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { useParams } from "react-router";
-import { creerProduit, disponible, entrerStock, modifierPrix, useCategories, useProduits } from "../../api/catalogue";
+import { creerProduit, disponible, entrerStock, modifierPrix, modifierProduit, useCategories, useProduits } from "../../api/catalogue";
 import { correspond, EnTeteEcran, ErreurApi, formatMontant, formatNombre, Formulaire, lireEntier, lireNombre, ListeChargee, televerser, urlImage, useEcriture, useSession } from "@multiboutique/front";
 import { useMonnaie } from "../../api/generales";
 import { useBoutique } from "../../api/tableaux";
@@ -19,7 +19,9 @@ export function Produits() {
   const [recherche, setRecherche] = useState("");
   const [creation, setCreation] = useState(false);
   const [prixDe, setPrixDe] = useState<ProduitBoutique | null>(null);
+  const [aModifier, setAModifier] = useState<ProduitBoutique | null>(null);
   const voitCout = peut("prix:gerer");
+  const gereProduits = peut("produits:gerer");
 
   const filtres = {
     ...produits,
@@ -101,19 +103,29 @@ export function Produits() {
               rendu: (p) => (p.produit_actif ? <Badge ton="succes">Actif</Badge> : <Badge ton="danger">Inactif</Badge>),
             },
           ]}
-          libelleAction="Prix"
+          libelleAction="Actions"
           action={
-            voitCout
+            gereProduits || voitCout
               ? (p) => (
-                  <Bouton variante="discret" aria-label={`Modifier le prix de ${p.produit_nom}`} onClick={() => setPrixDe(p)}>
-                    Modifier le prix
-                  </Bouton>
+                  <span className="flex flex-wrap justify-end gap-1">
+                    {gereProduits && (
+                      <Bouton variante="discret" aria-label={`Modifier ${p.produit_nom}`} onClick={() => setAModifier(p)}>
+                        Modifier
+                      </Bouton>
+                    )}
+                    {voitCout && (
+                      <Bouton variante="discret" aria-label={`Modifier le prix de ${p.produit_nom}`} onClick={() => setPrixDe(p)}>
+                        Prix
+                      </Bouton>
+                    )}
+                  </span>
                 )
               : undefined
           }
         />
       </Carte>
       {creation && <NouveauProduit boutiqueId={boutiqueId} onFermer={() => setCreation(false)} />}
+      {aModifier && <ModifierProduit boutiqueId={boutiqueId} produit={aModifier} onFermer={() => setAModifier(null)} />}
       {prixDe && <PrixProduit boutiqueId={boutiqueId} produit={prixDe} onFermer={() => setPrixDe(null)} />}
     </div>
   );
@@ -126,7 +138,6 @@ function NouveauProduit({ boutiqueId, onFermer }: { boutiqueId: string; onFermer
   const [image, setImage] = useState("");
   const [envoiPhoto, setEnvoiPhoto] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
-  const photo = useRef<HTMLInputElement>(null);
   const client = useQueryClient();
   const creation = useEcriture({
     appel: async () => {
@@ -168,20 +179,6 @@ function NouveauProduit({ boutiqueId, onFermer }: { boutiqueId: string; onFermer
     ? champs.code.trim().toUpperCase()
     : `${categorie?.code || "PRD"}-000${(categories.data?.length || 0) + 1}`;
 
-  async function choisirPhoto(fichier: File | undefined) {
-    if (!fichier) return;
-    setEnvoiPhoto(true);
-    setErreur(null);
-    try {
-      setImage((await televerser(fichier)).url);
-    } catch (e) {
-      setErreur(e instanceof ErreurApi ? e.message : "Erreur lors de l'envoi de la photo");
-    } finally {
-      setEnvoiPhoto(false);
-      if (photo.current) photo.current.value = "";
-    }
-  }
-
   async function envoyer() {
     const prix = lireNombre(champs.prix);
     if (!(prix > 0)) return setErreur("Le prix de vente doit être un nombre positif");
@@ -204,34 +201,7 @@ function NouveauProduit({ boutiqueId, onFermer }: { boutiqueId: string; onFermer
       >
         <Champ libelle="Nom du produit" required value={champs.nom} onChange={maj("nom")} erreur={creation.champs["produit.nom"]} />
         <Champ libelle="Référence (optionnel)" placeholder="auto si vide" value={champs.reference} onChange={maj("reference")} />
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="photo-produit" className="text-libelle font-semibold">
-            Photo du produit
-          </label>
-          <div className="flex items-center gap-3">
-            {image ? (
-              <img src={urlImage(image)} alt="Aperçu du produit" className="size-14 rounded-bouton object-cover" />
-            ) : (
-              <span className="flex size-14 items-center justify-center rounded-bouton border border-dashed border-bordure-forte text-mention text-texte-discret">
-                {envoiPhoto ? "…" : "Aucune"}
-              </span>
-            )}
-            <input
-              id="photo-produit"
-              ref={photo}
-              type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif"
-              disabled={envoiPhoto}
-              onChange={(e) => void choisirPhoto(e.target.files?.[0])}
-              className="min-w-0 text-libelle file:mr-3 file:min-h-11 file:rounded-bouton file:border-0 file:bg-primaire-fond file:px-4 file:font-semibold file:text-primaire"
-            />
-          </div>
-          {image && (
-            <Bouton variante="discret" className="self-start" onClick={() => setImage("")}>
-              Retirer la photo
-            </Bouton>
-          )}
-        </div>
+        <ChampPhoto image={image} onImage={setImage} enCours={envoiPhoto} onEnCours={setEnvoiPhoto} onErreur={setErreur} />
         <Champ
           libelle="Code produit (nomenclature)"
           placeholder={apercuCode}
@@ -250,6 +220,136 @@ function NouveauProduit({ boutiqueId, onFermer }: { boutiqueId: string; onFermer
         <Champ libelle="Prix de vente" type="montant" required value={champs.prix} onChange={maj("prix")} />
         <Champ libelle="Coût de revient" type="montant" value={champs.cout} onChange={maj("cout")} />
         <Champ libelle="Quantité initiale en stock" type="nombre" placeholder="0" value={champs.quantite} onChange={maj("quantite")} />
+      </Formulaire>
+    </Panneau>
+  );
+}
+
+/**
+ * Photo d'un produit : envoyée dès le choix, l'adresse rendue par l'API part
+ * ensuite avec le formulaire. Chaîne vide : pas de photo.
+ */
+function ChampPhoto({
+  image,
+  onImage,
+  enCours,
+  onEnCours,
+  onErreur,
+}: {
+  image: string;
+  onImage: (url: string) => void;
+  enCours: boolean;
+  onEnCours: (enCours: boolean) => void;
+  onErreur: (erreur: string | null) => void;
+}) {
+  const photo = useRef<HTMLInputElement>(null);
+
+  async function choisir(fichier: File | undefined) {
+    if (!fichier) return;
+    onEnCours(true);
+    onErreur(null);
+    try {
+      onImage((await televerser(fichier)).url);
+    } catch (e) {
+      onErreur(e instanceof ErreurApi ? e.message : "Erreur lors de l'envoi de la photo");
+    } finally {
+      onEnCours(false);
+      if (photo.current) photo.current.value = "";
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor="photo-produit" className="text-libelle font-semibold">
+        Photo du produit
+      </label>
+      <div className="flex items-center gap-3">
+        {image ? (
+          <img src={urlImage(image)} alt="Aperçu du produit" className="size-14 rounded-bouton object-cover" />
+        ) : (
+          <span className="flex size-14 items-center justify-center rounded-bouton border border-dashed border-bordure-forte text-mention text-texte-discret">
+            {enCours ? "…" : "Aucune"}
+          </span>
+        )}
+        <input
+          id="photo-produit"
+          ref={photo}
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/gif"
+          disabled={enCours}
+          onChange={(e) => void choisir(e.target.files?.[0])}
+          className="min-w-0 text-libelle file:mr-3 file:min-h-11 file:rounded-bouton file:border-0 file:bg-primaire-fond file:px-4 file:font-semibold file:text-primaire"
+        />
+      </div>
+      {image && (
+        <Bouton variante="discret" className="self-start" onClick={() => onImage("")}>
+          Retirer la photo
+        </Bouton>
+      )}
+    </div>
+  );
+}
+
+/** Informations du produit (communes à toutes les boutiques), dans un panneau. */
+function ModifierProduit({ boutiqueId, produit, onFermer }: { boutiqueId: string; produit: ProduitBoutique; onFermer: () => void }) {
+  const categories = useCategories();
+  const [champs, setChamps] = useState({
+    nom: produit.produit_nom,
+    code: produit.produit_code ?? "",
+    description: produit.produit_description ?? "",
+    categorie: produit.categorie_id ?? "",
+  });
+  const [image, setImage] = useState(produit.produit_image ?? "");
+  const [envoiPhoto, setEnvoiPhoto] = useState(false);
+  const [erreur, setErreur] = useState<string | null>(null);
+  const modification = useEcriture({ appel: modifierProduit, invalide: [["boutiques"]], succes: "Produit modifié" });
+  const maj = (cle: keyof typeof champs) => (e: { target: { value: string } }) => setChamps((c) => ({ ...c, [cle]: e.target.value }));
+
+  async function envoyer() {
+    if (!champs.nom.trim()) return setErreur("Le nom du produit est requis");
+    setErreur(null);
+    const ok = await modification.envoyer({
+      boutiqueId,
+      produitId: produit.produit_id,
+      produit: {
+        nom: champs.nom.trim(),
+        description: champs.description,
+        categorie_id: champs.categorie,
+        image_url: image,
+        ...(champs.code.trim() ? { code: champs.code } : {}),
+      },
+    });
+    if (ok) onFermer();
+  }
+
+  return (
+    <Panneau ouvert titre={`Modifier ${produit.produit_nom}`} onFermer={onFermer}>
+      <Formulaire
+        libelleEnvoyer="Enregistrer"
+        onEnvoyer={() => void envoyer()}
+        erreur={erreur ?? modification.erreur}
+        enCours={modification.enCours || envoiPhoto}
+        desactivee={modification.desactivee}
+        actions={
+          <Bouton variante="secondaire" onClick={onFermer}>
+            Annuler
+          </Bouton>
+        }
+      >
+        <p className="m-0 text-mention text-texte-discret">
+          Réf. {produit.produit_reference}. Ces informations sont communes à toutes les boutiques qui vendent le produit.
+        </p>
+        <Champ libelle="Nom du produit" required value={champs.nom} onChange={maj("nom")} erreur={modification.champs["nom"]} />
+        <ChampPhoto image={image} onImage={setImage} enCours={envoiPhoto} onEnCours={setEnvoiPhoto} onErreur={setErreur} />
+        <Champ libelle="Code produit (nomenclature)" value={champs.code} onChange={maj("code")} aide="Vide = code actuel conservé." />
+        <Champ libelle="Description" value={champs.description} onChange={maj("description")} />
+        <Selecteur
+          libelle="Catégorie (rayon)"
+          optionVide="Aucune"
+          options={(categories.data ?? []).map((c) => ({ valeur: c.id, libelle: c.nom }))}
+          value={champs.categorie}
+          onChange={maj("categorie")}
+        />
       </Formulaire>
     </Panneau>
   );

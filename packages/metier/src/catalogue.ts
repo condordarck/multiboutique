@@ -1,10 +1,13 @@
-import { aPermission, type ProduitFormData } from "@multiboutique/shared";
+import { aPermission, type ProduitFormData, type ProduitModifieData } from "@multiboutique/shared";
 import { exigerAccesBoutique, peutAccederBoutique } from "./acces";
 import type { Db, Utilisateur } from "./contexte";
 import { ErreurMetier } from "./erreurs";
 import { insererMouvementWithClient } from "./interne";
 
 // Produits, stock et prix : repris de lib/actions/index.ts, SQL inchangé.
+
+/** Chemin rendu par POST /uploads (apps/api/src/routes/uploads.ts). */
+const IMAGE_TELEVERSEE = /^\/uploads\/produits\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|png|webp|gif)$/;
 
 export async function creerProduit(db: Db, user: Utilisateur, 
   boutiqueId: string,
@@ -101,6 +104,87 @@ export async function creerProduit(db: Db, user: Utilisateur,
   } finally {
     client.release();
   }
+}
+
+/**
+ * Informations d'un produit : nom, description, catégorie, photo, code. Le
+ * produit est commun à toutes les boutiques ; il doit être vendu dans celle-ci.
+ */
+export async function modifierProduit(db: Db, user: Utilisateur, 
+  boutiqueId: string,
+  produitId: string,
+  data: ProduitModifieData
+) {
+  exigerAccesBoutique(user, boutiqueId, ["produits:gerer"]);
+  if (!data.nom?.trim()) throw new ErreurMetier("Nom requis");
+
+  const { rows: avantRows } = await db.query(
+    `SELECT p.nom, p.description, p.categorie_id, p.image_url, p.code
+     FROM produits p
+     JOIN prix_boutique pb ON pb.produit_id = p.id AND pb.boutique_id = $2
+     WHERE p.id = $1`,
+    [produitId, boutiqueId]
+  );
+  const avant = avantRows[0];
+  if (!avant) throw new ErreurMetier("Produit introuvable", 404);
+
+  // Une photo envoyée par POST /uploads, ou celle déjà enregistrée : pas
+  // d'adresse arbitraire, que la vitrine afficherait.
+  if (data.image_url && data.image_url !== avant.image_url && !IMAGE_TELEVERSEE.test(data.image_url)) {
+    throw new ErreurMetier("Photo invalide");
+  }
+
+  if (data.categorie_id) {
+    const { rows: categorie } = await db.query(`SELECT 1 FROM categories WHERE id = $1`, [data.categorie_id]);
+    if (categorie.length === 0) throw new ErreurMetier("Catégorie introuvable");
+  }
+
+  let code: string = avant.code;
+  if (data.code && data.code.trim()) {
+    code = data.code.trim().toUpperCase();
+    if (!/^[A-Z0-9-]{2,20}$/.test(code)) {
+      throw new ErreurMetier("Code produit invalide (lettres, chiffres, tirets uniquement)");
+    }
+    const { rows: dupe } = await db.query(
+      `SELECT 1 FROM produits WHERE code = $1 AND id <> $2`,
+      [code, produitId]
+    );
+    if (dupe.length > 0) throw new ErreurMetier("Ce code produit existe déjà");
+  }
+
+  const apres = {
+    nom: data.nom.trim(),
+    description: data.description.trim() || null,
+    categorie_id: data.categorie_id || null,
+    image_url: data.image_url || null,
+    code,
+  };
+
+  const client = await db.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query(
+      `UPDATE produits
+       SET nom = $2, description = $3, categorie_id = $4, image_url = $5, code = $6, updated_at = NOW()
+       WHERE id = $1`,
+      [produitId, apres.nom, apres.description, apres.categorie_id, apres.image_url, apres.code]
+    );
+    // Le produit est commun à toutes les boutiques : la trace dit qui l'a
+    // modifié, depuis quelle boutique, et ce qui a changé.
+    await client.query(
+      `INSERT INTO journal_audit (auteur_id, boutique_id, action, entite, entite_id, valeur_avant, valeur_apres)
+       VALUES ($1, $2, 'modification', 'produit', $3, $4, $5)`,
+      [user.id, boutiqueId, produitId, JSON.stringify(avant), JSON.stringify(apres)]
+    );
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+
+  return { success: true };
 }
 
 export async function entrerStock(db: Db, user: Utilisateur, 

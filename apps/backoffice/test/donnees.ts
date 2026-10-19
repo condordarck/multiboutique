@@ -147,6 +147,7 @@ export function produit(surcharge: Partial<ProduitBoutique> = {}): ProduitBoutiq
     produit_image: null,
     produit_description: null,
     produit_actif: true,
+    categorie_id: "cat-1",
     categorie_nom: "Céréales",
     prix_vente: 22,
     cout_revient: 18,

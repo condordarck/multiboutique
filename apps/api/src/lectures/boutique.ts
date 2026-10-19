@@ -118,7 +118,8 @@ export const lecturesBoutique: FastifyPluginAsync<{ db: Db }> = async (app, { db
     if (!rows[0]) throw new ErreurMetier("Vente introuvable", 404);
     const lignes = await db.query(
       `SELECT l.quantite, l.prix_unitaire,
-              p.nom AS produit_nom, p.reference AS produit_reference, p.code AS produit_code
+              COALESCE(l.produit_nom, p.nom) AS produit_nom, p.reference AS produit_reference,
+              COALESCE(l.produit_code, p.code) AS produit_code
        FROM lignes_vente l
        JOIN produits p ON p.id = l.produit_id
        WHERE l.vente_id = $1
@@ -198,7 +199,7 @@ export const lecturesBoutique: FastifyPluginAsync<{ db: Db }> = async (app, { db
       `SELECT pb.id, pb.produit_id, p.nom AS produit_nom, p.reference AS produit_reference,
               p.code AS produit_code, p.image_url AS produit_image,
               p.description AS produit_description, p.actif AS produit_actif,
-              c.nom AS categorie_nom,
+              p.categorie_id, c.nom AS categorie_nom,
               pb.prix_vente, pb.cout_revient,
               s.quantite, s.quantite_reservee, s.seuil_alerte
        FROM prix_boutique pb

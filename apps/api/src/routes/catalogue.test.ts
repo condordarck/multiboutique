@@ -61,6 +61,106 @@ describe("POST /boutiques/:boutiqueId/produits", () => {
   });
 });
 
+describe("PUT /boutiques/:boutiqueId/produits/:produitId", () => {
+  const url = (p: string, b: string = BOUTIQUES.b1) => `/boutiques/${b}/produits/${p}`;
+  const PHOTO = "/uploads/produits/11111111-2222-3333-4444-555555555555.png";
+  const corps = (champs: Record<string, string> = {}) => ({ nom: "N", description: "", categorie_id: "", image_url: "", ...champs });
+  const lire = async (p: string) =>
+    (await base.pool.query(`SELECT nom, description, categorie_id, image_url, code FROM produits WHERE id = $1`, [p])).rows[0];
+
+  it("modifie nom, description, catégorie, photo et code, et le trace", async () => {
+    const p = await creerProduit(base.pool, BOUTIQUES.b1);
+    const { rows: cat } = await base.pool.query(`SELECT id FROM categories LIMIT 1`);
+    const avant = await lire(p);
+    const r = await envoyer("gerant", "PUT", url(p), {
+      nom: " Riz parfumé 5 kg ",
+      description: "Sac",
+      categorie_id: cat[0].id,
+      image_url: PHOTO,
+      code: "riz-5",
+    });
+    expect(r.statusCode).toBe(200);
+    const apres = { nom: "Riz parfumé 5 kg", description: "Sac", categorie_id: cat[0].id, image_url: PHOTO, code: "RIZ-5" };
+    expect(await lire(p)).toEqual(apres);
+    const liste = await app.inject({ method: "GET", url: `/boutiques/${BOUTIQUES.b1}/produits`, headers: ecriture("backoffice", cookies.gerant) });
+    expect(liste.json().find((l: { produit_id: string }) => l.produit_id === p)).toMatchObject({ categorie_id: cat[0].id });
+
+    const { rows: trace } = await base.pool.query(
+      `SELECT boutique_id, action, entite, valeur_avant, valeur_apres FROM journal_audit WHERE entite_id = $1`,
+      [p]
+    );
+    expect(trace).toEqual([{ boutique_id: BOUTIQUES.b1, action: "modification", entite: "produit", valeur_avant: avant, valeur_apres: apres }]);
+  });
+
+  it("champs vides : photo, description et catégorie effacées, code inchangé", async () => {
+    const p = await creerProduit(base.pool, BOUTIQUES.b1);
+    await envoyer("gerant", "PUT", url(p), corps({ nom: "X", description: "D", image_url: PHOTO, code: "GARDE-1" }));
+    const r = await envoyer("gerant", "PUT", url(p), corps({ nom: "X", code: "" }));
+    expect(r.statusCode).toBe(200);
+    expect(await lire(p)).toEqual({ nom: "X", description: null, categorie_id: null, image_url: null, code: "GARDE-1" });
+  });
+
+  it("refuse un corps incomplet : un champ oublié n'efface rien", async () => {
+    const p = await creerProduit(base.pool, BOUTIQUES.b1);
+    await envoyer("gerant", "PUT", url(p), corps({ description: "D", image_url: PHOTO }));
+    expect((await envoyer("gerant", "PUT", url(p), { nom: "Y" })).statusCode).toBe(400);
+    expect(await lire(p)).toMatchObject({ nom: "N", description: "D", image_url: PHOTO });
+  });
+
+  it("photo : refuse une adresse qui ne vient pas de l'envoi d'images, garde l'ancienne telle quelle", async () => {
+    const p = await creerProduit(base.pool, BOUTIQUES.b1);
+    for (const image_url of ["https://exemple.com/x.png", "/uploads/produits/../../etc/passwd", "/uploads/produits/a.png"]) {
+      const r = await envoyer("gerant", "PUT", url(p), corps({ image_url }));
+      expect(r.statusCode).toBe(400);
+      expect(r.json().erreur).toBe("Photo invalide");
+    }
+    // Une photo plus ancienne, d'un autre format, reste acceptée inchangée.
+    await base.pool.query(`UPDATE produits SET image_url = '/uploads/ancienne.jpg' WHERE id = $1`, [p]);
+    expect((await envoyer("gerant", "PUT", url(p), corps({ nom: "Z", image_url: "/uploads/ancienne.jpg" }))).statusCode).toBe(200);
+    expect((await lire(p)).image_url).toBe("/uploads/ancienne.jpg");
+  });
+
+  it("refuse un nom vide, un code pris, une catégorie inconnue", async () => {
+    const p = await creerProduit(base.pool, BOUTIQUES.b1);
+    const autre = await creerProduit(base.pool, BOUTIQUES.b1);
+    await envoyer("gerant", "PUT", url(autre), corps({ nom: "Autre", code: "PRIS-1" }));
+    expect((await envoyer("gerant", "PUT", url(p), corps({ nom: "  " }))).statusCode).toBe(400);
+    const doublon = await envoyer("gerant", "PUT", url(p), corps({ code: "pris-1" }));
+    expect(doublon.json().erreur).toBe("Ce code produit existe déjà");
+    // Son propre code n'est pas un doublon.
+    expect((await envoyer("gerant", "PUT", url(autre), corps({ nom: "Autre", code: "PRIS-1" }))).statusCode).toBe(200);
+    const categorie = await envoyer("gerant", "PUT", url(p), corps({ categorie_id: "00000000-0000-0000-0000-000000000000" }));
+    expect(categorie.json().erreur).toBe("Catégorie introuvable");
+  });
+
+  it("refuse le vendeur, une boutique hors périmètre et un produit non vendu dans la boutique", async () => {
+    const p = await creerProduit(base.pool, BOUTIQUES.b1);
+    expect((await envoyer("vendeur", "PUT", url(p), corps())).statusCode).toBe(403);
+    expect((await envoyer("magasinier", "PUT", url(p), corps())).statusCode).toBe(403);
+    expect((await envoyer("gerantB2", "PUT", url(p), corps())).statusCode).toBe(403);
+    expect((await envoyer("gerantB2", "PUT", url(p, BOUTIQUES.b2), corps())).statusCode).toBe(404);
+    expect((await lire(p)).nom).not.toBe("N");
+  });
+
+  it("un produit renommé ne réécrit pas le reçu d'une vente passée", async () => {
+    const p = await creerProduit(base.pool, BOUTIQUES.b1, { nom: "Nom d'origine" });
+    await base.pool.query(`UPDATE produits SET code = 'ORIG-1' WHERE id = $1`, [p]);
+    const vente = await envoyer("vendeur", "POST", `/boutiques/${BOUTIQUES.b1}/ventes`, {
+      mode_paiement: "especes",
+      lignes: [{ produit_id: p, quantite: 1, prix_unitaire: 10 }],
+    });
+    expect(vente.statusCode).toBe(201);
+    await envoyer("gerant", "PUT", url(p), corps({ nom: "Nom nouveau", code: "NEUF-1" }));
+    const { rows } = await base.pool.query(`SELECT vente_id FROM lignes_vente WHERE produit_id = $1`, [p]);
+    const detail = await app.inject({
+      method: "GET",
+      url: `/boutiques/${BOUTIQUES.b1}/ventes/${rows[0].vente_id}`,
+      headers: ecriture("backoffice", cookies.gerant),
+    });
+    expect(detail.json().lignes[0]).toMatchObject({ produit_nom: "Nom d'origine", produit_code: "ORIG-1" });
+  });
+});
+
 describe("stock", () => {
   it("entrée : ajoute la quantité et trace le mouvement", async () => {
     const p = await creerProduit(base.pool, BOUTIQUES.b1, { stock: 4 });

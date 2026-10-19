@@ -266,6 +266,14 @@ export interface ProduitFormData {
   code?: string;
 }
 
+export interface ProduitModifieData {
+  nom: string;
+  description: string;
+  categorie_id: string;
+  image_url: string;
+  code?: string;
+}
+
 export interface NouvelUtilisateurData {
   nom_complet: string;
   email: string;

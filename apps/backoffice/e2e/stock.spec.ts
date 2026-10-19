@@ -34,6 +34,27 @@ test("la gérante crée un produit avec photo et stock initial, puis fait une en
   await expect(page.getByRole("table", { name: "Produits de la boutique" }).getByText("Farine de blé e2e")).toBeVisible();
   await verifierFormats(page, "produits");
 
+  // Modification : photo remplacée par une nouvelle, puis retirée.
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const imageDeLaLigne = () =>
+    page.getByRole("table", { name: "Produits de la boutique" }).getByRole("row").filter({ hasText: "Farine de blé e2e" }).locator("img");
+  const avant = await imageDeLaLigne().getAttribute("src");
+  await page.getByRole("button", { name: "Modifier Farine de blé e2e" }).click();
+  let modification = page.getByRole("dialog", { name: "Modifier Farine de blé e2e" });
+  await modification.getByLabel("Photo du produit").setInputFiles(PHOTO);
+  await expect(modification.getByRole("img", { name: "Aperçu du produit" })).not.toHaveAttribute("src", avant!);
+  await modification.getByRole("button", { name: "Enregistrer" }).click();
+  await expect(modification).toHaveCount(0);
+  await expect(imageDeLaLigne()).not.toHaveAttribute("src", avant!);
+  expect(await imageDeLaLigne().evaluate((img: HTMLImageElement) => img.naturalWidth)).toBe(1);
+
+  await page.getByRole("button", { name: "Modifier Farine de blé e2e" }).click();
+  modification = page.getByRole("dialog", { name: "Modifier Farine de blé e2e" });
+  await modification.getByRole("button", { name: "Retirer la photo" }).click();
+  await modification.getByRole("button", { name: "Enregistrer" }).click();
+  await expect(modification).toHaveCount(0);
+  await expect(imageDeLaLigne()).toHaveCount(0);
+
   await page.setViewportSize({ width: 1440, height: 900 });
   expect(await disponible(page, BOUTIQUE_1, "Farine de blé e2e")).toBe("40");
   await ligne(page, "Farine de blé e2e").getByRole("button", { name: /Gérer le stock/ }).click();

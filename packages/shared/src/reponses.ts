@@ -88,6 +88,7 @@ export interface ProduitBoutique {
   produit_image: string | null;
   produit_description: string | null;
   produit_actif: boolean;
+  categorie_id: string | null;
   categorie_nom: string | null;
   prix_vente: number;
   /** Absent sans prix:gerer. */

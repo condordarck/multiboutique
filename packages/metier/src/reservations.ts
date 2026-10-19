@@ -289,8 +289,8 @@ export async function encaisserReservation(db: Db, user: Utilisateur,
           : null;
 
       await client.query(
-        `INSERT INTO lignes_vente (vente_id, produit_id, quantite, prix_unitaire, cout_unitaire)
-         VALUES ($1, $2, $3, $4, $5)`,
+        `INSERT INTO lignes_vente (vente_id, produit_id, quantite, prix_unitaire, cout_unitaire, produit_nom, produit_code)
+         VALUES ($1, $2, $3, $4, $5, (SELECT nom FROM produits WHERE id = $2), (SELECT code FROM produits WHERE id = $2))`,
         [venteId, ligne.produit_id, ligne.quantite, prixVente, coutUnitaire]
       );
 

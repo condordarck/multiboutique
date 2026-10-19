@@ -49,6 +49,16 @@ export interface NouveauProduit {
 export const creerProduit = ({ boutiqueId, ...corps }: NouveauProduit) =>
   appeler<{ success: true; produitId: string }>("POST", `/boutiques/${boutiqueId}/produits`, corps);
 
+export interface ProduitModifie {
+  boutiqueId: string;
+  produitId: string;
+  produit: { nom: string; description: string; categorie_id: string; image_url: string; code?: string };
+}
+
+/** Champs vides : effacés ; code absent : inchangé. */
+export const modifierProduit = ({ boutiqueId, produitId, produit }: ProduitModifie) =>
+  appeler<{ success: true }>("PUT", `/boutiques/${boutiqueId}/produits/${produitId}`, produit);
+
 interface MouvementSaisi {
   boutiqueId: string;
   produitId: string;
@@ -89,4 +99,4 @@ export const modifierPrix = ({
   cout_revient?: number;
 }) => appeler<{ success: true }>("PUT", `/boutiques/${boutiqueId}/prix/${produitId}`, { prix_vente, cout_revient });
 
-export const SERVICES_CATALOGUE = { creerProduit, entrerStock, ajusterStock, transfertStock, modifierPrix };
+export const SERVICES_CATALOGUE = { creerProduit, modifierProduit, entrerStock, ajusterStock, transfertStock, modifierPrix };

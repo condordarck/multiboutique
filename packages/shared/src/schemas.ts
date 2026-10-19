@@ -56,6 +56,17 @@ export const schemaCreationProduit = z.object({
   cout_revient: z.number().optional(),
 });
 
+// Modification des informations d'un produit (commun à toutes les boutiques).
+// Tous les champs sont envoyés : un champ oublié ne doit pas en effacer la
+// valeur. Chaîne vide = champ effacé ; code absent ou vide = code inchangé.
+export const schemaModificationProduit = z.object({
+  nom: z.string().trim().min(1, "Nom requis"),
+  description: z.string(),
+  categorie_id: z.string(),
+  image_url: z.string(),
+  code: z.string().optional(),
+});
+
 export const schemaMouvementStock = z.object({
   quantite: z.number().int(),
   motif: z.string().default(""),
