@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { sansViolation } from "@multiboutique/front/test/axe";
 import { fauxApi, type FauxApi } from "@multiboutique/front/test/faux-api";
-import { fauxMateriel, type FauxMateriel } from "../../impression/faux-materiel";
+import { fauxMateriel, type FauxMateriel } from "../../../test/faux-materiel";
 import { lireReglages, oublierReglages } from "../../impression/reglages";
 import { oublierBluetooth } from "../../impression/transports";
 import { connecte, rendreApp, utilisateur } from "../../../test/rendu";

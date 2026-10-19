@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { fauxMateriel, type FauxMateriel } from "./faux-materiel";
-import { choisirImprimante, envoyer, ErreurImpression, modeDisponible, oublierBluetooth } from "./transports";
+import { fauxMateriel, type FauxMateriel } from "../../test/faux-materiel";
+import { choisirImprimante, envoyer, ErreurImpression, modeDisponible, oublierBluetooth, PAUSE_BLE_MS } from "./transports";
 
 let materiel: FauxMateriel;
 afterEach(() => {
@@ -48,6 +48,29 @@ describe("transports", () => {
     await envoyer("serie", associee, OCTETS, 115200);
     expect(materiel.journal).toEqual(["serie:open:115200", "serie:close"]);
     expect(materiel.recus).toEqual([OCTETS]);
+  });
+
+  it("port série : une imprimante Bluetooth appairée ne prend pas le port d'un autre appareil USB", async () => {
+    materiel = fauxMateriel(["serie"], { ports: ["usb", "bluetooth"] });
+    const associee = await choisirImprimante("serie");
+    expect(associee).toEqual({ nom: "Port série (Bluetooth ou intégré)" });
+    await envoyer("serie", associee, OCTETS, 9600);
+    expect(materiel.journal).toEqual(["serie-bt:open:9600", "serie-bt:close"]);
+
+    // Associée en USB-série : le port Bluetooth ne convient pas.
+    materiel.journal = [];
+    await envoyer("serie", { nom: "CH340", vendorId: 0x1a86, productId: 0x7523 }, OCTETS, 9600);
+    expect(materiel.journal).toEqual(["serie:open:9600", "serie:close"]);
+  });
+
+  it("Bluetooth sans accusé de réception : une pause entre deux morceaux", async () => {
+    materiel = fauxMateriel(["bluetooth"], { bleSansReponse: true });
+    await choisirImprimante("bluetooth");
+    await envoyer("bluetooth", { nom: "MPT-II" }, OCTETS, 9600);
+    expect(materiel.recus).toEqual([OCTETS]);
+    const instants = materiel.journal.filter((j) => j.startsWith("ble:ecrit")).map((j) => Number(j.split("@")[1]));
+    expect(instants).toHaveLength(3);
+    for (let i = 1; i < instants.length; i++) expect(instants[i]! - instants[i - 1]!).toBeGreaterThanOrEqual(PAUSE_BLE_MS - 2);
   });
 
   it("Bluetooth : canal d'écriture trouvé, envoi par morceaux ; redemandé après un rechargement", async () => {

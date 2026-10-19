@@ -15,7 +15,17 @@ export interface FauxMateriel {
 
 const concat = (morceaux: Uint8Array[]) => Uint8Array.from(morceaux.flatMap((m) => [...m]));
 
-export function fauxMateriel(modes: ("usb" | "serie" | "bluetooth")[] = ["usb", "serie", "bluetooth"]): FauxMateriel {
+export interface OptionsFauxMateriel {
+  /** Ports série présents : USB-série (identifiants USB) et/ou Bluetooth (aucun). */
+  ports?: ("usb" | "bluetooth")[];
+  /** Imprimante BLE qui n'accepte que l'écriture sans accusé de réception. */
+  bleSansReponse?: boolean;
+}
+
+export function fauxMateriel(
+  modes: ("usb" | "serie" | "bluetooth")[] = ["usb", "serie", "bluetooth"],
+  options: OptionsFauxMateriel = {}
+): FauxMateriel {
   const etat: FauxMateriel = {
     recus: [],
     journal: [],
@@ -70,18 +80,18 @@ export function fauxMateriel(modes: ("usb" | "serie" | "bluetooth")[] = ["usb", 
     },
   });
 
-  const port = () => {
+  const port = (genre: "usb" | "bluetooth") => {
     const morceaux: Uint8Array[] = [];
     return {
-      getInfo: () => ({ usbVendorId: 0x1a86, usbProductId: 0x7523 }),
+      getInfo: () => (genre === "usb" ? { usbVendorId: 0x1a86, usbProductId: 0x7523 } : {}),
       writable: null as WritableStream<Uint8Array> | null,
       async open(o: { baudRate: number }) {
         echouer();
-        etat.journal.push(`serie:open:${o.baudRate}`);
+        etat.journal.push(`serie${genre === "usb" ? "" : "-bt"}:open:${o.baudRate}`);
         this.writable = new WritableStream({ write: (m) => void morceaux.push(m) });
       },
       async close() {
-        etat.journal.push("serie:close");
+        etat.journal.push(`serie${genre === "usb" ? "" : "-bt"}:close`);
         etat.recus.push(concat(morceaux.splice(0)));
       },
     };
@@ -90,15 +100,18 @@ export function fauxMateriel(modes: ("usb" | "serie" | "bluetooth")[] = ["usb", 
   const ble = () => {
     const morceaux: Uint8Array[] = [];
     const canal = {
-      properties: { write: true, writeWithoutResponse: false },
+      properties: { write: !options.bleSansReponse, writeWithoutResponse: !!options.bleSansReponse },
       async writeValueWithResponse(m: Uint8Array) {
         echouer();
         morceaux.push(m);
         etat.recus.splice(0, etat.recus.length, concat(morceaux));
         etat.journal.push(`ble:ecrit:${m.length}`);
       },
-      async writeValueWithoutResponse() {
-        throw new Error("non attendu");
+      async writeValueWithoutResponse(m: Uint8Array) {
+        echouer();
+        morceaux.push(m);
+        etat.recus.splice(0, etat.recus.length, concat(morceaux));
+        etat.journal.push(`ble:ecrit-sans-reponse:${m.length}@${Date.now()}`);
       },
     };
     const gatt = {
@@ -131,14 +144,15 @@ export function fauxMateriel(modes: ("usb" | "serie" | "bluetooth")[] = ["usb", 
     });
   }
   if (modes.includes("serie")) {
-    const p = port();
+    // Le sélecteur rend le dernier port ; getPorts, tous ceux autorisés, dans l'ordre.
+    const ports = (options.ports ?? ["usb"]).map(port);
     def("serial", {
       requestPort: async () => {
         echouer();
-        etat.autorises.serie = 1;
-        return p;
+        etat.autorises.serie = ports.length;
+        return ports.at(-1);
       },
-      getPorts: async () => (etat.autorises.serie ? [p] : []),
+      getPorts: async () => (etat.autorises.serie ? ports : []),
     });
   }
   if (modes.includes("bluetooth")) {

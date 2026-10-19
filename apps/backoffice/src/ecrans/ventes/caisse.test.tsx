@@ -5,7 +5,7 @@ import { sansViolation } from "@multiboutique/front/test/axe";
 import { fauxApi, type FauxApi } from "@multiboutique/front/test/faux-api";
 import { BOUTIQUE_DETAIL, CLIENTS_ACTIFS, PRODUITS } from "../../../test/donnees";
 import { BOUTIQUE_1, connecte, rendreApp, utilisateur } from "../../../test/rendu";
-import { fauxMateriel } from "../../impression/faux-materiel";
+import { fauxMateriel } from "../../../test/faux-materiel";
 import { enregistrerReglages, REGLAGES_DEFAUT } from "../../impression/reglages";
 
 let api: FauxApi;

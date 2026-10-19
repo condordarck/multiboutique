@@ -129,6 +129,12 @@ export const SERVICES_BLE = [
 ];
 /** Taille des envois : sous la limite des petites imprimantes BLE. */
 const MORCEAU_BLE = 100;
+/**
+ * Pause entre deux envois sans accusé de réception : sans elle, la mémoire
+ * tampon des petites imprimantes déborde et le ticket sort tronqué.
+ */
+export const PAUSE_BLE_MS = 20;
+const attendre = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // Chrome ne retrouve pas un appareil Bluetooth après un rechargement :
 // celui choisi pendant la session est gardé ici.
@@ -148,8 +154,10 @@ async function envoyerBle(appareil: AppareilBle, octets: Uint8Array) {
   const canal = await caracteristiqueBle(appareil);
   for (let debut = 0; debut < octets.length; debut += MORCEAU_BLE) {
     const morceau = octets.slice(debut, debut + MORCEAU_BLE);
-    if (canal.properties.writeWithoutResponse) await canal.writeValueWithoutResponse(morceau);
-    else await canal.writeValueWithResponse(morceau);
+    if (canal.properties.writeWithoutResponse) {
+      await canal.writeValueWithoutResponse(morceau);
+      if (debut + MORCEAU_BLE < octets.length) await attendre(PAUSE_BLE_MS);
+    } else await canal.writeValueWithResponse(morceau);
   }
 }
 
@@ -191,8 +199,14 @@ export async function choisirImprimante(mode: ModeDirect): Promise<ImprimanteAss
   }
 }
 
-const correspond = (associee: ImprimanteAssociee | undefined, vendorId?: number, productId?: number, serie?: string) =>
-  !associee?.vendorId || (associee.vendorId === vendorId && associee.productId === productId && (!associee.serialNumber || associee.serialNumber === serie));
+/**
+ * L'appareil autorisé est-il celui associé ? Associé sans identifiant USB (port
+ * série Bluetooth ou intégré) : seul un port sans identifiant USB convient.
+ */
+const correspond = (associee: ImprimanteAssociee, vendorId?: number, productId?: number, serie?: string) =>
+  associee.vendorId === undefined
+    ? vendorId === undefined
+    : associee.vendorId === vendorId && associee.productId === productId && (!associee.serialNumber || associee.serialNumber === serie);
 
 /** Envoie les octets à l'imprimante associée à ce poste pour ce mode. */
 export async function envoyer(mode: ModeDirect, associee: ImprimanteAssociee | undefined, octets: Uint8Array, vitesse: number): Promise<void> {
@@ -210,7 +224,7 @@ export async function envoyer(mode: ModeDirect, associee: ImprimanteAssociee | u
       if (!port) throw new ErreurImpression("Port série introuvable : branchez l'imprimante, ou associez-la dans les réglages d'impression.");
       return await envoyerSerie(port, octets, vitesse);
     }
-    if (!appareilBle && n.bluetooth!.getDevices) {
+    if (!appareilBle && associee && n.bluetooth!.getDevices) {
       appareilBle = (await n.bluetooth!.getDevices()).find((a) => a.name === associee?.nom) ?? null;
     }
     // Après un rechargement, Chrome redemande l'imprimante (le clic sur
