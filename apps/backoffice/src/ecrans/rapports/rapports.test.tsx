@@ -24,6 +24,13 @@ const RAPPORT = {
   ],
   top_produits: [{ nom: "Riz 25 kg", qte: 40, ca: 880 }],
   reservations: { nb: 2, montant: 60 },
+  vendeur: null,
+  produit: null,
+  vendeurs: [
+    { id: "v1", nom: "Awa Diallo" },
+    { id: "v2", nom: "Koffi Mensah" },
+  ],
+  produits: [{ id: "p1", nom: "Riz 25 kg" }],
 };
 
 function preparer() {
@@ -66,5 +73,25 @@ describe("rapports", () => {
     await userEvent.click(screen.getByRole("button", { name: "Générer le rapport" }));
     await waitFor(() => expect(app.adresse()).toBe(`${PAGE}?periode=personnalisee&debut=2026-10-01&fin=2026-10-15`));
     expect(await screen.findByRole("heading", { level: 2, name: "Rapport personnalisé — 01/10/2026 au 15/10/2026" })).toBeTruthy();
+  });
+
+  it("filtres vendeur et produit : partent à l'API, nommés sous le titre", async () => {
+    preparer();
+    api.repondre("GET", `/boutiques/${BOUTIQUE_1}/rapports?periode=mois&vendeur=v2&produit=p1`, 200, {
+      ...RAPPORT,
+      vendeur: "v2",
+      produit: "p1",
+    });
+    const app = rendreApp(PAGE);
+    await screen.findByRole("heading", { level: 2, name: /Rapport mensuel/ });
+    expect(screen.getByText("Remises accordées", { selector: "span" })).toBeTruthy();
+    await userEvent.selectOptions(screen.getByLabelText("Vendeur"), "v2");
+    await userEvent.selectOptions(screen.getByLabelText("Produit"), "p1");
+    await userEvent.click(screen.getByRole("button", { name: "Générer le rapport" }));
+    await waitFor(() => expect(app.adresse()).toBe(`${PAGE}?periode=mois&vendeur=v2&produit=p1`));
+    expect(await screen.findByText("Vendeur : Koffi Mensah")).toBeTruthy();
+    expect(screen.getByText(/Produit : Riz 25 kg/)).toBeTruthy();
+    expect(screen.queryByText("Remises accordées", { selector: "span" })).toBeNull();
+    expect(screen.getByText(/ce filtre ne s'y applique pas/)).toBeTruthy();
   });
 });

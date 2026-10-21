@@ -15,12 +15,13 @@ export function exigerLecture(utilisateur: Utilisateur, boutiqueId: string, perm
 
 export type Periode = "jour" | "semaine" | "mois" | "annee";
 
-/** Début et fin d'une période, calculés par la base, dans son fuseau. */
-export async function bornesPeriode(db: Db, periode: Periode): Promise<{ debut: Date; fin: Date }> {
+/** Début et fin d'une période contenant `reference` (AAAA-MM-JJ, aujourd'hui par défaut), calculés par la base, dans son fuseau. */
+export async function bornesPeriode(db: Db, periode: Periode, reference?: string): Promise<{ debut: Date; fin: Date }> {
   const unite = { jour: "day", semaine: "week", mois: "month", annee: "year" }[periode];
   const { rows } = await db.query(
-    `SELECT date_trunc($1, now()) AS debut, date_trunc($1, now()) + ('1 ' || $1)::interval AS fin`,
-    [unite]
+    `SELECT date_trunc($1, r) AS debut, date_trunc($1, r) + ('1 ' || $1)::interval AS fin
+     FROM (SELECT COALESCE($2::date::timestamptz, now()) AS r) AS ref`,
+    [unite, reference ?? null]
   );
   return rows[0];
 }

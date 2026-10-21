@@ -45,14 +45,20 @@ export function Rapports() {
   const periode = parametres.get("periode") ?? "mois";
   const debut = parametres.get("debut") ?? "";
   const fin = parametres.get("fin") ?? "";
-  const rapport = useRapport(boutiqueId, { periode, debut, fin });
-  const [saisie, setSaisie] = useState({ periode, debut, fin });
+  const vendeur = parametres.get("vendeur") ?? "";
+  const produit = parametres.get("produit") ?? "";
+  const rapport = useRapport(boutiqueId, { periode, debut, fin, vendeur, produit });
+  const [saisie, setSaisie] = useState({ periode, debut, fin, vendeur, produit });
+  const vendeurs = (rapport.data?.vendeurs ?? []).map((v) => ({ valeur: v.id, libelle: v.nom }));
+  const produits = (rapport.data?.produits ?? []).map((p) => ({ valeur: p.id, libelle: p.nom }));
 
   function generer(evenement: FormEvent) {
     evenement.preventDefault();
     const p = new URLSearchParams({ periode: saisie.periode });
     if (saisie.debut) p.set("debut", saisie.debut);
     if (saisie.fin) p.set("fin", saisie.fin);
+    if (saisie.vendeur) p.set("vendeur", saisie.vendeur);
+    if (saisie.produit) p.set("produit", saisie.produit);
     setParametres(p, { replace: true });
   }
 
@@ -64,6 +70,20 @@ export function Rapports() {
           <Selecteur libelle="Période" options={PERIODES} value={saisie.periode} onChange={(e) => setSaisie((s) => ({ ...s, periode: e.target.value }))} />
           <Champ libelle="Du" type="date" value={saisie.debut} onChange={(e) => setSaisie((s) => ({ ...s, debut: e.target.value }))} />
           <Champ libelle="Au" type="date" value={saisie.fin} onChange={(e) => setSaisie((s) => ({ ...s, fin: e.target.value }))} />
+          <Selecteur
+            libelle="Vendeur"
+            optionVide="Tous les vendeurs"
+            options={vendeurs}
+            value={saisie.vendeur}
+            onChange={(e) => setSaisie((s) => ({ ...s, vendeur: e.target.value }))}
+          />
+          <Selecteur
+            libelle="Produit"
+            optionVide="Tous les produits"
+            options={produits}
+            value={saisie.produit}
+            onChange={(e) => setSaisie((s) => ({ ...s, produit: e.target.value }))}
+          />
           <div className="flex flex-wrap gap-3 tablette:col-span-3">
             <Bouton type="submit">Générer le rapport</Bouton>
             <Bouton variante="secondaire" onClick={() => window.print()}>
@@ -72,18 +92,22 @@ export function Rapports() {
           </div>
         </form>
         <p className="m-0 text-mention text-texte-discret">
-          Astuce : pour une période précise, choisissez « Personnalisée » et renseignez les dates « Du » / « Au ».
+          Astuce : la date « Du » choisit le jour, la semaine, le mois ou l'année du rapport (aujourd'hui sinon) ; pour une période précise, choisissez « Personnalisée » et renseignez « Du » / « Au ». Vendeur et produit restreignent le rapport aux ventes concernées.
         </p>
       </Carte>
 
       <Lecture requete={rapport}>
         {(r) => {
           const ca = Number(r.totaux.ca) || 0;
+          const nomVendeur = r.vendeurs.find((v) => v.id === r.vendeur)?.nom;
+          const nomProduit = r.produits.find((p) => p.id === r.produit)?.nom;
           return (
             <div className="zone-impression flex flex-col gap-5">
               <div>
                 <h2 className="m-0 font-titre text-panneau font-bold">{titre(r)}</h2>
                 <p className="m-0 text-libelle text-texte-discret">Boutique : {boutique.data?.nom}</p>
+                {nomVendeur && <p className="m-0 text-libelle text-texte-discret">Vendeur : {nomVendeur}</p>}
+                {nomProduit && <p className="m-0 text-libelle text-texte-discret">Produit : {nomProduit} (montants de ce produit seul)</p>}
               </div>
               <div className="grid grid-cols-2 gap-3 tablette:gap-4 bureau:grid-cols-4">
                 <TuileChiffre libelle="Ventes validées" valeur={formatNombre(r.totaux.nb_ventes)} />
@@ -92,7 +116,8 @@ export function Rapports() {
                   libelle="Panier moyen"
                   valeur={`${Number(r.totaux.panier_moyen).toLocaleString("fr-FR", { maximumFractionDigits: 0 })} ${monnaie}`}
                 />
-                <TuileChiffre libelle="Remises accordées" valeur={formatMontant(r.totaux.remises, monnaie)} />
+                {/* Une remise porte sur la vente entière : sans objet pour un produit seul. */}
+                {!r.produit && <TuileChiffre libelle="Remises accordées" valeur={formatMontant(r.totaux.remises, monnaie)} />}
               </div>
               <Carte titre="Ventes par jour" niveauTitre={3}>
                 <ListeAdaptative
@@ -158,6 +183,9 @@ export function Rapports() {
                   <TuileChiffre libelle="Réservations créées" valeur={formatNombre(r.reservations.nb)} />
                   <TuileChiffre libelle="Montant réservé" valeur={formatMontant(r.reservations.montant, monnaie)} />
                 </div>
+                {r.vendeur && (
+                  <p className="m-0 text-mention text-texte-discret">Les réservations ne sont rattachées à aucun vendeur : ce filtre ne s'y applique pas.</p>
+                )}
               </Carte>
             </div>
           );

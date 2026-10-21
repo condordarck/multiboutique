@@ -204,16 +204,22 @@ export interface GrillePrixConseilles {
   produits: { produit_id: string; nom: string; prix_vente: number | null }[];
 }
 
-/** GET /boutiques/:id/rapports?periode=…&debut=…&fin=… (fin exclue). */
+/** GET /boutiques/:id/rapports?periode=…&debut=…&fin=…&vendeur=…&produit=… (fin exclue). */
 export interface Rapport {
   periode: "jour" | "semaine" | "mois" | "annee" | "personnalisee";
   debut: string;
   fin: string;
+  /** Filtres retenus (null : tous). */
+  vendeur: string | null;
+  produit: string | null;
   totaux: { nb_ventes: number; ca: number; remises: number; nb_promos: number; panier_moyen: number };
   par_jour: { jour: string; nb: number; ca: number }[];
   par_mode: { mode_paiement: string; nb: number; ca: number }[];
   top_produits: { nom: string; qte: number; ca: number }[];
   reservations: { nb: number; montant: number };
+  /** Choix des filtres : vendeurs ayant vendu, produits vendus dans la boutique. */
+  vendeurs: { id: string; nom: string }[];
+  produits: { id: string; nom: string }[];
 }
 
 /** GET /admin/statistiques */

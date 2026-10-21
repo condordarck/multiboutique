@@ -7,6 +7,8 @@ export interface ParametresRapport {
   periode: string;
   debut?: string;
   fin?: string;
+  vendeur?: string;
+  produit?: string;
 }
 
 export const useRapport = (boutiqueId: string, p: ParametresRapport) => {
@@ -14,5 +16,7 @@ export const useRapport = (boutiqueId: string, p: ParametresRapport) => {
   return useQuery({
     queryKey: [...cle.boutique(boutiqueId), "rapports", chaine],
     queryFn: () => appeler<Rapport>("GET", `/boutiques/${boutiqueId}/rapports?${chaine}`),
+    // Garde les choix de vendeurs et de produits affichés pendant le changement de filtre.
+    placeholderData: (precedent) => precedent,
   });
 };

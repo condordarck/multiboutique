@@ -148,4 +148,52 @@ describe("lectures par boutique : contenu", () => {
     const passee = (await lire("gerant", b1("/rapports?periode=personnalisee&debut=2020-01-01&fin=2020-12-31"))).json();
     expect(passee.totaux.nb_ventes).toBe(0);
   });
+
+  it("rapports : la date « Du » choisit le jour, la semaine, le mois ou l'année", async () => {
+    const jour = (await lire("gerant", b1("/rapports?periode=jour&debut=2020-03-15"))).json();
+    expect(jour.periode).toBe("jour");
+    expect(new Date(jour.fin).getTime() - new Date(jour.debut).getTime()).toBe(86_400_000);
+    expect(jour.totaux.nb_ventes).toBe(0);
+    const { rows } = await base.pool.query(`SELECT to_char(now(), 'YYYY-MM-DD') AS aujourdhui`);
+    for (const periode of ["jour", "semaine", "mois", "annee"]) {
+      const r = (await lire("gerant", b1(`/rapports?periode=${periode}&debut=${rows[0].aujourdhui}`))).json();
+      expect(r.totaux.nb_ventes, periode).toBe(1);
+    }
+    const annee = (await lire("gerant", b1("/rapports?periode=annee&debut=2020-03-15"))).json();
+    expect(new Date(annee.debut).getTime()).toBe((await base.pool.query(`SELECT '2020-01-01'::timestamptz AS d`)).rows[0].d.getTime());
+  });
+
+  it("rapports : filtres vendeur et produit", async () => {
+    const autre = await creerProduit(base.pool, BOUTIQUES.b1, { prix: 5, stock: 10, nom: "Huile 1 L" });
+    const vente = await app.inject({
+      method: "POST",
+      url: b1("/ventes"),
+      headers: ecriture("backoffice", cookies.gerant),
+      payload: { mode_paiement: "carte", lignes: [{ produit_id: autre, quantite: 2, prix_unitaire: 5 }, { produit_id: produit, quantite: 1, prix_unitaire: 10 }] },
+    });
+    expect(vente.statusCode).toBe(201);
+    const tout = (await lire("gerant", b1("/rapports"))).json();
+    expect(tout.totaux).toMatchObject({ nb_ventes: 2, ca: 30 });
+    expect(tout.vendeurs).toHaveLength(2);
+    expect(tout.produits.map((p: { nom: string }) => p.nom)).toEqual(["Huile 1 L", "Riz 25 kg"]);
+
+    const parVendeur = await Promise.all(
+      tout.vendeurs.map(async (v: { id: string }) => (await lire("gerant", b1(`/rapports?vendeur=${v.id}`))).json())
+    );
+    expect(parVendeur.map((r) => r.totaux.nb_ventes)).toEqual([1, 1]);
+    expect(parVendeur.map((r) => r.totaux.ca).sort()).toEqual([10, 20]);
+    expect(parVendeur[0].vendeur).toBe(tout.vendeurs[0].id);
+
+    const huile = (await lire("gerant", b1(`/rapports?produit=${autre}`))).json();
+    expect(huile.totaux).toMatchObject({ nb_ventes: 1, ca: 10, remises: 0 });
+    expect(huile.top_produits).toEqual([{ nom: "Huile 1 L", qte: 2, ca: 10 }]);
+    expect(huile.par_mode).toEqual([{ mode_paiement: "carte", nb: 1, ca: 10 }]);
+    expect(huile.reservations).toEqual({ nb: 0, montant: 0 });
+    const riz = (await lire("gerant", b1(`/rapports?produit=${produit}`))).json();
+    expect(riz.totaux).toMatchObject({ nb_ventes: 2, ca: 20 });
+    expect(riz.reservations).toEqual({ nb: 1, montant: 10 });
+
+    const invalide = (await lire("gerant", b1("/rapports?vendeur=pas-un-id&produit=x"))).json();
+    expect(invalide).toMatchObject({ vendeur: null, produit: null, totaux: { nb_ventes: 2 } });
+  });
 });

@@ -1,4 +1,4 @@
-import { aPermission } from "@multiboutique/shared";
+import { aPermission, identifiant } from "@multiboutique/shared";
 import { ErreurMetier, type Db, type Utilisateur } from "@multiboutique/metier";
 import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 import { parametre, route } from "../routes/registre";
@@ -355,7 +355,7 @@ export const lecturesBoutique: FastifyPluginAsync<{ db: Db }> = async (app, { db
   lecture("/rapports", async (r, u) => {
     const id = b(r);
     exigerLecture(u, id, "rapports:voir");
-    const q = requete<{ periode?: string; debut?: string; fin?: string }>(r);
+    const q = requete<{ periode?: string; debut?: string; fin?: string; vendeur?: string; produit?: string }>(r);
     const periode = estPeriode(q.periode) || q.periode === "personnalisee" ? q.periode : "mois";
     let bornes: { debut: Date; fin: Date };
     const dateValide = (d?: string) => !!d && /^\d{4}-\d{2}-\d{2}$/.test(d);
@@ -365,54 +365,89 @@ export const lecturesBoutique: FastifyPluginAsync<{ db: Db }> = async (app, { db
           ? (await db.query(`SELECT $1::date::timestamptz AS debut, ($2::date + 1)::timestamptz AS fin`, [q.debut, q.fin])).rows[0]
           : await bornesPeriode(db, "annee");
     } else {
-      bornes = await bornesPeriode(db, periode);
+      // La date « Du » choisit le jour, la semaine, le mois ou l'année du rapport.
+      bornes = await bornesPeriode(db, periode, dateValide(q.debut) ? q.debut : undefined);
     }
-    const valeurs = [id, bornes.debut, bornes.fin];
-    const [totaux, parJour, parMode, topProduits, reservations] = await Promise.all([
+    // Filtres facultatifs ; un identifiant mal formé est ignoré, comme une période inconnue.
+    const vendeur = identifiant.safeParse(q.vendeur).success ? q.vendeur! : null;
+    const produit = identifiant.safeParse(q.produit).success ? q.produit! : null;
+    const valeurs = [id, bornes.debut, bornes.fin, vendeur, produit];
+    // Ventes retenues ; avec un produit, le montant d'une vente est celui de ses lignes de ce produit
+    // et la remise, portée par la vente entière, n'est pas attribuable.
+    const retenues = `WITH v AS (
+      SELECT v.id, v.created_at, v.mode_paiement, v.code_promo_id,
+             CASE WHEN $5::uuid IS NULL THEN v.montant_total
+                  ELSE (SELECT SUM(lv.quantite * lv.prix_unitaire) FROM lignes_vente lv WHERE lv.vente_id = v.id AND lv.produit_id = $5::uuid)
+             END AS montant,
+             CASE WHEN $5::uuid IS NULL THEN v.remise ELSE 0 END AS remise
+      FROM ventes v
+      WHERE v.boutique_id = $1 AND v.statut = 'validee'
+        AND v.created_at >= $2 AND v.created_at < $3
+        AND ($4::uuid IS NULL OR v.vendeur_id = $4::uuid)
+        AND ($5::uuid IS NULL OR EXISTS (SELECT 1 FROM lignes_vente lv WHERE lv.vente_id = v.id AND lv.produit_id = $5::uuid))
+    )`;
+    const [totaux, parJour, parMode, topProduits, reservations, vendeurs, produits] = await Promise.all([
       db.query(
-        `SELECT COUNT(*) AS nb_ventes,
-                COALESCE(SUM(montant_total), 0) AS ca,
+        `${retenues}
+         SELECT COUNT(*) AS nb_ventes,
+                COALESCE(SUM(montant), 0) AS ca,
                 COALESCE(SUM(remise), 0) AS remises,
                 COUNT(*) FILTER (WHERE code_promo_id IS NOT NULL) AS nb_promos
-         FROM ventes
-         WHERE boutique_id = $1 AND statut = 'validee'
-           AND created_at >= $2 AND created_at < $3`,
+         FROM v`,
         valeurs
       ),
       db.query(
-        `SELECT to_char(date_trunc('day', created_at), 'YYYY-MM-DD') AS jour,
+        `${retenues}
+         SELECT to_char(date_trunc('day', created_at), 'YYYY-MM-DD') AS jour,
                 COUNT(*) AS nb,
-                COALESCE(SUM(montant_total), 0) AS ca
-         FROM ventes
-         WHERE boutique_id = $1 AND statut = 'validee'
-           AND created_at >= $2 AND created_at < $3
+                COALESCE(SUM(montant), 0) AS ca
+         FROM v
          GROUP BY 1 ORDER BY 1`,
         valeurs
       ),
       db.query(
-        `SELECT mode_paiement, COUNT(*) AS nb, COALESCE(SUM(montant_total), 0) AS ca
-         FROM ventes
-         WHERE boutique_id = $1 AND statut = 'validee'
-           AND created_at >= $2 AND created_at < $3
+        `${retenues}
+         SELECT mode_paiement, COUNT(*) AS nb, COALESCE(SUM(montant), 0) AS ca
+         FROM v
          GROUP BY mode_paiement ORDER BY 3 DESC`,
         valeurs
       ),
       db.query(
-        `SELECT p.nom, SUM(lv.quantite) AS qte, SUM(lv.quantite * lv.prix_unitaire) AS ca
+        `${retenues}
+         SELECT p.nom, SUM(lv.quantite) AS qte, SUM(lv.quantite * lv.prix_unitaire) AS ca
          FROM lignes_vente lv
-         JOIN ventes v ON v.id = lv.vente_id
+         JOIN v ON v.id = lv.vente_id
          JOIN produits p ON p.id = lv.produit_id
-         WHERE v.boutique_id = $1 AND v.statut = 'validee'
-           AND v.created_at >= $2 AND v.created_at < $3
+         WHERE $5::uuid IS NULL OR lv.produit_id = $5::uuid
          GROUP BY p.nom ORDER BY 3 DESC LIMIT 10`,
         valeurs
       ),
+      // Une réservation n'a pas de vendeur : seul le filtre produit s'y applique.
       db.query(
-        `SELECT COUNT(*) AS nb, COALESCE(SUM(montant_total), 0) AS montant
-         FROM reservations
-         WHERE boutique_id = $1 AND statut <> 'annulee'
-           AND created_at >= $2 AND created_at < $3`,
-        valeurs
+        `SELECT COUNT(*) AS nb,
+                COALESCE(SUM(CASE WHEN $4::uuid IS NULL THEN r.montant_total
+                                  ELSE (SELECT SUM(lr.quantite * lr.prix_unitaire) FROM lignes_reservation lr WHERE lr.reservation_id = r.id AND lr.produit_id = $4::uuid)
+                             END), 0) AS montant
+         FROM reservations r
+         WHERE r.boutique_id = $1 AND r.statut <> 'annulee'
+           AND r.created_at >= $2 AND r.created_at < $3
+           AND ($4::uuid IS NULL OR EXISTS (SELECT 1 FROM lignes_reservation lr WHERE lr.reservation_id = r.id AND lr.produit_id = $4::uuid))`,
+        [id, bornes.debut, bornes.fin, produit]
+      ),
+      // Choix des filtres : ceux qui ont déjà vendu dans la boutique, ce qui a déjà été vendu.
+      db.query(
+        `SELECT DISTINCT u.id, u.nom_complet AS nom
+         FROM ventes v JOIN utilisateurs u ON u.id = v.vendeur_id
+         WHERE v.boutique_id = $1 ORDER BY 2`,
+        [id]
+      ),
+      db.query(
+        `SELECT DISTINCT p.id, p.nom
+         FROM lignes_vente lv
+         JOIN ventes v ON v.id = lv.vente_id
+         JOIN produits p ON p.id = lv.produit_id
+         WHERE v.boutique_id = $1 ORDER BY 2`,
+        [id]
       ),
     ]);
     const t = totaux.rows[0];
@@ -420,11 +455,15 @@ export const lecturesBoutique: FastifyPluginAsync<{ db: Db }> = async (app, { db
       periode,
       debut: bornes.debut,
       fin: bornes.fin,
+      vendeur,
+      produit,
       totaux: { ...t, panier_moyen: t.nb_ventes > 0 ? t.ca / t.nb_ventes : 0 },
       par_jour: parJour.rows,
       par_mode: parMode.rows,
       top_produits: topProduits.rows,
       reservations: reservations.rows[0],
+      vendeurs: vendeurs.rows,
+      produits: produits.rows,
     };
   });
 };
