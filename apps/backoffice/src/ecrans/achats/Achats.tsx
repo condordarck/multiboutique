@@ -6,6 +6,7 @@ import {
   annulerCommandeFournisseur,
   creerCommandeFournisseur,
   creerFournisseur,
+  modifierCommandeFournisseur,
   modifierFournisseur,
   recevoirCommandeFournisseur,
   toggleActifFournisseur,
@@ -17,7 +18,7 @@ import { useProduits } from "../../api/catalogue";
 import { useMonnaie } from "../../api/generales";
 import { useBoutique } from "../../api/tableaux";
 import { EnTeteEcran, formatMontant, formatNombre, Formulaire, lireEntier, lireNombre, ListeChargee, useEcriture, useSession } from "@multiboutique/front";
-import { LignesArticles, lignesInvalides, type LigneSaisie } from "../../commun/LignesArticles";
+import { avecProduitsCommandes, LignesArticles, lignesInvalides, type LigneSaisie } from "../../commun/LignesArticles";
 
 const STATUTS: Record<StatutCmdFournisseur, { libelle: string; ton: TonBadge }> = {
   en_attente: { libelle: "En attente", ton: "alerte" },
@@ -35,13 +36,14 @@ export function Achats() {
   const fournisseurs = useFournisseurs(boutiqueId);
   const commandes = useCommandesFournisseurs(boutiqueId);
   const peutGerer = peut("achats:gerer");
+  const peutModifier = peut("achats:modifier");
   const invalide = [["boutiques", boutiqueId]];
   const annulation = useEcriture({ appel: annulerCommandeFournisseur, invalide, succes: "Commande fournisseur annulée" });
   const activation = useEcriture({ appel: toggleActifFournisseur, invalide });
   const [reception, setReception] = useState<CommandeFournisseurListee | null>(null);
   const [aAnnuler, setAAnnuler] = useState<CommandeFournisseurListee | null>(null);
   const [fiche, setFiche] = useState<Fournisseur | "nouveau" | null>(null);
-  const [nouvelleCommande, setNouvelleCommande] = useState(false);
+  const [ficheCommande, setFicheCommande] = useState<CommandeFournisseurListee | "nouvelle" | null>(null);
 
   const liste = commandes.data ?? [];
   const enCours = liste.filter((c) => c.statut === "en_attente" || c.statut === "partielle");
@@ -56,7 +58,7 @@ export function Achats() {
         actions={
           peutGerer && (
             <>
-              <Bouton onClick={() => setNouvelleCommande(true)}>Nouvelle commande fournisseur</Bouton>
+              <Bouton onClick={() => setFicheCommande("nouvelle")}>Nouvelle commande fournisseur</Bouton>
               <Bouton variante="secondaire" onClick={() => setFiche("nouveau")}>
                 Nouveau fournisseur
               </Bouton>
@@ -76,7 +78,7 @@ export function Achats() {
       )}
 
       <Carte titre="Commandes fournisseur">
-        {!peutGerer && (
+        {!peutGerer && !peutModifier && (
           <p className="m-0 rounded-bouton bg-surface-relevee px-4 py-3 text-libelle text-texte-discret">
             Lecture seule — la gestion des achats est réservée au gérant et au propriétaire.
           </p>
@@ -104,16 +106,22 @@ export function Achats() {
           ]}
           libelleAction="Actions"
           action={
-            peutGerer
+            peutGerer || peutModifier
               ? (c) => (
                   <span className="flex flex-wrap justify-end gap-1">
+                    {/* Modification tant que rien n'est reçu, comme l'annulation. */}
+                    {peutModifier && c.statut === "en_attente" && (
+                      <Bouton variante="discret" aria-label={`Modifier ${c.reference_cmd}`} onClick={() => setFicheCommande(c)}>
+                        Modifier
+                      </Bouton>
+                    )}
                     {/* Comme le monolithe : réception tant que la commande est ouverte, annulation tant que rien n'est reçu. */}
-                    {(c.statut === "en_attente" || c.statut === "partielle") && (
+                    {peutGerer && (c.statut === "en_attente" || c.statut === "partielle") && (
                       <Bouton variante="discret" aria-label={`Réceptionner ${c.reference_cmd}`} onClick={() => setReception(c)}>
                         Réceptionner
                       </Bouton>
                     )}
-                    {c.statut === "en_attente" && (
+                    {peutGerer && c.statut === "en_attente" && (
                       <Bouton variante="discret" aria-label={`Annuler ${c.reference_cmd}`} onClick={() => setAAnnuler(c)}>
                         Annuler
                       </Bouton>
@@ -173,11 +181,12 @@ export function Achats() {
 
       {reception && <Reception commande={reception} boutiqueId={boutiqueId} onFermer={() => setReception(null)} />}
       {fiche && <FicheFournisseur boutiqueId={boutiqueId} fournisseur={fiche === "nouveau" ? null : fiche} onFermer={() => setFiche(null)} />}
-      {nouvelleCommande && (
-        <NouvelleCommandeFournisseur
+      {ficheCommande && (
+        <FicheCommandeFournisseur
           boutiqueId={boutiqueId}
+          commande={ficheCommande === "nouvelle" ? null : ficheCommande}
           fournisseurs={(fournisseurs.data ?? []).filter((f) => f.actif)}
-          onFermer={() => setNouvelleCommande(false)}
+          onFermer={() => setFicheCommande(null)}
         />
       )}
       <Dialogue
@@ -295,21 +304,37 @@ function FicheFournisseur({ boutiqueId, fournisseur, onFermer }: { boutiqueId: s
   );
 }
 
-/** components/dashboard/CommandeFournisseurForm.tsx, dans un panneau. */
-function NouvelleCommandeFournisseur({ boutiqueId, fournisseurs, onFermer }: { boutiqueId: string; fournisseurs: Fournisseur[]; onFermer: () => void }) {
+/** Nouvelle commande d'achat ; avec une commande, sa modification tant que rien n'est reçu (fournisseur inchangé). */
+function FicheCommandeFournisseur({
+  boutiqueId,
+  commande,
+  fournisseurs,
+  onFermer,
+}: {
+  boutiqueId: string;
+  commande: CommandeFournisseurListee | null;
+  fournisseurs: Fournisseur[];
+  onFermer: () => void;
+}) {
   const monnaie = useMonnaie();
   const produits = useProduits(boutiqueId);
-  const creation = useEcriture({ appel: creerCommandeFournisseur, invalide: [["boutiques", boutiqueId]] });
+  const invalide = [["boutiques", boutiqueId]];
+  const creation = useEcriture({ appel: creerCommandeFournisseur, invalide });
+  const modification = useEcriture({ appel: modifierCommandeFournisseur, invalide, succes: `Commande fournisseur ${commande?.reference_cmd ?? ""} modifiée` });
+  const ecriture = commande ? modification : creation;
   const [fournisseurId, setFournisseurId] = useState("");
-  const [note, setNote] = useState("");
-  const [lignes, setLignes] = useState<LigneSaisie[]>([]);
+  const [note, setNote] = useState(commande?.note ?? "");
+  const [lignes, setLignes] = useState<LigneSaisie[]>(
+    (commande?.lignes ?? []).map((l) => ({ produit_id: l.produit_id, quantite: String(l.quantite_commandee), prix: String(l.prix_unitaire ?? "") }))
+  );
   const [erreur, setErreur] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const total = lignes.reduce((s, l) => s + (lireNombre(l.quantite) || 0) * (lireNombre(l.prix) || 0), 0);
+  const titre = commande ? `Modifier ${commande.reference_cmd}` : "Nouvelle commande fournisseur";
 
-  if (!fournisseurs.length || !produits.data?.length) {
+  if (!commande && (!fournisseurs.length || !produits.data?.length)) {
     return (
-      <Panneau ouvert titre="Nouvelle commande fournisseur" onFermer={onFermer}>
+      <Panneau ouvert titre={titre} onFermer={onFermer}>
         <p className="m-0 text-texte-discret">
           Ajoutez d'abord un fournisseur et configurez le prix des produits dans Produits pour pouvoir commander.
         </p>
@@ -318,16 +343,21 @@ function NouvelleCommandeFournisseur({ boutiqueId, fournisseurs, onFermer }: { b
   }
 
   async function envoyer() {
-    if (!fournisseurId) return setErreur("Choisissez un fournisseur");
+    if (!commande && !fournisseurId) return setErreur("Choisissez un fournisseur");
     if (!lignes.length || lignes.some((l) => !l.produit_id)) return setErreur("Ajoutez au moins une ligne avec un produit");
     const invalide = lignesInvalides(lignes);
     if (invalide) return setErreur(invalide);
     setErreur(null);
+    const lignesEnvoyees = lignes.map((l) => ({ produit_id: l.produit_id, quantite: lireNombre(l.quantite), prix_unitaire: lireNombre(l.prix) || 0 }));
+    if (commande) {
+      if (await modification.envoyer({ id: commande.id, note, lignes: lignesEnvoyees })) onFermer();
+      return;
+    }
     const resultat = await creation.envoyer({
       boutiqueId,
       fournisseur_id: fournisseurId,
       ...(note ? { note } : {}),
-      lignes: lignes.map((l) => ({ produit_id: l.produit_id, quantite: lireNombre(l.quantite), prix_unitaire: lireNombre(l.prix) || 0 })),
+      lignes: lignesEnvoyees,
     });
     if (resultat) {
       setMessage(`Commande fournisseur ${resultat.reference} enregistrée`);
@@ -338,26 +368,35 @@ function NouvelleCommandeFournisseur({ boutiqueId, fournisseurs, onFermer }: { b
   }
 
   return (
-    <Panneau ouvert titre="Nouvelle commande fournisseur" onFermer={onFermer}>
+    <Panneau ouvert titre={titre} onFermer={onFermer}>
       <Formulaire
-        libelleEnvoyer="Créer la commande"
+        libelleEnvoyer={commande ? "Enregistrer les modifications" : "Créer la commande"}
         onEnvoyer={() => void envoyer()}
-        erreur={erreur ?? creation.erreur}
-        enCours={creation.enCours}
-        desactivee={creation.desactivee}
+        erreur={erreur ?? ecriture.erreur}
+        enCours={ecriture.enCours}
+        desactivee={ecriture.desactivee}
       >
         {message && <p className="m-0 rounded-bouton bg-succes-fond px-4 py-3 font-semibold text-succes">{message}</p>}
-        <Selecteur
-          libelle="Fournisseur"
-          optionVide="— Choisir un fournisseur —"
-          options={fournisseurs.map((f) => ({ valeur: f.id, libelle: f.nom }))}
-          value={fournisseurId}
-          onChange={(e) => setFournisseurId(e.target.value)}
-        />
+        {commande ? (
+          <p className="m-0 rounded-bouton bg-surface-relevee px-4 py-3 text-libelle">
+            Fournisseur : <strong>{commande.fournisseur_nom}</strong>
+          </p>
+        ) : (
+          <Selecteur
+            libelle="Fournisseur"
+            optionVide="— Choisir un fournisseur —"
+            options={fournisseurs.map((f) => ({ valeur: f.id, libelle: f.nom }))}
+            value={fournisseurId}
+            onChange={(e) => setFournisseurId(e.target.value)}
+          />
+        )}
         <LignesArticles
           lignes={lignes}
           onChange={setLignes}
-          produits={(produits.data ?? []).map((p) => ({ produit_id: p.produit_id, nom: p.produit_nom }))}
+          produits={avecProduitsCommandes(
+            (produits.data ?? []).map((p) => ({ produit_id: p.produit_id, nom: p.produit_nom })),
+            commande?.lignes ?? []
+          )}
           // Prix d'achat détaillé, sinon le coût de revient connu, comme prix d'achat proposé.
           prixPropose={(id) => {
             const p = produits.data?.find((l) => l.produit_id === id);

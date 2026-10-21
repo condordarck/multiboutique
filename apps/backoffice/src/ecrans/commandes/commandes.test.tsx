@@ -11,7 +11,7 @@ afterEach(() => api.restaurer());
 const PAGE = `/b/${BOUTIQUE_1}/commandes`;
 const espaces = (t: string | null | undefined) => (t ?? "").replace(/[  ]/g, " ");
 
-function preparer(role: "gerant" | "comptable" = "gerant") {
+function preparer(role: "gerant" | "comptable" | "proprietaire" = "gerant") {
   api = fauxApi();
   connecte(api, utilisateur({ role }));
   api.repondre("GET", `/boutiques/${BOUTIQUE_1}`, 200, BOUTIQUE_DETAIL);
@@ -90,6 +90,72 @@ describe("commandes B2B", () => {
         lignes: [{ produit_id: "p-riz", quantite: 3, prix_unitaire: 22 }],
       })
     );
+  });
+
+  it("modifie une commande confirmée : lignes reprises, client et code promo figés, statut gardé", async () => {
+    preparer();
+    api.repondre("PUT", "/commandes/cmd1", 200, { success: true, montantTotal: 450, remise: 50 });
+    rendreApp(PAGE);
+    const [c1, , c3] = within(await tableau()).getAllByRole("row").slice(1);
+    expect(within(c3!).queryByRole("button", { name: /^Modifier/ })).toBeNull();
+    await userEvent.click(within(c1!).getByRole("button", { name: "Modifier CMD-0001" }));
+    const panneau = screen.getByRole("dialog", { name: "Modifier CMD-0001" });
+    expect(within(panneau).getByText("Quincaillerie Ade")).toBeTruthy();
+    expect(within(panneau).getByText(/Code promo GROSSISTE10 : la remise est recalculée/)).toBeTruthy();
+    expect(within(panneau).queryByLabelText("Client")).toBeNull();
+    expect(within(panneau).queryByLabelText(/Code promo/)).toBeNull();
+    expect((within(panneau).getByLabelText("Quantité de l'article 2") as HTMLInputElement).value).toBe("200");
+    expect(espaces(within(panneau).getByText(/^Total brut/).textContent)).toBe("Total brut : 440 $");
+
+    const qte = within(panneau).getByLabelText("Quantité de l'article 1");
+    await userEvent.clear(qte);
+    await userEvent.type(qte, "15");
+    await userEvent.click(within(panneau).getByText("Comptant"));
+    await userEvent.type(within(panneau).getByLabelText("Note (facultatif)"), "Livrer lundi");
+    await userEvent.click(within(panneau).getByRole("button", { name: "Enregistrer les modifications" }));
+    await waitFor(() =>
+      expect(api.ecritures()[0]).toMatchObject({
+        methode: "PUT",
+        chemin: "/commandes/cmd1",
+        corps: {
+          terme_paiement: "comptant",
+          note: "Livrer lundi",
+          lignes: [
+            { produit_id: "p-riz", quantite: 15, prix_unitaire: 22 },
+            { produit_id: "p-sucre", quantite: 200, prix_unitaire: 1.1 },
+          ],
+        },
+      })
+    );
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
+  it("un produit retiré de la vente reste lisible sur la commande modifiée ; pas de « lecture seule » avec la seule modification", async () => {
+    api = fauxApi();
+    // Rôle à qui l'admin n'a donné que la modification.
+    connecte(api, utilisateur({ role: "comptable", permissions: ["commandes:voir", "commandes:modifier"] }));
+    api.repondre("GET", `/boutiques/${BOUTIQUE_1}`, 200, BOUTIQUE_DETAIL);
+    api.repondre("GET", `/boutiques/${BOUTIQUE_1}/commandes`, 200, [
+      commande({ lignes: [{ produit_id: "p-retire", produit_nom: "Farine (retirée)", quantite: 4, prix_unitaire: 30 }] }),
+    ]);
+    api.repondre("GET", `/boutiques/${BOUTIQUE_1}/clients?actifs=1`, 200, CLIENTS_ACTIFS);
+    api.repondre("GET", `/boutiques/${BOUTIQUE_1}/produits`, 200, PRODUITS);
+    rendreApp(PAGE);
+    const [c1] = within(await tableau()).getAllByRole("row").slice(1);
+    expect(screen.queryByText(/^Lecture seule/)).toBeNull();
+    expect(within(c1!).queryByRole("button", { name: /^Confirmer/ })).toBeNull();
+    await userEvent.click(within(c1!).getByRole("button", { name: "Modifier CMD-0001" }));
+    const panneau = screen.getByRole("dialog", { name: "Modifier CMD-0001" });
+    const produit = within(panneau).getByLabelText("Produit de l'article 1") as HTMLSelectElement;
+    expect(produit.selectedOptions[0]!.textContent).toBe("Farine (retirée)");
+  });
+
+  it("sans commandes:modifier (propriétaire pour le moment), pas de bouton Modifier", async () => {
+    preparer("proprietaire");
+    rendreApp(PAGE);
+    const [c1] = within(await tableau()).getAllByRole("row").slice(1);
+    expect(within(c1!).getByRole("button", { name: "Confirmer CMD-0001" })).toBeTruthy();
+    expect(within(c1!).queryByRole("button", { name: /^Modifier/ })).toBeNull();
   });
 
   it("sans commandes:gerer, lecture seule", async () => {

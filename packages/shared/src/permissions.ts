@@ -24,8 +24,10 @@ export type Permission =
   | "credits:gerer"
   | "commandes:voir"
   | "commandes:gerer"
+  | "commandes:modifier"
   | "achats:voir"
   | "achats:gerer"
+  | "achats:modifier"
   | "consolidation:voir"
   | "prix_conseilles:voir"
   | "prix_conseilles:gerer";
@@ -50,12 +52,18 @@ const TOUTES_PERMISSIONS: Permission[] = [
   "credits:gerer",
   "commandes:voir",
   "commandes:gerer",
+  "commandes:modifier",
   "achats:voir",
   "achats:gerer",
+  "achats:modifier",
   "consolidation:voir",
   "prix_conseilles:voir",
   "prix_conseilles:gerer",
 ];
+
+// Modifier une commande (client ou fournisseur) déjà passée : réservé au
+// gérant pour le moment, attribuable aux autres rôles dans /admin/roles.
+const MODIFICATION_COMMANDES: Permission[] = ["commandes:modifier", "achats:modifier"];
 
 // Permissions "siège" : lecture + consolidation pour les directions
 const PERMISSIONS_DIRECTION: Permission[] = [
@@ -78,7 +86,7 @@ const PERMISSIONS_PAR_ROLE: Record<RoleUtilisateur, Permission[]> = {
   administrateur: [],
 
   // Toutes les boutiques, toutes les fonctionnalités
-  proprietaire: TOUTES_PERMISSIONS,
+  proprietaire: TOUTES_PERMISSIONS.filter((p) => !MODIFICATION_COMMANDES.includes(p)),
 
   // Direction d'un groupe (siège) : vue consolidée lecture
   directeur_groupe: PERMISSIONS_DIRECTION,

@@ -52,6 +52,12 @@ export async function insererMouvementWithClient(
 
 // Validation + application d'un code promo dans une transaction.
 // Utilisée par les ventes ET les commandes grossistes.
+/** Remise d'un code sur un montant : pourcentage, ou montant fixe plafonné au total. */
+export function calculerRemise(type: string, valeur: number, montantTotal: number): { remise: number; montantFinal: number } {
+  const remise = type === "pourcentage" ? (montantTotal * valeur) / 100 : Math.min(valeur, montantTotal);
+  return { remise, montantFinal: Math.max(0, montantTotal - remise) };
+}
+
 export async function appliquerCodePromo(
   client: Requeteur,
   code: string | undefined,
@@ -61,9 +67,12 @@ export async function appliquerCodePromo(
   remise: number;
   montantFinal: number;
   codePromoId: string | null;
+  /** Conditions appliquées, à figer sur une commande ; null sans code. */
+  typeRemise: string | null;
+  valeurRemise: number | null;
 }> {
   if (!code?.trim()) {
-    return { remise: 0, montantFinal: montantTotal, codePromoId: null };
+    return { remise: 0, montantFinal: montantTotal, codePromoId: null, typeRemise: null, valeurRemise: null };
   }
 
   const ref = code.trim().toUpperCase();
@@ -93,11 +102,7 @@ export async function appliquerCodePromo(
   }
 
   const valeur = Number(promo.valeur_reduction);
-  const remise =
-    promo.type_reduction === "pourcentage"
-      ? (montantTotal * valeur) / 100
-      : Math.min(valeur, montantTotal);
-  const montantFinal = Math.max(0, montantTotal - remise);
+  const { remise, montantFinal } = calculerRemise(promo.type_reduction, valeur, montantTotal);
 
   await client.query(
     `UPDATE codes_promo
@@ -106,7 +111,7 @@ export async function appliquerCodePromo(
     [promo.id]
   );
 
-  return { remise, montantFinal, codePromoId: promo.id };
+  return { remise, montantFinal, codePromoId: promo.id, typeRemise: promo.type_reduction, valeurRemise: valeur };
 }
 
 export async function exigerClientDeLaBoutique(db: Requeteur, clientId: string, boutiqueId: string) {

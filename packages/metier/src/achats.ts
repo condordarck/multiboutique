@@ -2,7 +2,7 @@ import type { CommandeFournisseurFormData, FournisseurFormData } from "@multibou
 import { exigerAccesBoutique } from "./acces";
 import type { Db, Utilisateur } from "./contexte";
 import { ErreurMetier } from "./erreurs";
-import { exigerFournisseurDeLaBoutique, genererReference, insererMouvementWithClient } from "./interne";
+import { exigerFournisseurDeLaBoutique, genererReference, insererMouvementWithClient, type Requeteur } from "./interne";
 
 // Fournisseurs et commandes d'achat : repris de lib/actions/index.ts, SQL inchangé.
 
@@ -68,6 +68,23 @@ export async function toggleActifFournisseur(db: Db, user: Utilisateur,
   return { success: true };
 }
 
+/** Lignes d'achat vérifiées (produit connu, quantité entière, prix positif) et total attendu. */
+async function validerLignesAchat(client: Requeteur, lignes: { produit_id: string; quantite: number; prix_unitaire: number }[]) {
+  let totalAttendu = 0;
+  for (const ligne of lignes) {
+    const prix = Number(ligne.prix_unitaire);
+    if (!prix || prix <= 0) throw new ErreurMetier("Prix unitaire invalide");
+    if (!Number.isInteger(ligne.quantite) || ligne.quantite <= 0) {
+      throw new ErreurMetier("Quantité invalide");
+    }
+    totalAttendu += ligne.quantite * prix;
+  }
+  const ids = [...new Set(lignes.map((l) => l.produit_id))];
+  const { rows } = await client.query(`SELECT id FROM produits WHERE id = ANY($1::uuid[])`, [ids]);
+  if (rows.length !== ids.length) throw new ErreurMetier("Produit inconnu");
+  return totalAttendu;
+}
+
 export async function creerCommandeFournisseur(db: Db, user: Utilisateur, 
   boutiqueId: string,
   data: CommandeFournisseurFormData
@@ -85,15 +102,7 @@ export async function creerCommandeFournisseur(db: Db, user: Utilisateur,
   try {
     await client.query("BEGIN");
 
-    let totalAttendu = 0;
-    for (const ligne of data.lignes) {
-      const prix = Number(ligne.prix_unitaire);
-      if (!prix || prix <= 0) throw new ErreurMetier("Prix unitaire invalide");
-      if (!ligne.quantite || ligne.quantite <= 0) {
-        throw new ErreurMetier("Quantité invalide");
-      }
-      totalAttendu += ligne.quantite * prix;
-    }
+    const totalAttendu = await validerLignesAchat(client, data.lignes);
 
     const { rows: cmdRows } = await client.query<{ id: string }>(
       `INSERT INTO commandes_fournisseur
@@ -116,6 +125,73 @@ export async function creerCommandeFournisseur(db: Db, user: Utilisateur,
     await client.query("COMMIT");
 
     return { success: true, reference };
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Modifie une commande d'achat tant que rien n'est reçu : lignes et note.
+ * Le fournisseur reste le même ; le total attendu est recalculé.
+ */
+export async function modifierCommandeFournisseur(db: Db, user: Utilisateur, 
+  commandeId: string,
+  data: { note: string; lignes: { produit_id: string; quantite: number; prix_unitaire: number }[] }
+) {
+  const client = await db.connect();
+  try {
+    await client.query("BEGIN");
+    const { rows } = await client.query<{ boutique_id: string; statut: string; note: string | null; total_attendu: string }>(
+      `SELECT boutique_id, statut, note, total_attendu FROM commandes_fournisseur WHERE id = $1 FOR UPDATE`,
+      [commandeId]
+    );
+    if (rows.length === 0) throw new ErreurMetier("Commande fournisseur non trouvée", 404);
+    const cmd = rows[0]!;
+    exigerAccesBoutique(user, cmd.boutique_id, ["achats:modifier"]);
+    // « en_attente » : aucune réception encore (la première la fait passer en « partielle »).
+    if (cmd.statut !== "en_attente") {
+      throw new ErreurMetier("Seule une commande fournisseur sans aucune réception peut être modifiée");
+    }
+    if (!data.lignes?.length) {
+      throw new ErreurMetier("La commande fournisseur doit contenir au moins un article");
+    }
+
+    const totalAttendu = await validerLignesAchat(client, data.lignes);
+
+    const { rows: avant } = await client.query(
+      `SELECT produit_id, quantite_commandee AS quantite, prix_unitaire::float AS prix_unitaire
+       FROM lignes_cmd_fournisseur WHERE commande_id = $1 ORDER BY created_at, produit_id`,
+      [commandeId]
+    );
+    await client.query(`DELETE FROM lignes_cmd_fournisseur WHERE commande_id = $1`, [commandeId]);
+    for (const ligne of data.lignes) {
+      await client.query(
+        `INSERT INTO lignes_cmd_fournisseur (commande_id, produit_id, quantite_commandee, prix_unitaire)
+         VALUES ($1, $2, $3, $4)`,
+        [commandeId, ligne.produit_id, ligne.quantite, Number(ligne.prix_unitaire)]
+      );
+    }
+    const note = data.note.trim() || null;
+    await client.query(
+      `UPDATE commandes_fournisseur SET total_attendu = $2, note = $3, updated_at = NOW() WHERE id = $1`,
+      [commandeId, totalAttendu, note]
+    );
+    await client.query(
+      `INSERT INTO journal_audit (auteur_id, boutique_id, action, entite, entite_id, valeur_avant, valeur_apres)
+       VALUES ($1, $2, 'modification', 'commande_fournisseur', $3, $4, $5)`,
+      [
+        user.id,
+        cmd.boutique_id,
+        commandeId,
+        JSON.stringify({ note: cmd.note, total_attendu: Number(cmd.total_attendu), lignes: avant }),
+        JSON.stringify({ note, total_attendu: totalAttendu, lignes: data.lignes }),
+      ]
+    );
+    await client.query("COMMIT");
+    return { success: true, totalAttendu, boutique_id: cmd.boutique_id };
   } catch (error) {
     await client.query("ROLLBACK");
     throw error;

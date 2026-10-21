@@ -46,6 +46,9 @@ export interface NouvelleCommandeFournisseur {
 
 export const creerCommandeFournisseur = ({ boutiqueId, ...corps }: NouvelleCommandeFournisseur) =>
   appeler<{ success: true; reference: string }>("POST", `/boutiques/${boutiqueId}/commandes-fournisseurs`, corps);
+/** Tant que rien n'est reçu : lignes et note ; fournisseur inchangé. Note vide : effacée. */
+export const modifierCommandeFournisseur = ({ id, ...corps }: { id: string; note: string; lignes: NouvelleCommandeFournisseur["lignes"] }) =>
+  appeler<{ success: true; totalAttendu: number }>("PUT", `/commandes-fournisseurs/${id}`, corps);
 export const recevoirCommandeFournisseur = ({ id, receptions }: { id: string; receptions: { ligne_id: string; quantite_recue: number }[] }) =>
   appeler<{ success: true; reference: string }>("POST", `/commandes-fournisseurs/${id}/reception`, { receptions });
 export const annulerCommandeFournisseur = ({ id }: { id: string }) =>
@@ -61,6 +64,7 @@ export const SERVICES_ACHATS = {
   modifierFournisseur,
   toggleActifFournisseur,
   creerCommandeFournisseur,
+  modifierCommandeFournisseur,
   recevoirCommandeFournisseur,
   annulerCommandeFournisseur,
   publierPrixReference,

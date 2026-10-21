@@ -1,5 +1,5 @@
 import * as metier from "@multiboutique/metier";
-import { schemaCommande } from "@multiboutique/shared";
+import { schemaCommande, schemaModificationCommande } from "@multiboutique/shared";
 import type { FastifyPluginAsync } from "fastify";
 import { parametre, route } from "./registre";
 
@@ -11,6 +11,14 @@ export const routesCommandes: FastifyPluginAsync<{ db: metier.Db }> = async (app
     service: "creerCommande",
     statut: 201,
     gerer: (r, u) => metier.creerCommande(db, u, parametre(r, "boutiqueId"), schemaCommande.parse(r.body)),
+  });
+
+  route(app, {
+    methode: "PUT",
+    chemin: "/commandes/:id",
+    garde: "connexion",
+    service: "modifierCommande",
+    gerer: (r, u) => metier.modifierCommande(db, u, parametre(r, "id"), schemaModificationCommande.parse(r.body)),
   });
 
   route(app, {
