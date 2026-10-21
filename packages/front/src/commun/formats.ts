@@ -10,6 +10,11 @@ export function formatMontant(valeur: number | string, monnaie: string): string 
   return `${formatNombre(valeur)} ${monnaie}`;
 }
 
+/** Pourcentage à une décimale, à la française : « 48,1 % ». */
+export function formatPourcentage(valeur: number): string {
+  return `${valeur.toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}\u00a0%`;
+}
+
 export function formatDate(date: string): string {
   return new Date(date).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
 }

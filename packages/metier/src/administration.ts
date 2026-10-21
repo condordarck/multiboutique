@@ -355,6 +355,50 @@ export async function supprimerCategorie(db: Db, user: Utilisateur, categorieId:
   return { success: true };
 }
 
+function libelleTypeFrais(libelle: string) {
+  const l = libelle.trim();
+  if (!l) throw new ErreurMetier("Le libellé du frais est requis");
+  if (l.length > 100) throw new ErreurMetier("Le libellé ne doit pas dépasser 100 caractères");
+  return l;
+}
+
+export async function creerTypeFrais(db: Db, user: Utilisateur, libelle: string) {
+  exigerAdministrateur(user);
+  try {
+    const { rows } = await db.query(`INSERT INTO types_frais (libelle) VALUES ($1) RETURNING id`, [libelleTypeFrais(libelle)]);
+    return { success: true, id: rows[0].id };
+  } catch (err) {
+    if ((err as { code?: string }).code === "23505") throw new ErreurMetier("Ce type de frais existe déjà");
+    throw err;
+  }
+}
+
+/** Renomme ou (dés)active : un type désactivé n'est plus proposé, les prix qui l'utilisent le gardent. */
+export async function modifierTypeFrais(db: Db, user: Utilisateur, typeFraisId: string, libelle: string, actif: boolean) {
+  exigerAdministrateur(user);
+  try {
+    const { rowCount } = await db.query(
+      `UPDATE types_frais SET libelle = $2, actif = $3, updated_at = NOW() WHERE id = $1`,
+      [typeFraisId, libelleTypeFrais(libelle), actif]
+    );
+    if (!rowCount) throw new ErreurMetier("Type de frais introuvable", 404);
+    return { success: true };
+  } catch (err) {
+    if ((err as { code?: string }).code === "23505") throw new ErreurMetier("Ce type de frais existe déjà");
+    throw err;
+  }
+}
+
+export async function supprimerTypeFrais(db: Db, user: Utilisateur, typeFraisId: string) {
+  exigerAdministrateur(user);
+  const { rows } = await db.query(`SELECT count(*)::int AS n FROM frais_prix WHERE type_frais_id = $1`, [typeFraisId]);
+  if (rows[0].n > 0) {
+    throw new ErreurMetier(`Impossible : ${rows[0].n} prix utilisent ce frais. Désactivez-le plutôt.`);
+  }
+  await db.query(`DELETE FROM types_frais WHERE id = $1`, [typeFraisId]);
+  return { success: true };
+}
+
 export async function togglePermissionRole(db: Db, user: Utilisateur, 
   role: string,
   permission: string,

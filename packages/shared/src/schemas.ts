@@ -50,10 +50,28 @@ export const schemaProduit = z.object({
   code: z.string().optional(),
 });
 
+// Détail du coût de revient : quand il est envoyé, le coût de revient en est
+// calculé (packages/shared/src/prix.ts) et cout_revient est ignoré.
+export const schemaDetailCout = z.object({
+  prix_achat: z.number().nonnegative(),
+  frais: z
+    .array(
+      z.object({
+        type_frais_id: identifiant,
+        mode: z.enum(["montant", "pourcentage"]),
+        valeur: z.number().nonnegative(),
+      })
+    )
+    .default([]),
+});
+
+export type DetailCout = z.input<typeof schemaDetailCout>;
+
 export const schemaCreationProduit = z.object({
   produit: schemaProduit,
   prix_vente: z.number(),
   cout_revient: z.number().optional(),
+  detail_cout: schemaDetailCout.optional(),
 });
 
 // Modification des informations d'un produit (commun à toutes les boutiques).
@@ -82,6 +100,7 @@ export const schemaTransfert = z.object({
 export const schemaPrix = z.object({
   prix_vente: z.number(),
   cout_revient: z.number().optional(),
+  detail_cout: schemaDetailCout.optional(),
 });
 
 export const schemaPrixReference = z.object({
@@ -194,5 +213,7 @@ export const schemaGroupe = z.object({
 export const schemaRegion = z.object({ nom: z.string(), groupe_id: z.string() });
 
 export const schemaCategorie = z.object({ nom: z.string(), description: z.string().optional() });
+
+export const schemaTypeFrais = z.object({ libelle: z.string(), actif: z.boolean().default(true) });
 
 export const schemaActivationPermission = z.object({ active: z.boolean() });

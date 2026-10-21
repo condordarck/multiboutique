@@ -63,6 +63,7 @@ export const ENTREES_ADMIN: Entree[] = [
   { cle: "roles", libelle: "Rôles & habilitations", chemin: "/admin/roles" },
   { cle: "boutiques", libelle: "Boutiques", chemin: "/admin/boutiques" },
   { cle: "categories", libelle: "Catégories", chemin: "/admin/categories" },
+  { cle: "types-frais", libelle: "Types de frais", chemin: "/admin/types-frais" },
   { cle: "parametres", libelle: "Paramètres", chemin: "/admin/parametres" },
 ];
 

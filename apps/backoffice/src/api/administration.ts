@@ -6,6 +6,7 @@ import type {
   Organisation,
   RoleUtilisateur,
   StatistiquesAdmin,
+  TypeFraisAdmin,
 } from "@multiboutique/shared";
 import { useQuery } from "@tanstack/react-query";
 import { appeler } from "@multiboutique/front";
@@ -17,6 +18,7 @@ export const useComptesAdmin = () => useQuery({ queryKey: cle("utilisateurs"), q
 export const useBoutiquesAdmin = () => useQuery({ queryKey: cle("boutiques"), queryFn: () => appeler<BoutiquesAdmin>("GET", "/admin/boutiques") });
 export const useOrganisation = () => useQuery({ queryKey: cle("organisation"), queryFn: () => appeler<Organisation>("GET", "/admin/organisation") });
 export const useCategoriesAdmin = () => useQuery({ queryKey: cle("categories"), queryFn: () => appeler<CategorieAdmin[]>("GET", "/admin/categories") });
+export const useTypesFraisAdmin = () => useQuery({ queryKey: cle("types-frais"), queryFn: () => appeler<TypeFraisAdmin[]>("GET", "/admin/types-frais") });
 export const useRolesPermissions = () =>
   useQuery({ queryKey: cle("roles"), queryFn: () => appeler<{ role: string; permission: string; active: boolean }[]>("GET", "/admin/roles") });
 export const useComptesBoutique = (boutiqueId: string) =>
@@ -74,6 +76,10 @@ export const creerCategorie = (corps: { nom: string; description?: string }) => 
 export const modifierCategorie = ({ id, ...corps }: { id: string; nom: string; description?: string }) =>
   appeler<{ success: true }>("PUT", `/admin/categories/${id}`, corps);
 export const supprimerCategorie = ({ id }: { id: string }) => appeler<{ success: true }>("DELETE", `/admin/categories/${id}`);
+export const creerTypeFrais = (corps: { libelle: string }) => appeler<{ success: true; id: string }>("POST", "/admin/types-frais", corps);
+export const modifierTypeFrais = ({ id, ...corps }: { id: string; libelle: string; actif: boolean }) =>
+  appeler<{ success: true }>("PUT", `/admin/types-frais/${id}`, corps);
+export const supprimerTypeFrais = ({ id }: { id: string }) => appeler<{ success: true }>("DELETE", `/admin/types-frais/${id}`);
 export const togglePermissionRole = ({ role, permission, active }: { role: string; permission: string; active: boolean }) =>
   appeler<{ success: true }>("PUT", `/admin/permissions/${role}/${encodeURIComponent(permission)}`, { active });
 
@@ -93,5 +99,8 @@ export const SERVICES_ADMINISTRATION = {
   creerCategorie,
   modifierCategorie,
   supprimerCategorie,
+  creerTypeFrais,
+  modifierTypeFrais,
+  supprimerTypeFrais,
   togglePermissionRole,
 };

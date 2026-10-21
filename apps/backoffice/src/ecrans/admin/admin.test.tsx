@@ -206,6 +206,33 @@ describe("administration", () => {
     await waitFor(() => expect(api.ecritures()[0]!.chemin).toBe("/admin/categories/c2"));
   });
 
+  it("types de frais : création, désactivation ; suppression impossible s'il sert à des prix", async () => {
+    api.repondre("GET", "/admin/types-frais", 200, [
+      { id: "tf1", libelle: "Transport", actif: true, nb_utilisations: 3 },
+      { id: "tf2", libelle: "Octroi", actif: false, nb_utilisations: 0 },
+    ]);
+    api.repondre("POST", "/admin/types-frais", 201, { success: true, id: "tf3" });
+    api.repondre("PUT", "/admin/types-frais/tf1", 200, { success: true });
+    const { container } = rendreApp("/admin/types-frais");
+    const table = await screen.findByRole("table", { name: "Types de frais" });
+    expect(within(table).getByRole("button", { name: "Supprimer Transport" }).hasAttribute("disabled")).toBe(true);
+    expect(within(table).getByRole("button", { name: "Supprimer Octroi" }).hasAttribute("disabled")).toBe(false);
+    await sansViolation(container);
+
+    await userEvent.click(screen.getByRole("button", { name: "Créer un type de frais" }));
+    const creation = screen.getByRole("dialog", { name: "Créer un type de frais" });
+    await userEvent.type(within(creation).getByLabelText(/Libellé/), "Assurance");
+    await userEvent.click(within(creation).getByRole("button", { name: "Créer le type de frais" }));
+    await waitFor(() => expect(api.ecritures()[0]).toMatchObject({ methode: "POST", chemin: "/admin/types-frais", corps: { libelle: "Assurance" } }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+    await userEvent.click(within(table).getByRole("button", { name: "Modifier Transport" }));
+    const fiche = screen.getByRole("dialog", { name: "Transport" });
+    await userEvent.click(within(fiche).getByRole("checkbox", { name: /Proposé dans les prix/ }));
+    await userEvent.click(within(fiche).getByRole("button", { name: "Enregistrer" }));
+    await waitFor(() => expect(api.ecritures()[1]).toMatchObject({ methode: "PUT", chemin: "/admin/types-frais/tf1", corps: { libelle: "Transport", actif: false } }));
+  });
+
   it("rôles : une case cochée est un appel ; l'échec rétablit la case", async () => {
     api.repondre("GET", "/admin/roles", 200, [{ role: "vendeur", permission: "ventes:creer", active: true }]);
     api.repondre("PUT", "/admin/permissions/vendeur/stock%3Agerer", 200, { success: true });

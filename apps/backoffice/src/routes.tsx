@@ -15,6 +15,7 @@ import { PrixConseilles } from "./ecrans/achats/PrixConseilles";
 import { AccueilAdmin } from "./ecrans/admin/AccueilAdmin";
 import { BoutiquesAdmin } from "./ecrans/admin/BoutiquesAdmin";
 import { CategoriesAdmin } from "./ecrans/admin/CategoriesAdmin";
+import { TypesFraisAdmin } from "./ecrans/admin/TypesFraisAdmin";
 import { OrganisationAdmin } from "./ecrans/admin/OrganisationAdmin";
 import { ParametresAdmin } from "./ecrans/admin/ParametresAdmin";
 import { Roles } from "./ecrans/admin/Roles";
@@ -59,6 +60,7 @@ export const routesAdmin: RouteObject[] = [
   { path: "boutiques", element: <BoutiquesAdmin /> },
   { path: "organisation", element: <OrganisationAdmin /> },
   { path: "categories", element: <CategoriesAdmin /> },
+  { path: "types-frais", element: <TypesFraisAdmin /> },
   { path: "roles", element: <Roles /> },
   { path: "parametres", element: <ParametresAdmin /> },
   { path: "*", element: sectionIntrouvable },

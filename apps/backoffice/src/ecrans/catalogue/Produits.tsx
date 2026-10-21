@@ -4,10 +4,11 @@ import { clsx } from "clsx";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { useParams } from "react-router";
-import { creerProduit, disponible, entrerStock, modifierPrix, modifierProduit, useCategories, useProduits } from "../../api/catalogue";
-import { correspond, EnTeteEcran, ErreurApi, formatMontant, formatNombre, Formulaire, lireEntier, lireNombre, ListeChargee, televerser, urlImage, useEcriture, useSession } from "@multiboutique/front";
+import { creerProduit, disponible, entrerStock, modifierPrix, modifierProduit, useCategories, useProduits, useTypesFrais } from "../../api/catalogue";
+import { correspond, EnTeteEcran, ErreurApi, formatMontant, formatNombre, formatPourcentage, Formulaire, lireEntier, lireNombre, ListeChargee, televerser, urlImage, useEcriture, useSession } from "@multiboutique/front";
 import { useMonnaie } from "../../api/generales";
 import { useBoutique } from "../../api/tableaux";
+import { DetailCoutRevient, lireDetail, saisieDe, type SaisieCout } from "./DetailCout";
 
 /** Catalogue et prix de la boutique (app/(dashboard)/dashboard/[boutiqueId]/produits/page.tsx). */
 export function Produits() {
@@ -74,11 +75,18 @@ export function Produits() {
                     alignement: "fin" as const,
                   },
                   {
+                    cle: "benefice",
+                    libelle: "Bénéfice",
+                    rendu: (p: ProduitBoutique) =>
+                      p.cout_revient != null ? formatMontant(Number(p.prix_vente) - Number(p.cout_revient), monnaie) : "—",
+                    alignement: "fin" as const,
+                  },
+                  {
                     cle: "marge",
                     libelle: "Marge",
                     rendu: (p: ProduitBoutique) =>
                       p.cout_revient
-                        ? `${(((Number(p.prix_vente) - Number(p.cout_revient)) / Number(p.cout_revient)) * 100).toFixed(1)}%`
+                        ? formatPourcentage(((Number(p.prix_vente) - Number(p.cout_revient)) / Number(p.cout_revient)) * 100)
                         : "—",
                     alignement: "fin" as const,
                   },
@@ -134,7 +142,11 @@ export function Produits() {
 /** Formulaire de components/dashboard/ProduitForm.tsx, dans un panneau. */
 function NouveauProduit({ boutiqueId, onFermer }: { boutiqueId: string; onFermer: () => void }) {
   const categories = useCategories();
-  const [champs, setChamps] = useState({ nom: "", reference: "", code: "", description: "", categorie: "", prix: "", cout: "", quantite: "" });
+  const typesFrais = useTypesFrais();
+  const monnaie = useMonnaie();
+  const { peut } = useSession();
+  const [champs, setChamps] = useState({ nom: "", reference: "", code: "", description: "", categorie: "", prix: "", quantite: "" });
+  const [saisieCout, setSaisieCout] = useState<SaisieCout>(saisieDe());
   const [image, setImage] = useState("");
   const [envoiPhoto, setEnvoiPhoto] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
@@ -142,7 +154,7 @@ function NouveauProduit({ boutiqueId, onFermer }: { boutiqueId: string; onFermer
   const creation = useEcriture({
     appel: async () => {
       const prix = lireNombre(champs.prix);
-      const cout = lireNombre(champs.cout);
+      const { detail } = lireDetail(saisieCout);
       const quantite = champs.quantite.trim() ? lireEntier(champs.quantite, 0) : 0;
       const { produitId } = await creerProduit({
         boutiqueId,
@@ -155,7 +167,7 @@ function NouveauProduit({ boutiqueId, onFermer }: { boutiqueId: string; onFermer
           ...(champs.code ? { code: champs.code } : {}),
         },
         prix_vente: prix,
-        ...(Number.isNaN(cout) ? {} : { cout_revient: cout }),
+        ...(detail ? { detail_cout: detail } : {}),
       });
       // Entrée de stock initiale facultative, comme le monolithe. Le produit existe
       // déjà : en cas d'échec, la liste le montre, et le message le dit.
@@ -182,7 +194,8 @@ function NouveauProduit({ boutiqueId, onFermer }: { boutiqueId: string; onFermer
   async function envoyer() {
     const prix = lireNombre(champs.prix);
     if (!(prix > 0)) return setErreur("Le prix de vente doit être un nombre positif");
-    if (champs.cout.trim() && !(lireNombre(champs.cout) >= 0)) return setErreur("Le coût de revient doit être un nombre positif ou nul");
+    const cout = lireDetail(saisieCout);
+    if (cout.erreur) return setErreur(cout.erreur);
     if (champs.quantite.trim() && Number.isNaN(lireEntier(champs.quantite, 0))) {
       return setErreur("La quantité initiale doit être un nombre entier");
     }
@@ -217,8 +230,11 @@ function NouveauProduit({ boutiqueId, onFermer }: { boutiqueId: string; onFermer
           value={champs.categorie}
           onChange={maj("categorie")}
         />
+        {/* Le coût de revient n'est saisi et vu qu'avec prix:gerer, comme dans la liste. */}
+        {peut("prix:gerer") && (
+          <DetailCoutRevient saisie={saisieCout} onSaisie={setSaisieCout} typesFrais={typesFrais.data ?? []} prixVente={champs.prix} monnaie={monnaie} />
+        )}
         <Champ libelle="Prix de vente" type="montant" required value={champs.prix} onChange={maj("prix")} />
-        <Champ libelle="Coût de revient" type="montant" value={champs.cout} onChange={maj("cout")} />
         <Champ libelle="Quantité initiale en stock" type="nombre" placeholder="0" value={champs.quantite} onChange={maj("quantite")} />
       </Formulaire>
     </Panneau>
@@ -357,23 +373,26 @@ function ModifierProduit({ boutiqueId, produit, onFermer }: { boutiqueId: string
 
 /** components/dashboard/PrixForm.tsx, dans un panneau. */
 function PrixProduit({ boutiqueId, produit, onFermer }: { boutiqueId: string; produit: ProduitBoutique; onFermer: () => void }) {
+  const typesFrais = useTypesFrais();
+  const monnaie = useMonnaie();
   const [prix, setPrix] = useState(String(produit.prix_vente));
-  const [cout, setCout] = useState(produit.cout_revient != null ? String(produit.cout_revient) : "");
+  const [saisieCout, setSaisieCout] = useState<SaisieCout>(saisieDe(produit));
   const [erreur, setErreur] = useState<string | null>(null);
   const modification = useEcriture({ appel: modifierPrix, invalide: [["boutiques", boutiqueId]], succes: "Prix enregistré" });
 
   async function envoyer() {
     const p = lireNombre(prix);
     if (!(p > 0)) return setErreur("Le prix de vente doit être positif");
-    const c = lireNombre(cout);
-    // Un coût mal saisi ne doit pas effacer le coût enregistré.
-    if (cout.trim() && !(c >= 0)) return setErreur("Le coût de revient doit être un nombre positif ou nul");
+    // Une saisie invalide ne doit pas effacer le coût enregistré.
+    const { detail, erreur: erreurCout } = lireDetail(saisieCout);
+    if (erreurCout) return setErreur(erreurCout);
     setErreur(null);
+    // Détail vide : le coût enregistré reste tel quel (saisi d'un seul montant).
     const ok = await modification.envoyer({
       boutiqueId,
       produitId: produit.produit_id,
       prix_vente: p,
-      ...(Number.isNaN(c) ? {} : { cout_revient: c }),
+      ...(detail ? { detail_cout: detail } : produit.cout_revient != null ? { cout_revient: Number(produit.cout_revient) } : {}),
     });
     if (ok) onFermer();
   }
@@ -392,8 +411,15 @@ function PrixProduit({ boutiqueId, produit, onFermer }: { boutiqueId: string; pr
           </Bouton>
         }
       >
+        <DetailCoutRevient
+          saisie={saisieCout}
+          onSaisie={setSaisieCout}
+          typesFrais={typesFrais.data ?? []}
+          prixVente={prix}
+          coutActuel={produit.prix_achat == null ? produit.cout_revient : undefined}
+          monnaie={monnaie}
+        />
         <Champ libelle="Prix de vente" type="montant" value={prix} onChange={(e) => setPrix(e.target.value)} />
-        <Champ libelle="Coût de revient" type="montant" value={cout} onChange={(e) => setCout(e.target.value)} />
       </Formulaire>
     </Panneau>
   );

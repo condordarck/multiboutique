@@ -19,8 +19,8 @@ export const routesCatalogue: FastifyPluginAsync<{ db: metier.Db }> = async (app
     service: "creerProduit",
     statut: 201,
     gerer: (r, u) => {
-      const { produit, prix_vente, cout_revient } = schemaCreationProduit.parse(r.body);
-      return metier.creerProduit(db, u, parametre(r, "boutiqueId"), produit, prix_vente, cout_revient);
+      const { produit, prix_vente, cout_revient, detail_cout } = schemaCreationProduit.parse(r.body);
+      return metier.creerProduit(db, u, parametre(r, "boutiqueId"), produit, prix_vente, cout_revient, detail_cout);
     },
   });
 
@@ -72,8 +72,8 @@ export const routesCatalogue: FastifyPluginAsync<{ db: metier.Db }> = async (app
     garde: "boutique",
     service: "modifierPrix",
     gerer: (r, u) => {
-      const { prix_vente, cout_revient } = schemaPrix.parse(r.body);
-      return metier.modifierPrix(db, u, parametre(r, "boutiqueId"), parametre(r, "produitId"), prix_vente, cout_revient);
+      const { prix_vente, cout_revient, detail_cout } = schemaPrix.parse(r.body);
+      return metier.modifierPrix(db, u, parametre(r, "boutiqueId"), parametre(r, "produitId"), prix_vente, cout_revient, detail_cout);
     },
   });
 

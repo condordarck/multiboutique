@@ -93,6 +93,9 @@ export interface ProduitBoutique {
   prix_vente: number;
   /** Absent sans prix:gerer. */
   cout_revient?: number | null;
+  /** Détail du coût de revient, absent sans prix:gerer ; prix_achat null : coût saisi d'un seul montant. */
+  prix_achat?: number | null;
+  frais?: FraisPrix[];
   quantite: number | null;
   quantite_reservee: number | null;
   seuil_alerte: number | null;
@@ -268,6 +271,26 @@ export interface Organisation {
 }
 
 /** GET /admin/categories */
+/** Un frais du coût de revient d'un produit dans une boutique. */
+export interface FraisPrix {
+  type_frais_id: string;
+  libelle: string;
+  mode: "montant" | "pourcentage";
+  valeur: number;
+}
+
+/** GET /types-frais */
+export interface TypeFrais {
+  id: string;
+  libelle: string;
+  actif: boolean;
+}
+
+/** GET /admin/types-frais */
+export interface TypeFraisAdmin extends TypeFrais {
+  nb_utilisations: number;
+}
+
 export interface CategorieAdmin {
   id: string;
   nom: string;

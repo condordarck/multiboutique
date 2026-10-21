@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { creerBaseDeTest, type BaseDeTest } from "../../test/base";
-import { BOUTIQUES, CONFIG_TEST, creerCompte, creerProduit, ecriture, seConnecter, stock } from "../../test/fixtures";
+import { BOUTIQUES, CONFIG_TEST, creerCompte, creerProduit, ecriture, ORIGINES, seConnecter, stock } from "../../test/fixtures";
 import { construireApp } from "../app";
 
 let base: BaseDeTest;
@@ -250,5 +250,101 @@ describe("prix", () => {
     const p = await creerProduit(base.pool, BOUTIQUES.b1);
     const r = await envoyer("gerant", "POST", `/boutiques/${BOUTIQUES.b1}/prix-conseilles/application`, { produit_ids: [p] });
     expect(r.statusCode).toBe(400);
+  });
+});
+
+describe("détail du coût de revient", () => {
+  const typeFrais = async (libelle: string) => (await base.pool.query(`SELECT id FROM types_frais WHERE libelle = $1`, [libelle])).rows[0].id as string;
+  const prix = async (p: string) =>
+    (await base.pool.query(`SELECT prix_vente, cout_revient, prix_achat FROM prix_boutique WHERE produit_id = $1 AND boutique_id = $2`, [p, BOUTIQUES.b1])).rows[0];
+  const fraisDe = async (p: string) =>
+    (await base.pool.query(`SELECT mode, valeur FROM frais_prix WHERE produit_id = $1 ORDER BY mode`, [p])).rows.map((f) => [f.mode, Number(f.valeur)]);
+
+  it("création : coût de revient = prix d'achat + frais (montant et %), le coût saisi est ignoré", async () => {
+    const r = await envoyer("gerant", "POST", `/boutiques/${BOUTIQUES.b1}/produits`, {
+      produit: { reference: "REF-DETAIL", nom: "Riz importé" },
+      prix_vente: 2000,
+      cout_revient: 1,
+      detail_cout: {
+        prix_achat: 1000,
+        frais: [
+          { type_frais_id: await typeFrais("Transport"), mode: "montant", valeur: 150 },
+          { type_frais_id: await typeFrais("Douane"), mode: "pourcentage", valeur: 20 },
+        ],
+      },
+    });
+    expect(r.statusCode).toBe(201);
+    const p = r.json().produitId;
+    expect(await prix(p)).toMatchObject({ cout_revient: 1350, prix_achat: 1000 });
+    expect(await fraisDe(p)).toEqual([["montant", 150], ["pourcentage", 20]]);
+
+    // La lecture du catalogue rend le détail à qui gère les prix, le masque aux autres.
+    const lire = (qui: string) =>
+      app.inject({ url: `/boutiques/${BOUTIQUES.b1}/produits`, headers: { origin: ORIGINES.backoffice, cookie: cookies[qui] } });
+    const vu = (await lire("gerant")).json().find((l: { produit_id: string }) => l.produit_id === p);
+    expect(vu).toMatchObject({ cout_revient: 1350, prix_achat: 1000 });
+    expect(vu.frais).toEqual([
+      { type_frais_id: await typeFrais("Douane"), libelle: "Douane", mode: "pourcentage", valeur: 20 },
+      { type_frais_id: await typeFrais("Transport"), libelle: "Transport", mode: "montant", valeur: 150 },
+    ]);
+    const masque = (await lire("vendeur")).json().find((l: { produit_id: string }) => l.produit_id === p);
+    expect(Object.keys(masque)).not.toEqual(expect.arrayContaining(["cout_revient"]));
+    expect(masque.prix_achat).toBeUndefined();
+    expect(masque.frais).toBeUndefined();
+
+    // La vente fige le coût calculé.
+    await base.pool.query(`UPDATE stocks SET quantite = 5 WHERE produit_id = $1 AND boutique_id = $2`, [p, BOUTIQUES.b1]);
+    const vente = await envoyer("gerant", "POST", `/boutiques/${BOUTIQUES.b1}/ventes`, {
+      mode_paiement: "especes",
+      lignes: [{ produit_id: p, quantite: 1, prix_unitaire: 2000 }],
+    });
+    expect(vente.statusCode).toBe(201);
+    const { rows } = await base.pool.query(`SELECT cout_unitaire FROM lignes_vente WHERE produit_id = $1`, [p]);
+    expect(Number(rows[0].cout_unitaire)).toBe(1350);
+  });
+
+  it("modification : remplace le détail ; sans détail, il est effacé ; prix conseillé appliqué aussi", async () => {
+    const p = await creerProduit(base.pool, BOUTIQUES.b1, { prix: 10 });
+    const url = `/boutiques/${BOUTIQUES.b1}/prix/${p}`;
+    const stockage = await typeFrais("Stockage");
+    expect((await envoyer("gerant", "PUT", url, { prix_vente: 20, detail_cout: { prix_achat: 10, frais: [{ type_frais_id: stockage, mode: "montant", valeur: 2.5 }] } })).statusCode).toBe(200);
+    expect(await prix(p)).toMatchObject({ prix_vente: 20, cout_revient: 12.5, prix_achat: 10 });
+    expect((await envoyer("gerant", "PUT", url, { prix_vente: 20, detail_cout: { prix_achat: 11 } })).statusCode).toBe(200);
+    expect(await prix(p)).toMatchObject({ cout_revient: 11, prix_achat: 11 });
+    expect(await fraisDe(p)).toEqual([]);
+    expect((await envoyer("gerant", "PUT", url, { prix_vente: 20, detail_cout: { prix_achat: 10, frais: [{ type_frais_id: stockage, mode: "montant", valeur: 1 }] } })).statusCode).toBe(200);
+    expect((await envoyer("gerant", "PUT", url, { prix_vente: 20, cout_revient: 9 })).statusCode).toBe(200);
+    expect(await prix(p)).toMatchObject({ cout_revient: 9, prix_achat: null });
+    expect(await fraisDe(p)).toEqual([]);
+
+    await envoyer("gerant", "PUT", url, { prix_vente: 20, detail_cout: { prix_achat: 10, frais: [{ type_frais_id: stockage, mode: "montant", valeur: 1 }] } });
+    expect((await envoyer("proprietaire", "POST", "/prix-reference", { produit_id: p, prix_vente: 15, cout_revient: 8 })).statusCode).toBe(200);
+    expect((await envoyer("gerant", "POST", `/boutiques/${BOUTIQUES.b1}/prix-conseilles/application`, { produit_ids: [p] })).statusCode).toBe(200);
+    expect(await prix(p)).toMatchObject({ prix_vente: 15, cout_revient: 8, prix_achat: null });
+    expect(await fraisDe(p)).toEqual([]);
+  });
+
+  it("refuse un frais en double, un type inconnu ou désactivé, une valeur négative ; un type désactivé déjà présent reste accepté", async () => {
+    const p = await creerProduit(base.pool, BOUTIQUES.b1, { prix: 10 });
+    const url = `/boutiques/${BOUTIQUES.b1}/prix/${p}`;
+    const transport = await typeFrais("Transport");
+    const frais = (...liste: { type_frais_id: string; valeur: number }[]) => ({
+      prix_vente: 20,
+      detail_cout: { prix_achat: 10, frais: liste.map((f) => ({ mode: "montant", ...f })) },
+    });
+    const doublon = await envoyer("gerant", "PUT", url, frais({ type_frais_id: transport, valeur: 1 }, { type_frais_id: transport, valeur: 2 }));
+    expect(doublon.statusCode).toBe(400);
+    expect(doublon.json().erreur).toBe("Un même frais ne peut figurer qu'une fois");
+    expect((await envoyer("gerant", "PUT", url, frais({ type_frais_id: "99999999-9999-9999-9999-999999999999", valeur: 1 }))).statusCode).toBe(400);
+    expect((await envoyer("gerant", "PUT", url, frais({ type_frais_id: transport, valeur: -1 }))).statusCode).toBe(400);
+    expect(await prix(p)).toMatchObject({ prix_vente: 10, prix_achat: null });
+
+    const { rows } = await base.pool.query(`INSERT INTO types_frais (libelle) VALUES ('Assurance') RETURNING id`);
+    expect((await envoyer("gerant", "PUT", url, frais({ type_frais_id: rows[0].id, valeur: 3 }))).statusCode).toBe(200);
+    await base.pool.query(`UPDATE types_frais SET actif = false WHERE id = $1`, [rows[0].id]);
+    expect((await envoyer("gerant", "PUT", url, frais({ type_frais_id: rows[0].id, valeur: 4 }))).statusCode).toBe(200);
+    expect(await prix(p)).toMatchObject({ cout_revient: 14 });
+    const autre = await creerProduit(base.pool, BOUTIQUES.b1, { prix: 10 });
+    expect((await envoyer("gerant", "PUT", `/boutiques/${BOUTIQUES.b1}/prix/${autre}`, frais({ type_frais_id: rows[0].id, valeur: 4 }))).statusCode).toBe(400);
   });
 });

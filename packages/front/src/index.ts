@@ -12,7 +12,7 @@ export {
 } from "./session/Session";
 export { Chargement } from "./commun/Chargement";
 export { EnTeteEcran } from "./commun/EnTeteEcran";
-export { formatDate, formatDateHeure, formatMontant, formatNombre } from "./commun/formats";
+export { formatDate, formatDateHeure, formatMontant, formatNombre, formatPourcentage } from "./commun/formats";
 export { Formulaire, type FormulaireProps } from "./commun/Formulaire";
 export { Lecture } from "./commun/Lecture";
 export { LienBouton } from "./commun/LienBouton";

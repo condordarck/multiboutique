@@ -10,10 +10,10 @@ import { bornesPeriode, boutiqueActive, estPeriode, exigerLecture } from "./comm
 
 const requete = <T extends Record<string, string | undefined>>(r: FastifyRequest) => r.query as T;
 
-/** Le coût de revient n'est visible qu'avec prix:gerer, quelle que soit la lecture. */
+/** Le coût de revient et son détail ne sont visibles qu'avec prix:gerer, quelle que soit la lecture. */
 function masquerCout<T extends Record<string, unknown>>(u: Utilisateur, lignes: T[]) {
   if (aPermission(u, "prix:gerer")) return lignes;
-  return lignes.map(({ cout_revient: _masque, ...reste }) => reste);
+  return lignes.map(({ cout_revient: _cout, prix_achat: _achat, frais: _frais, ...reste }) => reste);
 }
 
 export const lecturesBoutique: FastifyPluginAsync<{ db: Db }> = async (app, { db }) => {
@@ -200,7 +200,11 @@ export const lecturesBoutique: FastifyPluginAsync<{ db: Db }> = async (app, { db
               p.code AS produit_code, p.image_url AS produit_image,
               p.description AS produit_description, p.actif AS produit_actif,
               p.categorie_id, c.nom AS categorie_nom,
-              pb.prix_vente, pb.cout_revient,
+              pb.prix_vente, pb.cout_revient, pb.prix_achat,
+              COALESCE((SELECT json_agg(json_build_object('type_frais_id', f.type_frais_id, 'libelle', t.libelle,
+                                                          'mode', f.mode, 'valeur', f.valeur) ORDER BY t.libelle)
+                        FROM frais_prix f JOIN types_frais t ON t.id = f.type_frais_id
+                        WHERE f.produit_id = pb.produit_id AND f.boutique_id = pb.boutique_id), '[]') AS frais,
               s.quantite, s.quantite_reservee, s.seuil_alerte
        FROM prix_boutique pb
        JOIN produits p ON p.id = pb.produit_id

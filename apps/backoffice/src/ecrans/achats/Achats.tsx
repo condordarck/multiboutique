@@ -358,8 +358,11 @@ function NouvelleCommandeFournisseur({ boutiqueId, fournisseurs, onFermer }: { b
           lignes={lignes}
           onChange={setLignes}
           produits={(produits.data ?? []).map((p) => ({ produit_id: p.produit_id, nom: p.produit_nom }))}
-          // Le coût de revient connu sert de prix d'achat proposé.
-          prixPropose={(id) => produits.data?.find((p) => p.produit_id === id)?.cout_revient}
+          // Prix d'achat détaillé, sinon le coût de revient connu, comme prix d'achat proposé.
+          prixPropose={(id) => {
+            const p = produits.data?.find((l) => l.produit_id === id);
+            return p?.prix_achat ?? p?.cout_revient;
+          }}
           libellePrix="Prix d'achat"
         />
         <Champ libelle="Note (facultatif)" value={note} onChange={(e) => setNote(e.target.value)} />

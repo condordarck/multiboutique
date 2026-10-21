@@ -8,6 +8,7 @@ import {
   schemaNouvelUtilisateur,
   schemaParametres,
   schemaRegion,
+  schemaTypeFrais,
 } from "@multiboutique/shared";
 import type { FastifyPluginAsync } from "fastify";
 import { parametre, route } from "./registre";
@@ -144,6 +145,34 @@ export const routesAdministration: FastifyPluginAsync<{ db: metier.Db }> = async
     garde: "administrateur",
     service: "supprimerCategorie",
     gerer: (r, u) => metier.supprimerCategorie(db, u, id(r)),
+  });
+
+  route(app, {
+    methode: "POST",
+    chemin: "/admin/types-frais",
+    garde: "administrateur",
+    service: "creerTypeFrais",
+    statut: 201,
+    gerer: (r, u) => metier.creerTypeFrais(db, u, schemaTypeFrais.parse(r.body).libelle),
+  });
+
+  route(app, {
+    methode: "PUT",
+    chemin: "/admin/types-frais/:id",
+    garde: "administrateur",
+    service: "modifierTypeFrais",
+    gerer: (r, u) => {
+      const { libelle, actif } = schemaTypeFrais.parse(r.body);
+      return metier.modifierTypeFrais(db, u, id(r), libelle, actif);
+    },
+  });
+
+  route(app, {
+    methode: "DELETE",
+    chemin: "/admin/types-frais/:id",
+    garde: "administrateur",
+    service: "supprimerTypeFrais",
+    gerer: (r, u) => metier.supprimerTypeFrais(db, u, id(r)),
   });
 
   route(app, {

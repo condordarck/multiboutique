@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDate, formatDateHeure, formatMontant } from "./formats";
+import { formatDate, formatDateHeure, formatMontant, formatPourcentage } from "./formats";
 
 // Les formats du monolithe (lib/utils.ts et pages) : toLocaleString("fr-FR") puis le symbole.
 const monolithe = (v: number, monnaie: string) => `${Number(v).toLocaleString("fr-FR")} ${monnaie}`;
@@ -12,6 +12,12 @@ describe("formats", () => {
 
   it("le symbole ne se sépare jamais du nombre (espace insécable)", () => {
     expect(formatMontant(5, "FC")).toMatch(/5 FC$/);
+  });
+
+  it("pourcentage : une décimale, virgule, espace insécable avant %", () => {
+    expect(formatPourcentage(48.148)).toBe("48,1\u00a0%");
+    expect(formatPourcentage(20)).toBe("20,0\u00a0%");
+    expect(espaces(formatPourcentage(-12.35))).toBe("-12,4 %");
   });
 
   it("accepte un montant reçu en texte", () => {

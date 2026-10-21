@@ -41,5 +41,6 @@ export const ICONES: Record<string, ReactNode> = {
   roles: <IconeRoles />,
   boutiques: <IconeBoutiques />,
   categories: <IconeCategories />,
+  "types-frais": <IconePrix />,
   parametres: <IconeReglages />,
 };

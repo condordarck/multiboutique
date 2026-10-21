@@ -1,19 +1,65 @@
-import { aPermission, type ProduitFormData, type ProduitModifieData } from "@multiboutique/shared";
+import { aPermission, calculerCoutRevient, type DetailCout, type ProduitFormData, type ProduitModifieData } from "@multiboutique/shared";
 import { exigerAccesBoutique, peutAccederBoutique } from "./acces";
 import type { Db, Utilisateur } from "./contexte";
 import { ErreurMetier } from "./erreurs";
-import { insererMouvementWithClient } from "./interne";
+import { insererMouvementWithClient, type Requeteur } from "./interne";
 
 // Produits, stock et prix : repris de lib/actions/index.ts, SQL inchangé.
 
 /** Chemin rendu par POST /uploads (apps/api/src/routes/uploads.ts). */
 const IMAGE_TELEVERSEE = /^\/uploads\/produits\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|png|webp|gif)$/;
 
+/**
+ * Coût de revient à enregistrer : calculé du détail s'il est fourni, sinon le
+ * montant saisi. Les types de frais sont vérifiés avant toute écriture.
+ */
+async function coutSelonDetail(
+  client: Requeteur,
+  produitId: string | null,
+  boutiqueId: string,
+  coutRevient: number | undefined,
+  detail: DetailCout | undefined
+): Promise<number | null> {
+  if (!detail) return coutRevient ?? null;
+  const frais = detail.frais ?? [];
+  const ids = frais.map((f) => f.type_frais_id);
+  if (new Set(ids).size !== ids.length) throw new ErreurMetier("Un même frais ne peut figurer qu'une fois");
+  if (ids.length > 0) {
+    // Un type désactivé reste accepté s'il figure déjà sur ce prix.
+    const { rows } = await client.query(
+      `SELECT t.id FROM types_frais t
+       WHERE t.id = ANY($1::uuid[])
+         AND (t.actif OR EXISTS (SELECT 1 FROM frais_prix f
+                                 WHERE f.type_frais_id = t.id AND f.produit_id = $2 AND f.boutique_id = $3))`,
+      [ids, produitId, boutiqueId]
+    );
+    if (rows.length !== ids.length) throw new ErreurMetier("Type de frais inconnu ou désactivé");
+  }
+  return calculerCoutRevient(detail.prix_achat, frais);
+}
+
+/** Remplace le détail du coût (prix d'achat et frais) ; sans détail, l'efface. */
+async function enregistrerDetail(client: Requeteur, produitId: string, boutiqueId: string, detail: DetailCout | undefined) {
+  await client.query(`DELETE FROM frais_prix WHERE produit_id = $1 AND boutique_id = $2`, [produitId, boutiqueId]);
+  await client.query(`UPDATE prix_boutique SET prix_achat = $3 WHERE produit_id = $1 AND boutique_id = $2`, [
+    produitId,
+    boutiqueId,
+    detail ? detail.prix_achat : null,
+  ]);
+  for (const f of detail?.frais ?? []) {
+    await client.query(
+      `INSERT INTO frais_prix (produit_id, boutique_id, type_frais_id, mode, valeur) VALUES ($1, $2, $3, $4, $5)`,
+      [produitId, boutiqueId, f.type_frais_id, f.mode, f.valeur]
+    );
+  }
+}
+
 export async function creerProduit(db: Db, user: Utilisateur, 
   boutiqueId: string,
   data: ProduitFormData,
   prixVente: number,
-  coutRevient?: number
+  coutSaisi?: number,
+  detail?: DetailCout
 ) {
   exigerAccesBoutique(user, boutiqueId, ["produits:gerer"]);
 
@@ -78,14 +124,16 @@ export async function creerProduit(db: Db, user: Utilisateur,
       produitId = newRows[0].id;
     }
 
-    // Prix pour cette boutique (upsert)
+    // Prix pour cette boutique (upsert), coût calculé du détail s'il est fourni
+    const coutRevient = await coutSelonDetail(client, produitId, boutiqueId, coutSaisi, detail);
     await client.query(
       `INSERT INTO prix_boutique (produit_id, boutique_id, prix_vente, cout_revient, actif)
        VALUES ($1, $2, $3, $4, true)
        ON CONFLICT (produit_id, boutique_id)
        DO UPDATE SET prix_vente = $3, cout_revient = $4, actif = true, updated_at = NOW()`,
-      [produitId, boutiqueId, prixVente, coutRevient ?? null]
+      [produitId, boutiqueId, prixVente, coutRevient]
     );
+    await enregistrerDetail(client, produitId, boutiqueId, detail);
 
     // Ligne de stock (upsert) — seuil d'alerte depuis les paramètres généraux
     await client.query(
@@ -374,17 +422,30 @@ export async function modifierPrix(db: Db, user: Utilisateur,
   boutiqueId: string,
   produitId: string,
   prixVente: number,
-  coutRevient?: number
+  coutSaisi?: number,
+  detail?: DetailCout
 ) {
   exigerAccesBoutique(user, boutiqueId, ["prix:gerer"]);
   if (prixVente <= 0) throw new ErreurMetier("Le prix de vente doit être positif");
 
-  await db.query(
-    `UPDATE prix_boutique
-     SET prix_vente = $3, cout_revient = $4, actif = true, updated_at = NOW()
-     WHERE produit_id = $1 AND boutique_id = $2`,
-    [produitId, boutiqueId, prixVente, coutRevient ?? null]
-  );
+  const client = await db.connect();
+  try {
+    await client.query("BEGIN");
+    const coutRevient = await coutSelonDetail(client, produitId, boutiqueId, coutSaisi, detail);
+    const { rowCount } = await client.query(
+      `UPDATE prix_boutique
+       SET prix_vente = $3, cout_revient = $4, actif = true, updated_at = NOW()
+       WHERE produit_id = $1 AND boutique_id = $2`,
+      [produitId, boutiqueId, prixVente, coutRevient]
+    );
+    if (rowCount) await enregistrerDetail(client, produitId, boutiqueId, detail);
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
 
   return { success: true };
 }
@@ -463,10 +524,13 @@ export async function appliquerPrixConseilles(db: Db, user: Utilisateur,
          ON CONFLICT (produit_id, boutique_id) DO UPDATE
            SET prix_vente = EXCLUDED.prix_vente,
                cout_revient = EXCLUDED.cout_revient,
+               prix_achat = NULL,
                actif = true,
                updated_at = NOW()`,
         [row.produit_id, boutiqueId, Number(row.prix_vente), row.cout_revient ? Number(row.cout_revient) : null]
       );
+      // Le coût conseillé remplace le détail du coût de la boutique.
+      await client.query(`DELETE FROM frais_prix WHERE produit_id = $1 AND boutique_id = $2`, [row.produit_id, boutiqueId]);
     }
     await client.query("COMMIT");
   } catch (error) {

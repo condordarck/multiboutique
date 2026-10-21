@@ -123,7 +123,15 @@ export const lecturesGenerales: FastifyPluginAsync<{ db: Db }> = async (app, { d
     gerer: async () => (await db.query(`SELECT id, nom, code FROM categories ORDER BY nom`)).rows,
   });
 
-  // client/page.tsx:28
+  // Types de frais du coût de revient (désactivés compris : ils restent sur des prix).
+  route(app, {
+    methode: "GET",
+    chemin: "/types-frais",
+    garde: "connexion",
+    gerer: async () => (await db.query(`SELECT id, libelle, actif FROM types_frais ORDER BY libelle`)).rows,
+  });
+
+    // client/page.tsx:28
   route(app, {
     methode: "GET",
     chemin: "/me/reservations",

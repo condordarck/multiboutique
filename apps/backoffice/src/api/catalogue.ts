@@ -1,4 +1,4 @@
-import type { CategorieResumee, LigneStock, Mouvement, ProduitBoutique } from "@multiboutique/shared";
+import type { CategorieResumee, DetailCout, LigneStock, Mouvement, ProduitBoutique, TypeFrais } from "@multiboutique/shared";
 import { useQuery } from "@tanstack/react-query";
 import { appeler } from "@multiboutique/front";
 import { cle } from "./tableaux";
@@ -13,6 +13,9 @@ export const useProduits = (boutiqueId: string) =>
 
 export const useCategories = () =>
   useQuery({ queryKey: ["categories"], queryFn: () => appeler<CategorieResumee[]>("GET", "/categories"), staleTime: 5 * 60_000 });
+
+export const useTypesFrais = () =>
+  useQuery({ queryKey: ["types-frais"], queryFn: () => appeler<TypeFrais[]>("GET", "/types-frais"), staleTime: 5 * 60_000 });
 
 export const useStock = (boutiqueId: string) =>
   useQuery({
@@ -44,6 +47,8 @@ export interface NouveauProduit {
   produit: { nom: string; reference: string; description?: string; categorie_id?: string; image_url?: string; code?: string };
   prix_vente: number;
   cout_revient?: number;
+  /** Prix d'achat et frais : le coût de revient en est calculé par l'API. */
+  detail_cout?: DetailCout;
 }
 
 export const creerProduit = ({ boutiqueId, ...corps }: NouveauProduit) =>
@@ -90,13 +95,14 @@ export const transfertStock = ({
 export const modifierPrix = ({
   boutiqueId,
   produitId,
-  prix_vente,
-  cout_revient,
+  ...corps
 }: {
   boutiqueId: string;
   produitId: string;
   prix_vente: number;
   cout_revient?: number;
-}) => appeler<{ success: true }>("PUT", `/boutiques/${boutiqueId}/prix/${produitId}`, { prix_vente, cout_revient });
+  /** Prix d'achat et frais : le coût de revient en est calculé par l'API. Absent : détail effacé. */
+  detail_cout?: DetailCout;
+}) => appeler<{ success: true }>("PUT", `/boutiques/${boutiqueId}/prix/${produitId}`, corps);
 
 export const SERVICES_CATALOGUE = { creerProduit, modifierProduit, entrerStock, ajusterStock, transfertStock, modifierPrix };

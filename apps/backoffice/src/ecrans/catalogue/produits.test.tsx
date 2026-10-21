@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 import { sansViolation } from "@multiboutique/front/test/axe";
 import { fauxApi, type FauxApi } from "@multiboutique/front/test/faux-api";
-import { BOUTIQUE_DETAIL, PRODUITS } from "../../../test/donnees";
+import { BOUTIQUE_DETAIL, produit, PRODUITS } from "../../../test/donnees";
 import { BOUTIQUE_1, connecte, rendreApp, utilisateur } from "../../../test/rendu";
 
 let api: FauxApi;
@@ -18,7 +18,15 @@ function preparer(role: "gerant" | "vendeur" = "gerant") {
   // Comme l'API : pas de coût de revient sans prix:gerer.
   api.repondre("GET", `/boutiques/${BOUTIQUE_1}/produits`, 200, role === "vendeur" ? PRODUITS.map(({ cout_revient: _c, ...p }) => p) : PRODUITS);
   api.repondre("GET", "/categories", 200, [{ id: "cat-1", nom: "Céréales", code: "CER" }]);
+  api.repondre("GET", "/types-frais", 200, TYPES_FRAIS);
 }
+
+const TYPES_FRAIS = [
+  { id: "tf-douane", libelle: "Douane", actif: true },
+  { id: "tf-transport", libelle: "Transport", actif: true },
+  { id: "tf-ancien", libelle: "Octroi", actif: false },
+];
+const ligneCout = (panneau: HTMLElement, terme: string) => espaces(within(panneau).getByText(terme, { selector: "dt" }).nextElementSibling?.textContent);
 
 describe("produits", () => {
   it("catalogue avec prix, coût, marge et disponible", async () => {
@@ -29,7 +37,9 @@ describe("produits", () => {
     const riz = within(table).getAllByRole("row")[1]!;
     expect(espaces(riz.textContent)).toContain("22 $");
     expect(espaces(riz.textContent)).toContain("18 $");
-    expect(riz.textContent).toContain("22.2%");
+    expect(espaces(riz.textContent)).toContain("22,2 %");
+    expect(within(table).getAllByRole("columnheader").map((c) => c.textContent)).toContain("Bénéfice");
+    expect(espaces(riz.textContent)).toContain("4 $");
     expect(within(table).getAllByRole("row")[3]!.textContent).toContain("0");
     await sansViolation(container);
   });
@@ -55,8 +65,21 @@ describe("produits", () => {
     const panneau = screen.getByRole("dialog", { name: "Nouveau produit" });
     await userEvent.type(within(panneau).getByLabelText("Nom du produit"), "Farine de blé 1 kg");
     await userEvent.selectOptions(within(panneau).getByLabelText("Catégorie (rayon)"), "cat-1");
-    await userEvent.type(within(panneau).getByLabelText("Prix de vente"), "1,6");
-    await userEvent.type(within(panneau).getByLabelText("Coût de revient"), "1.2");
+    await userEvent.type(within(panneau).getByLabelText("Prix de vente"), "2000");
+    await userEvent.type(within(panneau).getByLabelText("Prix d'achat (par unité)"), "1000");
+    await userEvent.click(within(panneau).getByRole("button", { name: "Ajouter un frais" }));
+    await userEvent.selectOptions(within(panneau).getByLabelText("Frais n°1"), "tf-transport");
+    await userEvent.type(within(panneau).getByLabelText("Montant du frais n°1"), "150");
+    await userEvent.click(within(panneau).getByRole("button", { name: "Ajouter un frais" }));
+    // Seuls les types actifs et pas encore choisis sont proposés.
+    const choix = within(within(panneau).getByLabelText("Frais n°2")).getAllByRole("option").map((o) => o.textContent);
+    expect(choix).toEqual(["Choisir…", "Douane"]);
+    await userEvent.selectOptions(within(panneau).getByLabelText("Calcul du frais n°2"), "pourcentage");
+    await userEvent.type(within(panneau).getByLabelText("Taux du frais n°2 (%)"), "20");
+    expect(ligneCout(panneau, "Coût de revient")).toBe("1 350 $");
+    expect(ligneCout(panneau, "Bénéfice par unité")).toBe("650 $");
+    expect(ligneCout(panneau, "Marge (sur le coût)")).toBe("48,1 %");
+    expect(within(panneau).getByRole("button", { name: "Ajouter un frais" }).hasAttribute("disabled")).toBe(true);
     await userEvent.type(within(panneau).getByLabelText("Quantité initiale en stock"), "40");
     await userEvent.upload(within(panneau).getByLabelText("Photo du produit"), new File(["x"], "farine.png", { type: "image/png" }));
     expect((await within(panneau).findByRole("img", { name: "Aperçu du produit" })).getAttribute("src")).toBe(
@@ -71,8 +94,14 @@ describe("produits", () => {
     ]));
     expect(api.ecritures()[1]!.corps).toEqual({
       produit: { nom: "Farine de blé 1 kg", reference: "FARINE-DE-BLÉ-1-KG", categorie_id: "cat-1", image_url: "/uploads/produits/abc.png" },
-      prix_vente: 1.6,
-      cout_revient: 1.2,
+      prix_vente: 2000,
+      detail_cout: {
+        prix_achat: 1000,
+        frais: [
+          { type_frais_id: "tf-transport", mode: "montant", valeur: 150 },
+          { type_frais_id: "tf-douane", mode: "pourcentage", valeur: 20 },
+        ],
+      },
     });
     expect(api.ecritures()[2]!.corps).toEqual({ quantite: 40, motif: "Stock initial" });
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
@@ -124,7 +153,54 @@ describe("produits", () => {
     await waitFor(() => expect(api.appels().filter((a) => a.chemin.endsWith("/produits") && a.methode === "GET").length).toBeGreaterThan(lecturesAvant));
   });
 
-  it("modifie le prix et le coût de revient", async () => {
+  it("prix : reprend le détail enregistré, le recalcule et l'envoie ; un frais désactivé reste affiché", async () => {
+    preparer();
+    api.repondre("GET", `/boutiques/${BOUTIQUE_1}/produits`, 200, [
+      produit({
+        prix_achat: 15,
+        frais: [
+          { type_frais_id: "tf-douane", libelle: "Douane", mode: "pourcentage", valeur: 20 },
+          { type_frais_id: "tf-ancien", libelle: "Octroi", mode: "montant", valeur: 0 },
+        ],
+      }),
+    ]);
+    api.repondre("PUT", `/boutiques/${BOUTIQUE_1}/prix/p-riz`, 200, { success: true });
+    rendreApp(PAGE);
+    const table = await screen.findByRole("table", { name: "Produits de la boutique" });
+    await userEvent.click(within(table).getByRole("button", { name: "Modifier le prix de Riz 25 kg" }));
+    const panneau = screen.getByRole("dialog", { name: "Prix de Riz 25 kg" });
+    expect(ligneCout(panneau, "Coût de revient")).toBe("18 $");
+    expect((within(panneau).getByLabelText("Frais n°2") as HTMLSelectElement).selectedOptions[0]!.textContent).toBe("Octroi (désactivé)");
+    await userEvent.click(within(panneau).getByRole("button", { name: "Retirer le frais Octroi" }));
+    const taux = within(panneau).getByLabelText("Taux du frais n°1 (%)");
+    await userEvent.clear(taux);
+    await userEvent.type(taux, "10");
+    expect(ligneCout(panneau, "Coût de revient")).toBe("16,5 $");
+    expect(ligneCout(panneau, "Bénéfice par unité")).toBe("5,5 $");
+    await userEvent.click(within(panneau).getByRole("button", { name: "Enregistrer" }));
+    await waitFor(() =>
+      expect(api.ecritures()[0]!.corps).toEqual({
+        prix_vente: 22,
+        detail_cout: { prix_achat: 15, frais: [{ type_frais_id: "tf-douane", mode: "pourcentage", valeur: 10 }] },
+      })
+    );
+  });
+
+  it("prix : des frais sans prix d'achat sont refusés sans appeler l'API", async () => {
+    preparer();
+    rendreApp(PAGE);
+    const table = await screen.findByRole("table", { name: "Produits de la boutique" });
+    await userEvent.click(within(table).getByRole("button", { name: "Modifier le prix de Riz 25 kg" }));
+    const panneau = screen.getByRole("dialog", { name: "Prix de Riz 25 kg" });
+    expect(within(panneau).getByText(/Coût actuel 18 \$, saisi sans détail/)).toBeTruthy();
+    await userEvent.click(within(panneau).getByRole("button", { name: "Ajouter un frais" }));
+    await userEvent.type(within(panneau).getByLabelText("Montant du frais n°1"), "2");
+    await userEvent.click(within(panneau).getByRole("button", { name: "Enregistrer" }));
+    expect(within(panneau).getByRole("alert").textContent).toBe("Le prix d'achat doit être un nombre positif ou nul");
+    expect(api.ecritures()).toEqual([]);
+  });
+
+    it("modifie le prix et le coût de revient", async () => {
     preparer();
     api.repondre("PUT", `/boutiques/${BOUTIQUE_1}/prix/p-riz`, 200, { success: true });
     rendreApp(PAGE);

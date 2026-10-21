@@ -32,6 +32,7 @@ describe("toute route /admin est refusée au propriétaire", () => {
     ["POST", "/admin/groupes"],
     ["POST", "/admin/regions"],
     ["POST", "/admin/categories"],
+    ["POST", "/admin/types-frais"],
     ["PUT", "/admin/permissions/vendeur/ventes%3Avoir"],
   ] as const)("%s %s", async (methode, url) => {
     expect((await envoyer("proprietaire", methode, url, {})).statusCode).toBe(403);
@@ -133,6 +134,27 @@ describe("paramètres, organisation, catégories, habilitations", () => {
     expect(refus.statusCode).toBe(400);
     await base.pool.query(`UPDATE produits SET categorie_id = NULL WHERE id = $1`, [p]);
     expect((await envoyer("admin", "DELETE", `/admin/categories/${id}`)).statusCode).toBe(200);
+  });
+
+  it("types de frais : création, doublon, désactivation, suppression refusée s'ils servent à un prix", async () => {
+    const lire = async (url: string) => (await app.inject({ url, headers: { origin: ORIGINES.backoffice, cookie: cookies.admin } })).json();
+    expect((await lire("/admin/types-frais")).map((t: { libelle: string }) => t.libelle)).toEqual(["Douane", "Manutention", "Stockage", "Transport"]);
+    const r = await envoyer("admin", "POST", "/admin/types-frais", { libelle: " Assurance " });
+    expect(r.statusCode).toBe(201);
+    const id = r.json().id;
+    expect((await envoyer("admin", "POST", "/admin/types-frais", { libelle: "Assurance" })).json().erreur).toBe("Ce type de frais existe déjà");
+    expect((await envoyer("admin", "POST", "/admin/types-frais", { libelle: "  " })).statusCode).toBe(400);
+
+    const p = await creerProduit(base.pool, BOUTIQUES.b1);
+    await base.pool.query(`INSERT INTO frais_prix (produit_id, boutique_id, type_frais_id, mode, valeur) VALUES ($1, $2, $3, 'montant', 5)`, [p, BOUTIQUES.b1, id]);
+    expect((await envoyer("admin", "PUT", `/admin/types-frais/${id}`, { libelle: "Assurance transport", actif: false })).statusCode).toBe(200);
+    expect((await lire("/admin/types-frais")).at(-1)).toEqual({ id, libelle: "Assurance transport", actif: false, nb_utilisations: 1 });
+    expect((await lire("/types-frais")).find((t: { id: string }) => t.id === id)).toEqual({ id, libelle: "Assurance transport", actif: false });
+    const refus = await envoyer("admin", "DELETE", `/admin/types-frais/${id}`);
+    expect(refus.statusCode).toBe(400);
+    await base.pool.query(`DELETE FROM frais_prix WHERE type_frais_id = $1`, [id]);
+    expect((await envoyer("admin", "DELETE", `/admin/types-frais/${id}`)).statusCode).toBe(200);
+    expect((await envoyer("admin", "PUT", `/admin/types-frais/${id}`, { libelle: "X", actif: true })).statusCode).toBe(404);
   });
 
   it("habilitations : active une permission, refuse un rôle inconnu", async () => {

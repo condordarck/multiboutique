@@ -65,6 +65,16 @@ export const lecturesAdmin: FastifyPluginAsync<{ db: Db }> = async (app, { db })
   });
 
   // admin/roles/page.tsx:5
+  lecture("/types-frais", async () => {
+    const { rows } = await db.query(
+      `SELECT t.id, t.libelle, t.actif,
+              (SELECT count(*)::int FROM frais_prix f WHERE f.type_frais_id = t.id) AS nb_utilisations
+       FROM types_frais t
+       ORDER BY t.actif DESC, t.libelle`
+    );
+    return rows;
+  });
+
   lecture("/roles", async () => (await db.query(`SELECT role, permission, active FROM roles_permissions`)).rows);
 
   // admin/utilisateurs/page.tsx:38-62 — jamais password_hash
