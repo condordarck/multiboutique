@@ -26,6 +26,9 @@ export interface NouvelleCommande {
 
 export const creerCommande = ({ boutiqueId, ...corps }: NouvelleCommande) =>
   appeler<{ success: true; reference: string; montantTotal: number; remise: number }>("POST", `/boutiques/${boutiqueId}/commandes`, corps);
+/** Avant livraison : lignes, paiement et note ; client et code promo inchangés. Note vide : effacée. */
+export const modifierCommande = ({ id, ...corps }: { id: string; terme_paiement: TermePaiement; note: string; lignes: NouvelleCommande["lignes"] }) =>
+  appeler<{ success: true; montantTotal: number; remise: number }>("PUT", `/commandes/${id}`, corps);
 export const confirmerCommande = ({ id }: { id: string }) => appeler<{ success: true }>("POST", `/commandes/${id}/confirmation`);
 export const livrerCommande = ({ id }: { id: string }) => appeler<{ success: true }>("POST", `/commandes/${id}/livraison`);
 export const annulerCommande = ({ id }: { id: string }) => appeler<{ success: true }>("POST", `/commandes/${id}/annulation`);
@@ -38,6 +41,7 @@ export const annulerReservation = ({ id, motif }: { id: string; motif: string })
 
 export const SERVICES_COMMANDES = {
   creerCommande,
+  modifierCommande,
   confirmerCommande,
   livrerCommande,
   annulerCommande,

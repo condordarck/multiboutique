@@ -1,11 +1,11 @@
 import type { CommandeListee, StatutCommande, TermePaiement } from "@multiboutique/shared";
 import { Badge, Bouton, Carte, Champ, ChoixSegmente, Dialogue, Panneau, Selecteur, type TonBadge } from "@multiboutique/ui";
-import { LignesArticles, lignesInvalides, type LigneSaisie } from "../../commun/LignesArticles";
+import { avecProduitsCommandes, LignesArticles, lignesInvalides, type LigneSaisie } from "../../commun/LignesArticles";
 import { useState } from "react";
 import { useParams } from "react-router";
 import { useProduits } from "../../api/catalogue";
 import { useClientsActifs } from "../../api/clients";
-import { annulerCommande, confirmerCommande, creerCommande, livrerCommande, useCommandes } from "../../api/commandes";
+import { annulerCommande, confirmerCommande, creerCommande, livrerCommande, modifierCommande, useCommandes } from "../../api/commandes";
 import { useMonnaie } from "../../api/generales";
 import { useBoutique } from "../../api/tableaux";
 import { EnTeteEcran, formatDate, formatMontant, Formulaire, lireNombre, ListeChargee, useEcriture, useSession } from "@multiboutique/front";
@@ -27,11 +27,12 @@ export function Commandes() {
   const boutique = useBoutique(boutiqueId);
   const commandes = useCommandes(boutiqueId);
   const peutGerer = peut("commandes:gerer");
+  const peutModifier = peut("commandes:modifier");
   const invalide = [["boutiques", boutiqueId]];
   const confirmation = useEcriture({ appel: confirmerCommande, invalide, succes: "Commande confirmée" });
   const livraison = useEcriture({ appel: livrerCommande, invalide, succes: "Commande livrée, stock déduit" });
   const annulation = useEcriture({ appel: annulerCommande, invalide, succes: "Commande annulée" });
-  const [creation, setCreation] = useState(false);
+  const [fiche, setFiche] = useState<CommandeListee | "nouvelle" | null>(null);
   const [demande, setDemande] = useState<Demande | null>(null);
   const erreur = confirmation.erreur ?? livraison.erreur ?? annulation.erreur;
   const ecritureDemande = demande?.action === "livrer" ? livraison : annulation;
@@ -41,10 +42,10 @@ export function Commandes() {
       <EnTeteEcran
         titre={`Commandes B2B — ${boutique.data?.nom ?? ""}`}
         sousTitre="Bons de commande grossistes : confirmation, livraison (déduction du stock) et suivi de l'encours"
-        actions={peutGerer && <Bouton onClick={() => setCreation(true)}>Nouvelle commande grossiste</Bouton>}
+        actions={peutGerer && <Bouton onClick={() => setFiche("nouvelle")}>Nouvelle commande grossiste</Bouton>}
       />
       <Carte titre="Commandes en cours">
-        {!peutGerer && (
+        {!peutGerer && !peutModifier && (
           <p className="m-0 rounded-bouton bg-surface-relevee px-4 py-3 text-libelle text-texte-discret">
             Lecture seule — la gestion des commandes est réservée au gérant et au propriétaire.
           </p>
@@ -104,11 +105,16 @@ export function Commandes() {
           ]}
           libelleAction="Actions"
           action={
-            peutGerer
+            peutGerer || peutModifier
               ? (c) =>
                   c.statut === "en_attente" || c.statut === "confirmee" ? (
                     <span className="flex flex-wrap justify-end gap-1">
-                      {c.statut === "en_attente" && (
+                      {peutModifier && (
+                        <Bouton variante="discret" aria-label={`Modifier ${c.reference_commande}`} onClick={() => setFiche(c)}>
+                          Modifier
+                        </Bouton>
+                      )}
+                      {peutGerer && c.statut === "en_attente" && (
                         <Bouton
                           variante="discret"
                           aria-label={`Confirmer ${c.reference_commande}`}
@@ -119,21 +125,23 @@ export function Commandes() {
                           Confirmer
                         </Bouton>
                       )}
-                      {c.statut === "confirmee" && (
+                      {peutGerer && c.statut === "confirmee" && (
                         <Bouton variante="discret" aria-label={`Livrer ${c.reference_commande}`} onClick={() => setDemande({ commande: c, action: "livrer" })}>
                           Livrer
                         </Bouton>
                       )}
-                      <Bouton variante="discret" aria-label={`Annuler ${c.reference_commande}`} onClick={() => setDemande({ commande: c, action: "annuler" })}>
-                        Annuler
-                      </Bouton>
+                      {peutGerer && (
+                        <Bouton variante="discret" aria-label={`Annuler ${c.reference_commande}`} onClick={() => setDemande({ commande: c, action: "annuler" })}>
+                          Annuler
+                        </Bouton>
+                      )}
                     </span>
                   ) : null
               : undefined
           }
         />
       </Carte>
-      {creation && <NouvelleCommande boutiqueId={boutiqueId} onFermer={() => setCreation(false)} />}
+      {fiche && <FicheCommande boutiqueId={boutiqueId} commande={fiche === "nouvelle" ? null : fiche} onFermer={() => setFiche(null)} />}
       <Dialogue
         ouvert={!!demande}
         titre={demande ? `${demande.action === "livrer" ? "Livrer" : "Annuler"} ${demande.commande.reference_commande} ?` : ""}
@@ -153,35 +161,48 @@ export function Commandes() {
   );
 }
 
-/** components/dashboard/CommandeForm.tsx, dans un panneau. */
-function NouvelleCommande({ boutiqueId, onFermer }: { boutiqueId: string; onFermer: () => void }) {
+/**
+ * components/dashboard/CommandeForm.tsx, dans un panneau. Avec une commande :
+ * sa modification avant livraison (client et code promo inchangés).
+ */
+function FicheCommande({ boutiqueId, commande, onFermer }: { boutiqueId: string; commande: CommandeListee | null; onFermer: () => void }) {
   const monnaie = useMonnaie();
   const clients = useClientsActifs(boutiqueId);
   const produits = useProduits(boutiqueId);
-  const creation = useEcriture({ appel: creerCommande, invalide: [["boutiques", boutiqueId]] });
+  const invalide = [["boutiques", boutiqueId]];
+  const creation = useEcriture({ appel: creerCommande, invalide });
+  const modification = useEcriture({ appel: modifierCommande, invalide, succes: `Commande ${commande?.reference_commande ?? ""} modifiée` });
+  const ecriture = commande ? modification : creation;
   const [clientId, setClientId] = useState("");
-  const [terme, setTerme] = useState<TermePaiement>("comptant");
+  const [terme, setTerme] = useState<TermePaiement>(commande?.terme_paiement ?? "comptant");
   const [codePromo, setCodePromo] = useState("");
-  const [note, setNote] = useState("");
-  const [lignes, setLignes] = useState<LigneSaisie[]>([]);
+  const [note, setNote] = useState(commande?.note ?? "");
+  const [lignes, setLignes] = useState<LigneSaisie[]>(
+    (commande?.lignes ?? []).map((l) => ({ produit_id: l.produit_id, quantite: String(l.quantite), prix: String(l.prix_unitaire) }))
+  );
   const [erreur, setErreur] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
   const totalBrut = lignes.reduce((s, l) => s + (lireNombre(l.quantite) || 0) * (lireNombre(l.prix) || 0), 0);
 
   async function envoyer() {
-    if (!clientId) return setErreur("Choisissez un client");
+    if (!commande && !clientId) return setErreur("Choisissez un client");
     if (!lignes.length || lignes.some((l) => !l.produit_id)) return setErreur("Ajoutez au moins une ligne avec un produit");
     const invalide = lignesInvalides(lignes);
     if (invalide) return setErreur(invalide);
     setErreur(null);
+    const lignesEnvoyees = lignes.map((l) => ({ produit_id: l.produit_id, quantite: lireNombre(l.quantite), prix_unitaire: lireNombre(l.prix) }));
+    if (commande) {
+      if (await modification.envoyer({ id: commande.id, terme_paiement: terme, note, lignes: lignesEnvoyees })) onFermer();
+      return;
+    }
     const resultat = await creation.envoyer({
       boutiqueId,
       client_id: clientId,
       terme_paiement: terme,
       ...(codePromo ? { code_promo: codePromo } : {}),
       ...(note ? { note } : {}),
-      lignes: lignes.map((l) => ({ produit_id: l.produit_id, quantite: lireNombre(l.quantite), prix_unitaire: lireNombre(l.prix) })),
+      lignes: lignesEnvoyees,
     });
     if (resultat) {
       setMessage(`Commande ${resultat.reference} enregistrée (${formatMontant(resultat.montantTotal, monnaie)})`);
@@ -194,22 +215,32 @@ function NouvelleCommande({ boutiqueId, onFermer }: { boutiqueId: string; onFerm
   }
 
   return (
-    <Panneau ouvert titre="Nouvelle commande grossiste" onFermer={onFermer}>
+    <Panneau ouvert titre={commande ? `Modifier ${commande.reference_commande}` : "Nouvelle commande grossiste"} onFermer={onFermer}>
       <Formulaire
-        libelleEnvoyer="Créer la commande"
+        libelleEnvoyer={commande ? "Enregistrer les modifications" : "Créer la commande"}
         onEnvoyer={() => void envoyer()}
-        erreur={erreur ?? creation.erreur}
-        enCours={creation.enCours}
-        desactivee={creation.desactivee}
+        erreur={erreur ?? ecriture.erreur}
+        enCours={ecriture.enCours}
+        desactivee={ecriture.desactivee}
       >
         {message && <p className="m-0 rounded-bouton bg-succes-fond px-4 py-3 font-semibold text-succes">{message}</p>}
-        <Selecteur
-          libelle="Client"
-          optionVide="— Choisir un client —"
-          options={(clients.data ?? []).map((c) => ({ valeur: c.id, libelle: c.nom }))}
-          value={clientId}
-          onChange={(e) => setClientId(e.target.value)}
-        />
+        {commande ? (
+          <div className="flex flex-col gap-1 rounded-bouton bg-surface-relevee px-4 py-3 text-libelle">
+            <span>
+              Client : <strong>{commande.client_nom}</strong>
+            </span>
+            {commande.code_promo && <span>{`Code promo ${commande.code_promo} : la remise est recalculée sur le nouveau total.`}</span>}
+            {commande.statut === "confirmee" && <span className="text-texte-discret">La commande reste confirmée.</span>}
+          </div>
+        ) : (
+          <Selecteur
+            libelle="Client"
+            optionVide="— Choisir un client —"
+            options={(clients.data ?? []).map((c) => ({ valeur: c.id, libelle: c.nom }))}
+            value={clientId}
+            onChange={(e) => setClientId(e.target.value)}
+          />
+        )}
         <ChoixSegmente<TermePaiement>
           legende="Modalité de paiement"
           legendeVisible
@@ -220,16 +251,21 @@ function NouvelleCommande({ boutiqueId, onFermer }: { boutiqueId: string; onFerm
           valeur={terme}
           onChange={setTerme}
         />
-        <Champ
-          libelle="Code promo (facultatif)"
-          placeholder="Ex. GROSSISTE25"
-          value={codePromo}
-          onChange={(e) => setCodePromo(e.target.value.toUpperCase())}
-        />
+        {!commande && (
+          <Champ
+            libelle="Code promo (facultatif)"
+            placeholder="Ex. GROSSISTE25"
+            value={codePromo}
+            onChange={(e) => setCodePromo(e.target.value.toUpperCase())}
+          />
+        )}
         <LignesArticles
           lignes={lignes}
           onChange={setLignes}
-          produits={(produits.data ?? []).map((p) => ({ produit_id: p.produit_id, nom: p.produit_nom }))}
+          produits={avecProduitsCommandes(
+            (produits.data ?? []).map((p) => ({ produit_id: p.produit_id, nom: p.produit_nom })),
+            commande?.lignes ?? []
+          )}
           // Prix officiel de la boutique, modifiable.
           prixPropose={(id) => produits.data?.find((p) => p.produit_id === id)?.prix_vente}
           libellePrix="Prix unitaire"

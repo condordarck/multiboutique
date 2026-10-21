@@ -37,8 +37,10 @@ const GROUPES = [
     permissions: [
       ["commandes:voir", "Voir les commandes B2B"],
       ["commandes:gerer", "Gérer les commandes B2B"],
+      ["commandes:modifier", "Modifier une commande B2B avant livraison"],
       ["achats:voir", "Voir les achats fournisseurs"],
       ["achats:gerer", "Gérer les achats fournisseurs"],
+      ["achats:modifier", "Modifier une commande fournisseur avant réception"],
     ],
   },
   {

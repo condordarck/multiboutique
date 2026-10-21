@@ -268,7 +268,16 @@ export const lecturesBoutique: FastifyPluginAsync<{ db: Db }> = async (app, { db
     const { rows } = await db.query(
       `SELECT c.*, cl.nom AS client_nom, cl.type_client AS client_type,
               cp.code AS code_promo,
-              (SELECT COUNT(*)::int FROM lignes_commandes lc WHERE lc.commande_id = c.id) AS nb_lignes
+              (SELECT COUNT(*)::int FROM lignes_commandes lc WHERE lc.commande_id = c.id) AS nb_lignes,
+              -- Lignes des commandes encore modifiables (avant livraison), pour les rouvrir ;
+              -- les lignes d'une même commande ont la même date : le nom les départage.
+              CASE WHEN c.statut IN ('en_attente', 'confirmee') THEN
+                COALESCE((SELECT json_agg(json_build_object('produit_id', lc.produit_id, 'produit_nom', p.nom,
+                                                            'quantite', lc.quantite, 'prix_unitaire', lc.prix_unitaire)
+                                          ORDER BY lc.created_at, p.nom, lc.id)
+                          FROM lignes_commandes lc JOIN produits p ON p.id = lc.produit_id
+                          WHERE lc.commande_id = c.id), '[]')
+              ELSE '[]' END AS lignes
        FROM commandes c
        INNER JOIN clients cl ON cl.id = c.client_id
        LEFT JOIN codes_promo cp ON cp.id = c.code_promo_id
@@ -300,17 +309,24 @@ export const lecturesBoutique: FastifyPluginAsync<{ db: Db }> = async (app, { db
         [b(r)]
       ),
       db.query(
-        `SELECT lc.commande_id, lc.id AS ligne_id, p.nom AS produit_nom,
-                lc.quantite_commandee, lc.quantite_recue
+        `SELECT lc.commande_id, lc.id AS ligne_id, lc.produit_id, p.nom AS produit_nom,
+                lc.quantite_commandee, lc.quantite_recue, lc.prix_unitaire
          FROM lignes_cmd_fournisseur lc
          INNER JOIN produits p ON p.id = lc.produit_id
          INNER JOIN commandes_fournisseur cf ON cf.id = lc.commande_id
          WHERE cf.boutique_id = $1
-         ORDER BY cf.created_at DESC, lc.created_at`,
+         ORDER BY cf.created_at DESC, lc.created_at, p.nom, lc.id`,
         [b(r)]
       ),
     ]);
-    return commandes.rows.map((c) => ({ ...c, lignes: lignes.rows.filter((l) => l.commande_id === c.id) }));
+    // Le prix d'achat unitaire ne sert qu'à rouvrir la commande : réservé à qui peut la modifier.
+    const prixVisibles = aPermission(u, "achats:modifier");
+    return commandes.rows.map((c) => ({
+      ...c,
+      lignes: lignes.rows
+        .filter((l) => l.commande_id === c.id)
+        .map(({ prix_unitaire, ...l }) => (prixVisibles ? { ...l, prix_unitaire } : l)),
+    }));
   });
 
   // prix-conseilles/page.tsx:43,58

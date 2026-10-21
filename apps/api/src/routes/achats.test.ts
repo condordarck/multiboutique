@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { creerBaseDeTest, type BaseDeTest } from "../../test/base";
-import { BOUTIQUES, CONFIG_TEST, creerCompte, creerProduit, ecriture, seConnecter, stock } from "../../test/fixtures";
+import { BOUTIQUES, CONFIG_TEST, creerCompte, creerProduit, ecriture, ORIGINES, seConnecter, stock } from "../../test/fixtures";
 import { construireApp } from "../app";
 
 let base: BaseDeTest;
@@ -18,6 +18,8 @@ beforeAll(async () => {
     gerant: await creerCompte(base.pool, "gerant", { boutique_ids: [BOUTIQUES.b1] }),
     gerantB2: await creerCompte(base.pool, "gerant", { boutique_ids: [BOUTIQUES.b2] }),
     vendeur: await creerCompte(base.pool, "vendeur", { boutique_ids: [BOUTIQUES.b1] }),
+    proprietaire: await creerCompte(base.pool, "proprietaire"),
+    comptable: await creerCompte(base.pool, "comptable", { boutique_ids: [BOUTIQUES.b1] }),
   };
   for (const [nom, compte] of Object.entries(comptes)) cookies[nom] = await seConnecter(app, compte, "backoffice");
   const { rows } = await base.pool.query(`INSERT INTO fournisseurs (nom, boutique_id) VALUES ('Grossiste du port', $1) RETURNING id`, [BOUTIQUES.b1]);
@@ -100,5 +102,70 @@ describe("commandes d'achat", () => {
     const url = `/boutiques/${BOUTIQUES.b1}/commandes-fournisseurs`;
     expect((await envoyer("gerant", "POST", url, { fournisseur_id: fournisseur, lignes: [] })).statusCode).toBe(400);
     expect((await envoyer("gerant", "POST", url, { fournisseur_id: fournisseur, lignes: [{ produit_id: produit, quantite: 1, prix_unitaire: 0 }] })).statusCode).toBe(400);
+  });
+});
+
+describe("PUT /commandes-fournisseurs/:id (modification avant réception)", () => {
+  const lire = async (id: string) => (await base.pool.query(`SELECT statut, total_attendu, note FROM commandes_fournisseur WHERE id = $1`, [id])).rows[0];
+
+  it("remplace les lignes et la note, recalcule le total, trace l'avant/après", async () => {
+    const autre = await creerProduit(base.pool, BOUTIQUES.b1, { stock: 0 });
+    const { id } = await commandeAchat(10);
+    const r = await envoyer("gerant", "PUT", `/commandes-fournisseurs/${id}`, {
+      note: "Livraison quai 2",
+      lignes: [
+        { produit_id: produit, quantite: 4, prix_unitaire: 3 },
+        { produit_id: autre, quantite: 6, prix_unitaire: 2.5 },
+      ],
+    });
+    expect(r.statusCode).toBe(200);
+    expect(await lire(id)).toEqual({ statut: "en_attente", total_attendu: 27, note: "Livraison quai 2" });
+    const { rows } = await base.pool.query(
+      `SELECT produit_id, quantite_commandee, quantite_recue FROM lignes_cmd_fournisseur WHERE commande_id = $1 ORDER BY quantite_commandee`,
+      [id]
+    );
+    expect(rows).toEqual([
+      { produit_id: produit, quantite_commandee: 4, quantite_recue: 0 },
+      { produit_id: autre, quantite_commandee: 6, quantite_recue: 0 },
+    ]);
+    const { rows: trace } = await base.pool.query(`SELECT entite, valeur_avant FROM journal_audit WHERE entite_id = $1`, [id]);
+    expect(trace).toEqual([{ entite: "commande_fournisseur", valeur_avant: { note: null, total_attendu: 30, lignes: [{ produit_id: produit, quantite: 10, prix_unitaire: 3 }] } }]);
+  });
+
+  it("refuse après une première réception, une commande annulée, un produit inconnu ; 403 hors gérant", async () => {
+    const corps = { lignes: [{ produit_id: produit, quantite: 2, prix_unitaire: 3 }] };
+    const recue = await commandeAchat(10);
+    await envoyer("gerant", "POST", `/commandes-fournisseurs/${recue.id}/reception`, { receptions: [{ ligne_id: recue.ligne, quantite_recue: 1 }] });
+    const refus = await envoyer("gerant", "PUT", `/commandes-fournisseurs/${recue.id}`, corps);
+    expect(refus.statusCode).toBe(400);
+    expect(refus.json().erreur).toBe("Seule une commande fournisseur sans aucune réception peut être modifiée");
+    const annulee = await commandeAchat();
+    await envoyer("gerant", "POST", `/commandes-fournisseurs/${annulee.id}/annulation`);
+    expect((await envoyer("gerant", "PUT", `/commandes-fournisseurs/${annulee.id}`, corps)).statusCode).toBe(400);
+
+    const { id } = await commandeAchat();
+    const inconnu = await envoyer("gerant", "PUT", `/commandes-fournisseurs/${id}`, { lignes: [{ produit_id: "99999999-9999-9999-9999-999999999999", quantite: 1, prix_unitaire: 3 }] });
+    expect(inconnu.statusCode).toBe(400);
+    for (const qui of ["proprietaire", "vendeur", "gerantB2"]) {
+      expect((await envoyer(qui, "PUT", `/commandes-fournisseurs/${id}`, corps)).statusCode, qui).toBe(403);
+    }
+    expect(await lire(id)).toMatchObject({ total_attendu: 30 });
+  });
+
+  it("prix d'achat des lignes réservé à qui peut modifier ; quantité décimale refusée dès la création", async () => {
+    const { id } = await commandeAchat(10);
+    const lignes = async (qui: string) =>
+      (await app.inject({ url: `/boutiques/${BOUTIQUES.b1}/commandes-fournisseurs`, headers: { origin: ORIGINES.backoffice, cookie: cookies[qui] } }))
+        .json()
+        .find((c: { id: string }) => c.id === id).lignes;
+    expect((await lignes("gerant"))[0]).toMatchObject({ produit_id: produit, quantite_commandee: 10, prix_unitaire: 3 });
+    expect((await lignes("comptable"))[0].prix_unitaire).toBeUndefined();
+
+    const decimale = await envoyer("gerant", "POST", `/boutiques/${BOUTIQUES.b1}/commandes-fournisseurs`, {
+      fournisseur_id: fournisseur,
+      lignes: [{ produit_id: produit, quantite: 1.5, prix_unitaire: 3 }],
+    });
+    expect(decimale.statusCode).toBe(400);
+    expect(decimale.json().erreur).toBe("Quantité invalide");
   });
 });

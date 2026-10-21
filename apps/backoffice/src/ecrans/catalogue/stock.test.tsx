@@ -1,13 +1,20 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { sansViolation } from "@multiboutique/front/test/axe";
 import { fauxApi, type FauxApi } from "@multiboutique/front/test/faux-api";
 import { BOUTIQUE_DETAIL, MOUVEMENTS, STOCK } from "../../../test/donnees";
 import { BOUTIQUE_1, BOUTIQUE_2, connecte, rendreApp, utilisateur } from "../../../test/rendu";
 
+// L'export lui-même (fichiers réels) est vérifié dans export-stock.test.ts.
+const exporterStock = vi.hoisted(() => vi.fn(async (..._args: unknown[]) => {}));
+vi.mock("./exportStock", () => ({ exporterStock }));
+
 let api: FauxApi;
-afterEach(() => api.restaurer());
+afterEach(() => {
+  api.restaurer();
+  exporterStock.mockClear();
+});
 const PAGE = `/b/${BOUTIQUE_1}/stock`;
 const tuile = (libelle: string) => screen.getByText(libelle, { selector: "span" }).parentElement!;
 
@@ -98,5 +105,32 @@ describe("stock", () => {
     rendreApp(PAGE);
     await screen.findByRole("table", { name: "État du stock" });
     expect(screen.queryByRole("button", { name: /Gérer le stock/ })).toBeNull();
+  });
+
+  it("exporte en Excel ou en PDF ce qui est affiché, filtre compris", async () => {
+    preparer();
+    rendreApp(PAGE);
+    await screen.findByRole("table", { name: "État du stock" });
+    await userEvent.click(screen.getByText(/^Rupture \(/));
+    await userEvent.click(screen.getByRole("button", { name: "Exporter en Excel" }));
+    await waitFor(() => expect(exporterStock).toHaveBeenCalledTimes(1));
+    const [format, lignes, contexte] = exporterStock.mock.calls[0] as unknown as [string, { statut_stock: string }[], Record<string, unknown>];
+    expect(format).toBe("excel");
+    expect(lignes.length).toBeGreaterThan(0);
+    expect(lignes.every((l) => l.statut_stock === "rupture")).toBe(true);
+    expect(contexte).toMatchObject({ boutique: "Boutique 1", avecCout: true, filtre: "Rupture" });
+    await userEvent.click(screen.getByRole("button", { name: "Exporter en PDF" }));
+    await waitFor(() => expect(exporterStock.mock.calls[1]?.[0]).toBe("pdf"));
+  });
+
+  it("un échec d'export est annoncé", async () => {
+    preparer("vendeur");
+    exporterStock.mockRejectedValueOnce(new Error("quota"));
+    rendreApp(PAGE);
+    await screen.findByRole("table", { name: "État du stock" });
+    await userEvent.click(screen.getByRole("button", { name: "Exporter en PDF" }));
+    expect((await screen.findByRole("alert")).textContent).toBe("L'export a échoué, réessayez");
+    // Sans prix:gerer, ni coût ni valeur au coût dans l'export.
+    expect((exporterStock.mock.calls[0] as unknown as [string, unknown, { avecCout: boolean }])[2].avecCout).toBe(false);
   });
 });

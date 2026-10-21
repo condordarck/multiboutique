@@ -14,6 +14,13 @@ describe("matrice de permissions", () => {
     expect(permissionsDuRole("gerant")).not.toContain("prix_conseilles:gerer");
   });
 
+  it("la modification des commandes passées est réservée au gérant", () => {
+    expect(permissionsDuRole("gerant")).toEqual(expect.arrayContaining(["commandes:modifier", "achats:modifier"]));
+    expect(permissionsDuRole("proprietaire")).not.toContain("commandes:modifier");
+    expect(permissionsDuRole("proprietaire")).not.toContain("achats:modifier");
+    expect(permissionsDuRole("proprietaire")).toContain("commandes:gerer");
+  });
+
   it("le magasinier consulte le stock sans le modifier", () => {
     expect(permissionsDuRole("gerant_stock")).toEqual(["stock:voir", "produits:voir"]);
   });

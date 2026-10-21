@@ -13,6 +13,19 @@ export function lignesInvalides(lignes: LigneSaisie[]): string | null {
   return i < 0 ? null : `Article ${i + 1} : quantité entière d'au moins 1 et prix positif ou nul requis`;
 }
 
+/**
+ * Produits proposés pour une commande modifiée : ceux de la boutique, plus
+ * ceux déjà commandés qui n'y sont plus en vente (la ligne reste lisible).
+ */
+export function avecProduitsCommandes(
+  produits: { produit_id: string; nom: string }[],
+  lignes: { produit_id: string; produit_nom: string }[]
+): { produit_id: string; nom: string }[] {
+  const connus = new Set(produits.map((p) => p.produit_id));
+  const absents = lignes.filter((l) => !connus.has(l.produit_id)).map((l) => ({ produit_id: l.produit_id, nom: l.produit_nom }));
+  return [...produits, ...absents.filter((p, i) => absents.findIndex((q) => q.produit_id === p.produit_id) === i)];
+}
+
 interface Props {
   lignes: LigneSaisie[];
   onChange: (lignes: LigneSaisie[]) => void;

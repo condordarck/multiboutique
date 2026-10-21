@@ -146,6 +146,14 @@ export const schemaCommande = z.object({
   lignes: z.array(z.object({ produit_id: identifiant, quantite: z.number(), prix_unitaire: z.number() })),
 });
 
+// Modification d'une commande avant livraison : le client et le code promo
+// restent ceux de la création ; note vide = note effacée.
+export const schemaModificationCommande = z.object({
+  terme_paiement: z.enum(["comptant", "credit"]),
+  note: z.string().default(""),
+  lignes: z.array(z.object({ produit_id: identifiant, quantite: z.number(), prix_unitaire: z.number() })),
+});
+
 // Fournisseurs et commandes d'achat.
 export const schemaFournisseur = z.object({
   nom: z.string(),
@@ -157,6 +165,12 @@ export const schemaFournisseur = z.object({
 export const schemaCommandeFournisseur = z.object({
   fournisseur_id: z.string(),
   note: z.string().optional(),
+  lignes: z.array(z.object({ produit_id: identifiant, quantite: z.number(), prix_unitaire: z.number() })),
+});
+
+// Modification d'une commande d'achat tant que rien n'est reçu : le fournisseur reste le même.
+export const schemaModificationCommandeFournisseur = z.object({
+  note: z.string().default(""),
   lignes: z.array(z.object({ produit_id: identifiant, quantite: z.number(), prix_unitaire: z.number() })),
 });
 

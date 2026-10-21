@@ -20,7 +20,7 @@ function preparer(role: "gerant" | "comptable" = "gerant") {
   api.repondre("GET", `/boutiques/${BOUTIQUE_1}/produits`, 200, PRODUITS);
   api.repondre("GET", `/boutiques/${BOUTIQUE_1}/commandes-fournisseurs`, 200, [
     commandeFournisseur(),
-    commandeFournisseur({ id: "cf2", reference_cmd: "CF-0002", statut: "en_attente", total_attendu: 50, lignes: [{ commande_id: "cf2", ligne_id: "l2", produit_nom: "Sucre 1 kg", quantite_commandee: 30, quantite_recue: 0 }] }),
+    commandeFournisseur({ id: "cf2", reference_cmd: "CF-0002", statut: "en_attente", total_attendu: 50, lignes: [{ commande_id: "cf2", ligne_id: "l2", produit_id: "p-sucre", produit_nom: "Sucre 1 kg", quantite_commandee: 30, quantite_recue: 0, prix_unitaire: 1 }] }),
     commandeFournisseur({ id: "cf3", reference_cmd: "CF-0003", statut: "annulee", total_attendu: 99 }),
   ]);
 }
@@ -43,6 +43,33 @@ describe("achats", () => {
     const fournisseurs = screen.getByRole("table", { name: "Fournisseurs" });
     expect(within(fournisseurs).getByText("Inactif")).toBeTruthy();
     await sansViolation(container);
+  });
+
+  it("modifie une commande sans réception : fournisseur figé, lignes reprises, total recalculé", async () => {
+    preparer();
+    api.repondre("PUT", "/commandes-fournisseurs/cf2", 200, { success: true, totalAttendu: 70 });
+    rendreApp(PAGE);
+    const [cf1, cf2] = within(await commandes()).getAllByRole("row").slice(1);
+    // Une réception a commencé : plus de modification.
+    expect(within(cf1!).queryByRole("button", { name: /^Modifier/ })).toBeNull();
+    await userEvent.click(within(cf2!).getByRole("button", { name: "Modifier CF-0002" }));
+    const panneau = screen.getByRole("dialog", { name: "Modifier CF-0002" });
+    expect(within(panneau).getByText("Minoterie du Fleuve")).toBeTruthy();
+    expect(within(panneau).queryByLabelText("Fournisseur")).toBeNull();
+    const qte = within(panneau).getByLabelText("Quantité de l'article 1");
+    expect((qte as HTMLInputElement).value).toBe("30");
+    await userEvent.clear(qte);
+    await userEvent.type(qte, "70");
+    expect(espaces(within(panneau).getByText(/^Total attendu/).textContent)).toBe("Total attendu : 70 $");
+    await userEvent.click(within(panneau).getByRole("button", { name: "Enregistrer les modifications" }));
+    await waitFor(() =>
+      expect(api.ecritures()[0]).toMatchObject({
+        methode: "PUT",
+        chemin: "/commandes-fournisseurs/cf2",
+        corps: { note: "", lignes: [{ produit_id: "p-sucre", quantite: 70, prix_unitaire: 1 }] },
+      })
+    );
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
 
   it("réception partielle : seules les quantités saisies partent, plafonnées au restant", async () => {

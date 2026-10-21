@@ -21,7 +21,7 @@ describe("registre des routes", () => {
       .filter(([nom, valeur]) => typeof valeur === "function" && !OUTILS.has(nom))
       .map(([nom]) => nom)
       .sort();
-    expect(services).toHaveLength(54);
+    expect(services).toHaveLength(56);
 
     const appels = (await registre()).flatMap((e) => (e.service ? [e.service] : []));
     const manquants = services.filter((s) => !appels.includes(s));

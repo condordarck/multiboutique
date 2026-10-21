@@ -187,6 +187,8 @@ export interface CommandeListee extends Commande {
   client_type: string;
   code_promo: string | null;
   nb_lignes: number;
+  /** Vide une fois la commande livrée ou annulée (plus modifiable). */
+  lignes: { produit_id: string; produit_nom: string; quantite: number; prix_unitaire: number }[];
 }
 
 /** GET /boutiques/:id/reservations : lignes renseignées pour celles à traiter. */
@@ -198,7 +200,16 @@ export interface ReservationDetaillee extends Reservation {
 export interface CommandeFournisseurListee extends CommandeFournisseur {
   fournisseur_nom: string;
   nb_lignes: number;
-  lignes: { commande_id: string; ligne_id: string; produit_nom: string; quantite_commandee: number; quantite_recue: number }[];
+  lignes: {
+    commande_id: string;
+    ligne_id: string;
+    produit_id: string;
+    produit_nom: string;
+    quantite_commandee: number;
+    quantite_recue: number;
+    /** Absent sans achats:modifier. */
+    prix_unitaire?: number;
+  }[];
 }
 
 /** GET /boutiques/:id/prix-conseilles */
