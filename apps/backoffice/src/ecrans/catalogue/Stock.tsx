@@ -5,6 +5,7 @@ import { useParams, useSearchParams } from "react-router";
 import { ajusterStock, entrerStock, transfertStock, useMouvements, useStock } from "../../api/catalogue";
 import { useMesBoutiques, useMonnaie } from "../../api/generales";
 import { useBoutique } from "../../api/tableaux";
+import { exporterStock } from "./exportStock";
 import { correspond, EnTeteEcran, formatMontant, formatNombre, Formulaire, lireEntier, ListeChargee, useEcriture, useSession } from "@multiboutique/front";
 
 type Filtre = "tous" | "alerte" | "rupture";
@@ -48,6 +49,8 @@ export function Stock() {
   const [recherche, setRecherche] = useState("");
   const [filtre, setFiltre] = useState<Filtre>("tous");
   const [fiche, setFiche] = useState<LigneStock | null>(null);
+  const [export_, setExport] = useState<"excel" | "pdf" | null>(null);
+  const [erreurExport, setErreurExport] = useState<string | null>(null);
 
   const lignes = stock.data ?? [];
   const nb = (s: LigneStock["statut_stock"]) => lignes.filter((l) => l.statut_stock === s).length;
@@ -58,9 +61,48 @@ export function Stock() {
     ),
   };
 
+  // Exporte ce qui est affiché : la recherche et le filtre s'appliquent.
+  async function exporter(format: "excel" | "pdf") {
+    const restriction = [
+      filtre === "alerte" ? "Sous le seuil" : filtre === "rupture" ? "Rupture" : "",
+      recherche.trim() ? `Recherche : ${recherche.trim()}` : "",
+    ]
+      .filter(Boolean)
+      .join(", ");
+    const contexte = { boutique: boutique.data?.nom ?? "Boutique", monnaie, avecCout: peut("prix:gerer"), filtre: restriction };
+    setExport(format);
+    setErreurExport(null);
+    try {
+      await exporterStock(format, visibles.data ?? [], contexte);
+    } catch {
+      setErreurExport("L'export a échoué, réessayez");
+    } finally {
+      setExport(null);
+    }
+  }
+  const exportable = !!visibles.data?.length;
+
   return (
     <div className="flex flex-col gap-6 pb-6">
-      <EnTeteEcran titre={`Stock — ${boutique.data?.nom ?? ""}`} sousTitre="Gestion des stocks et mouvements" />
+      <EnTeteEcran
+        titre={`Stock — ${boutique.data?.nom ?? ""}`}
+        sousTitre="Gestion des stocks et mouvements"
+        actions={
+          <>
+            <Bouton variante="secondaire" disabled={!exportable || !!export_} chargement={export_ === "excel"} onClick={() => void exporter("excel")}>
+              Exporter en Excel
+            </Bouton>
+            <Bouton variante="secondaire" disabled={!exportable || !!export_} chargement={export_ === "pdf"} onClick={() => void exporter("pdf")}>
+              Exporter en PDF
+            </Bouton>
+          </>
+        }
+      />
+      {erreurExport && (
+        <p role="alert" className="m-0 font-semibold text-danger">
+          {erreurExport}
+        </p>
+      )}
       <div className="grid grid-cols-2 gap-3 tablette:grid-cols-3 tablette:gap-4">
         <TuileChiffre libelle="Produits en stock" valeur={formatNombre(lignes.length - nb("rupture"))} />
         <TuileChiffre libelle="Alertes stock" valeur={formatNombre(nb("alerte"))} />
